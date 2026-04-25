@@ -3378,15 +3378,18 @@
     }
 
     function normalizeTournament(tournament) {
-      const normalizedPlayerCount = tournament.playerCount || (Array.isArray(tournament.players) ? tournament.players.length : 0);
-      const normalizedRoundCount = tournament.roundCount || (Array.isArray(tournament.rounds) ? tournament.rounds.length : 0);
-      const normalizedTargets = defaultProtectionTargets(tournament.protectionTargets || {});
-      const currentRoundIndex = Number.isFinite(Number(tournament.currentRoundIndex)) ? Number(tournament.currentRoundIndex) : 0;
-      const normalizedDealCount = Number.isFinite(Number(tournament.dealsPerRound)) ? Math.max(1, Number(tournament.dealsPerRound)) : 8;
-      const normalizedRounds = (tournament.rounds || []).map((round, roundIndex) => ({
+      const safeTournament = tournament && typeof tournament === 'object' ? tournament : {};
+      const safePlayers = Array.isArray(safeTournament.players) ? safeTournament.players : [];
+      const safeRounds = Array.isArray(safeTournament.rounds) ? safeTournament.rounds : [];
+      const normalizedPlayerCount = safeTournament.playerCount || safePlayers.length;
+      const normalizedRoundCount = safeTournament.roundCount || safeRounds.length;
+      const normalizedTargets = defaultProtectionTargets(safeTournament.protectionTargets || {});
+      const currentRoundIndex = Number.isFinite(Number(safeTournament.currentRoundIndex)) ? Number(safeTournament.currentRoundIndex) : 0;
+      const normalizedDealCount = Number.isFinite(Number(safeTournament.dealsPerRound)) ? Math.max(1, Number(safeTournament.dealsPerRound)) : 8;
+      const normalizedRounds = safeRounds.map((round, roundIndex) => ({
         ...round,
         roundIndex: typeof round.roundIndex === 'number' ? round.roundIndex : roundIndex,
-        tables: (round.tables || []).map((table, tableIndex) => {
+        tables: (Array.isArray(round.tables) ? round.tables : []).map((table, tableIndex) => {
           const counter = normalizeCounterState(table.counter, normalizedDealCount);
           const entryMode = table.entryMode === 'counter' ? 'counter' : 'manual';
           const derivedCounterResult = counter.finalised ? buildResultFromCounter(counter, normalizedDealCount) : null;
@@ -3400,27 +3403,28 @@
           };
         })
       }));
-      const started = typeof tournament.started === 'boolean'
-        ? tournament.started
+      const started = typeof safeTournament.started === 'boolean'
+        ? safeTournament.started
         : normalizedRounds.length > 0;
       return {
-        ...tournament,
-        title: tournament.title || `${normalizedPlayerCount} Spieler · ${normalizedRoundCount} Runden`,
-        createdAt: tournament.createdAt || new Date().toISOString(),
-        updatedAt: tournament.updatedAt || tournament.createdAt || new Date().toISOString(),
-        clientUpdatedAt: tournament.clientUpdatedAt || Date.now(),
+        ...safeTournament,
+        title: safeTournament.title || `${normalizedPlayerCount} Spieler · ${normalizedRoundCount} Runden`,
+        createdAt: safeTournament.createdAt || new Date().toISOString(),
+        updatedAt: safeTournament.updatedAt || safeTournament.createdAt || new Date().toISOString(),
+        clientUpdatedAt: safeTournament.clientUpdatedAt || Date.now(),
         playerCount: normalizedPlayerCount,
         currentRoundIndex: started ? currentRoundIndex : 0,
         started,
-        status: tournament.status === 'finished' ? 'finished' : 'active',
-        passwordProtectionEnabled: Boolean(tournament.passwordProtectionEnabled),
+        status: safeTournament.status === 'finished' ? 'finished' : 'active',
+        passwordProtectionEnabled: Boolean(safeTournament.passwordProtectionEnabled),
         protectionTargets: normalizedTargets,
-        protectionPassword: tournament.passwordProtectionEnabled ? String(tournament.protectionPassword || '') : '',
-        showdownEnabled: Boolean(tournament.showdownEnabled),
-        showdownOrder: tournament.showdownOrder === 'bottom' ? 'bottom' : 'top',
-        showdownRevealCount: Number.isFinite(Number(tournament.showdownRevealCount)) ? Math.max(0, Number(tournament.showdownRevealCount)) : 0,
-        showdownFinalVisible: Boolean(tournament.showdownFinalVisible),
-        tableNames: tournament.tableNames || {},
+        protectionPassword: safeTournament.passwordProtectionEnabled ? String(safeTournament.protectionPassword || '') : '',
+        showdownEnabled: Boolean(safeTournament.showdownEnabled),
+        showdownOrder: safeTournament.showdownOrder === 'bottom' ? 'bottom' : 'top',
+        showdownRevealCount: Number.isFinite(Number(safeTournament.showdownRevealCount)) ? Math.max(0, Number(safeTournament.showdownRevealCount)) : 0,
+        showdownFinalVisible: Boolean(safeTournament.showdownFinalVisible),
+        tableNames: safeTournament.tableNames || {},
+        players: safePlayers,
         rounds: normalizedRounds
       };
     }
