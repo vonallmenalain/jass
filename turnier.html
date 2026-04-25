@@ -1591,6 +1591,95 @@
       max-height: 95vh;
     }
 
+    .scorepad-modal {
+      max-width: min(96vw, 520px);
+      max-height: 95vh;
+    }
+
+    .scorepad-body {
+      display: grid;
+      gap: 14px;
+    }
+
+    .scorepad-display-wrap {
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.05);
+      padding: 14px;
+      display: grid;
+      gap: 4px;
+      text-align: center;
+    }
+
+    .scorepad-meta,
+    .scorepad-sub {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .scorepad-display {
+      font-size: clamp(40px, 10vw, 56px);
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .scorepad-quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .scorepad-quick-btn {
+      min-height: 44px;
+      font-weight: 800;
+    }
+
+    .scorepad-key-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .scorepad-key {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      min-height: 58px;
+      font-size: 24px;
+      font-weight: 900;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .scorepad-key:active {
+      transform: scale(.98);
+    }
+
+    .scorepad-key.action {
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .scorepad-key.action.danger {
+      color: #fecaca;
+      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(248, 113, 113, 0.08);
+    }
+
+    .scorepad-key.wide {
+      grid-column: 1 / -1;
+    }
+
+    .scorepad-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
     .counter-modal-body {
       display: grid;
       gap: 14px;
@@ -2076,6 +2165,7 @@
       background: rgba(255,255,255,0.06) !important;
       color: var(--text) !important;
       transition: all 0.2s;
+      cursor: pointer;
     }
     .score-input:focus {
       background: rgba(255,255,255,0.1) !important;
@@ -2359,6 +2449,49 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="scorePadBackdrop" aria-hidden="true">
+    <div class="modal scorepad-modal" role="dialog" aria-modal="true" aria-labelledby="scorePadTitle">
+      <div class="modal-header">
+        <div>
+          <div class="eyebrow">Punkteingabe</div>
+          <h2 id="scorePadTitle">Punkte</h2>
+        </div>
+        <button class="icon-btn" id="closeScorePadBtn" aria-label="Schliessen">×</button>
+      </div>
+      <div class="modal-body scorepad-body">
+        <div class="scorepad-display-wrap">
+          <div class="scorepad-meta" id="scorePadMeta">Team</div>
+          <div class="scorepad-display" id="scorePadDisplay">0</div>
+          <div class="scorepad-sub" id="scorePadRange">0 bis 157</div>
+        </div>
+        <div class="scorepad-quick-grid">
+          <button class="mini-btn scorepad-quick-btn" type="button" data-scorepad-action="half">Halbe</button>
+          <button class="mini-btn scorepad-quick-btn" type="button" data-scorepad-action="full">Match 157</button>
+          <button class="mini-btn scorepad-quick-btn" type="button" data-scorepad-action="max">Max</button>
+        </div>
+        <div class="scorepad-key-grid">
+          <button type="button" class="scorepad-key" data-scorepad-digit="1">1</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="2">2</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="3">3</button>
+          <button type="button" class="scorepad-key action danger" data-scorepad-action="backspace">⌫</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="4">4</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="5">5</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="6">6</button>
+          <button type="button" class="scorepad-key action" data-scorepad-action="clear">C</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="7">7</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="8">8</button>
+          <button type="button" class="scorepad-key" data-scorepad-digit="9">9</button>
+          <button type="button" class="scorepad-key action" data-scorepad-action="plus157">+157</button>
+          <button type="button" class="scorepad-key wide" data-scorepad-digit="0">0</button>
+        </div>
+        <div class="scorepad-actions">
+          <button class="btn-ghost" type="button" id="scorePadCancelBtn">Abbrechen</button>
+          <button class="btn" type="button" id="scorePadApplyBtn">Übernehmen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="passwordPromptBackdrop" aria-hidden="true">
     <div class="modal password-modal" role="dialog" aria-modal="true" aria-labelledby="passwordPromptTitle">
       <div class="modal-header">
@@ -2429,6 +2562,14 @@
           scoringTeam: 'team1',
           points: ''
         }
+      },
+      scorePad: {
+        open: false,
+        tournamentId: null,
+        roundIndex: null,
+        tableIndex: null,
+        team: 'team1',
+        value: ''
       },
       firebase: {
         app: null,
@@ -4444,17 +4585,17 @@
             <div class="score-input-container"${isLockedSavedResult ? ' style="opacity: 0.85;"' : ''}>
               <div class="score-side team1-side ${activeTeam === 'team1' ? 'active-side' : ''}">
                 <div class="score-names">${renderDashboardNameList([p_t1_1, p_t1_2], allowDashboardLinks)}</div>
-                <input id="points_team1_${roundIndex}_${tableIdx}" type="number" inputmode="numeric" min="0" max="${total}" step="1" value="${valT1}" class="score-input" data-team="team1" data-table-index="${tableIdx}" data-round-index="${roundIndex}" ${isLockedSavedResult ? 'readonly tabindex="-1"' : ''} />
+                <input id="points_team1_${roundIndex}_${tableIdx}" type="number" inputmode="none" min="0" max="${total}" step="1" value="${valT1}" class="score-input" data-team="team1" data-table-index="${tableIdx}" data-round-index="${roundIndex}" ${isLockedSavedResult ? 'readonly tabindex="-1"' : 'readonly data-open-scorepad="1"'} />
               </div>
               <div class="score-vs">:</div>
               <div class="score-side team2-side ${activeTeam === 'team2' ? 'active-side' : ''}">
-                <input id="points_team2_${roundIndex}_${tableIdx}" type="number" inputmode="numeric" min="0" max="${total}" step="1" value="${valT2}" class="score-input" data-team="team2" data-table-index="${tableIdx}" data-round-index="${roundIndex}" ${isLockedSavedResult ? 'readonly tabindex="-1"' : ''} />
+                <input id="points_team2_${roundIndex}_${tableIdx}" type="number" inputmode="none" min="0" max="${total}" step="1" value="${valT2}" class="score-input" data-team="team2" data-table-index="${tableIdx}" data-round-index="${roundIndex}" ${isLockedSavedResult ? 'readonly tabindex="-1"' : 'readonly data-open-scorepad="1"'} />
                 <div class="score-names">${renderDashboardNameList([p_t2_1, p_t2_2], allowDashboardLinks)}</div>
               </div>
             </div>
             ${isLockedSavedResult
               ? ''
-              : `<button class="btn btn-compact" type="button" data-save-table="${tableIdx}" data-round-index="${roundIndex}">Ergebnis speichern</button>`}
+              : `<button class="btn btn-compact" type="button" data-save-table="${tableIdx}" data-round-index="${roundIndex}">Ergebnis bestätigen</button>`}
           </div>
         `;
 
@@ -4471,6 +4612,181 @@
           </div>
         `;
       }).join('');
+    }
+
+    function getOpenScorePadContext() {
+      if (!state.scorePad.open) return null;
+      const tournament = getTournament(state.scorePad.tournamentId);
+      if (!tournament) return null;
+      const round = tournament.rounds?.[state.scorePad.roundIndex];
+      const table = round?.tables?.[state.scorePad.tableIndex];
+      if (!round || !table) return null;
+      return {
+        tournament,
+        round,
+        table,
+        roundIndex: state.scorePad.roundIndex,
+        tableIndex: state.scorePad.tableIndex,
+        team: state.scorePad.team === 'team2' ? 'team2' : 'team1'
+      };
+    }
+
+    function closeScorePad() {
+      state.scorePad = {
+        open: false,
+        tournamentId: null,
+        roundIndex: null,
+        tableIndex: null,
+        team: 'team1',
+        value: ''
+      };
+      const backdrop = $('scorePadBackdrop');
+      if (backdrop) {
+        backdrop.classList.remove('show');
+        backdrop.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    function normalizeScorePadValue(raw, max) {
+      const digits = String(raw ?? '').replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+      if (!digits) return '';
+      const parsed = Number(digits);
+      if (!Number.isFinite(parsed)) return '';
+      return String(Math.max(0, Math.min(max, parsed)));
+    }
+
+    function applyScorePadValueToDraft() {
+      const context = getOpenScorePadContext();
+      if (!context) return;
+      const entered = normalizeScorePadValue(state.scorePad.value, totalPointsPerTable(context.tournament));
+      const tableId = context.tableIndex;
+      const roundId = context.roundIndex;
+      const selectedTeam = context.team;
+
+      setTableDraft(context.tournament.id, roundId, tableId, {
+        entryTeam: selectedTeam,
+        enteredPoints: entered
+      });
+
+      const activeInput = $(`points_${selectedTeam}_${roundId}_${tableId}`);
+      const oppositeTeam = selectedTeam === 'team1' ? 'team2' : 'team1';
+      const otherInput = $(`points_${oppositeTeam}_${roundId}_${tableId}`);
+      const total = totalPointsPerTable(context.tournament);
+
+      if (activeInput) activeInput.value = entered;
+      if (otherInput) {
+        if (entered === '') {
+          otherInput.value = '';
+        } else {
+          otherInput.value = String(total - Number(entered));
+        }
+      }
+
+      const container = activeInput?.closest('.score-input-container') || otherInput?.closest('.score-input-container');
+      if (container) {
+        container.querySelector('.team1-side')?.classList.toggle('active-side', selectedTeam === 'team1');
+        container.querySelector('.team2-side')?.classList.toggle('active-side', selectedTeam === 'team2');
+      }
+
+      const tableLayout = activeInput?.closest('.table-card')?.querySelector('.jass-table-layout')
+        || otherInput?.closest('.table-card')?.querySelector('.jass-table-layout');
+      if (tableLayout) {
+        tableLayout.querySelectorAll('.jass-player-node').forEach(node => {
+          node.classList.remove('active');
+          if (node.classList.contains(selectedTeam)) {
+            node.classList.add('active');
+          }
+        });
+      }
+    }
+
+    function updateScorePadValue(nextValue) {
+      const context = getOpenScorePadContext();
+      if (!context) return;
+      state.scorePad.value = normalizeScorePadValue(nextValue, totalPointsPerTable(context.tournament));
+      renderScorePad();
+    }
+
+    function renderScorePad() {
+      const context = getOpenScorePadContext();
+      const backdrop = $('scorePadBackdrop');
+      if (!backdrop || !context) {
+        closeScorePad();
+        return;
+      }
+
+      const total = totalPointsPerTable(context.tournament);
+      const names = context.team === 'team1'
+        ? `${context.tournament.players[context.table.team1[0]]} & ${context.tournament.players[context.table.team1[1]]}`
+        : `${context.tournament.players[context.table.team2[0]]} & ${context.tournament.players[context.table.team2[1]]}`;
+
+      $('scorePadTitle').textContent = `Runde ${context.roundIndex + 1} · Tisch ${context.table.tableIndex}`;
+      $('scorePadMeta').textContent = `${context.team === 'team1' ? 'Team 1' : 'Team 2'} · ${names}`;
+      $('scorePadDisplay').textContent = state.scorePad.value === '' ? '0' : state.scorePad.value;
+      $('scorePadRange').textContent = `0 bis ${total}`;
+
+      backdrop.classList.add('show');
+      backdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function openScorePadForInput(tournamentId, roundIndex, tableIndex, team) {
+      const tournament = getTournament(tournamentId);
+      if (!tournament) return;
+      if (!canEditViewedRound(tournament, roundIndex)) return;
+      const table = tournament.rounds?.[roundIndex]?.tables?.[tableIndex];
+      if (!table || table.entryMode === 'counter') return;
+
+      const draft = getTableDraft(tournamentId, roundIndex, tableIndex);
+      let currentValue = '';
+      if (draft.entryTeam === team && draft.enteredPoints !== undefined) {
+        currentValue = draft.enteredPoints;
+      } else if (table.result) {
+        currentValue = team === table.result.enteredTeam
+          ? table.result.enteredPoints
+          : totalPointsPerTable(tournament) - table.result.enteredPoints;
+      }
+
+      state.scorePad = {
+        open: true,
+        tournamentId,
+        roundIndex,
+        tableIndex,
+        team: team === 'team2' ? 'team2' : 'team1',
+        value: normalizeScorePadValue(currentValue, totalPointsPerTable(tournament))
+      };
+      renderScorePad();
+    }
+
+    function handleScorePadAction(action) {
+      const context = getOpenScorePadContext();
+      if (!context) return;
+      const total = totalPointsPerTable(context.tournament);
+      const current = state.scorePad.value || '';
+
+      if (action === 'backspace') {
+        updateScorePadValue(current.slice(0, -1));
+        return;
+      }
+      if (action === 'clear') {
+        updateScorePadValue('');
+        return;
+      }
+      if (action === 'max') {
+        updateScorePadValue(String(total));
+        return;
+      }
+      if (action === 'half') {
+        updateScorePadValue(String(Math.round(total / 2)));
+        return;
+      }
+      if (action === 'full') {
+        updateScorePadValue(String(Math.min(157, total)));
+        return;
+      }
+      if (action === 'plus157') {
+        const base = Number(current || 0);
+        updateScorePadValue(String(base + 157));
+      }
     }
 
     function openCounterModalForTable(tournamentId, roundIndex, tableIndex) {
@@ -4893,11 +5209,7 @@
           const viewRoundIndex = Number(button.dataset.roundIndex);
           const tableIndex = Number(button.dataset.tableIndex);
           const team = button.dataset.pickTeam;
-          
-          const input = $(`points_${team}_${viewRoundIndex}_${tableIndex}`);
-          if (input && !input.readOnly) {
-              input.focus(); 
-          }
+          openScorePadForInput(tournament.id, viewRoundIndex, tableIndex, team);
         });
       });
 
@@ -4934,49 +5246,13 @@
         });
       });
 
-      $('activeRoundTables').querySelectorAll('input.score-input').forEach(input => {
-        if (input.readOnly) return;
-        const updateState = () => {
+      $('activeRoundTables').querySelectorAll('input.score-input[data-open-scorepad]').forEach(input => {
+        input.addEventListener('click', () => {
           const tableIndex = Number(input.dataset.tableIndex);
           const viewRoundIndex = Number(input.dataset.roundIndex);
-          const activeTeam = input.dataset.team;
-          const activeTournament = getTournament();
-          if (!activeTournament) return;
-
-          setTableDraft(activeTournament.id, viewRoundIndex, tableIndex, {
-            entryTeam: activeTeam,
-            enteredPoints: input.value
-          });
-
-          const otherTeam = activeTeam === 'team1' ? 'team2' : 'team1';
-          const otherInput = $(`points_${otherTeam}_${viewRoundIndex}_${tableIndex}`);
-          
-          if (input.value === '') {
-             if (otherInput && document.activeElement !== otherInput) otherInput.value = '';
-          } else {
-             const entered = Math.max(0, Math.min(total, Number(input.value || 0)));
-             if (otherInput && document.activeElement !== otherInput) otherInput.value = total - entered;
-          }
-
-          const container = input.closest('.score-input-container');
-          if (container) {
-             container.querySelector('.team1-side').classList.toggle('active-side', activeTeam === 'team1');
-             container.querySelector('.team2-side').classList.toggle('active-side', activeTeam === 'team2');
-          }
-          
-          const tableLayout = input.closest('.table-card').querySelector('.jass-table-layout');
-          if (tableLayout) {
-             tableLayout.querySelectorAll('.jass-player-node').forEach(node => {
-                 node.classList.remove('active');
-                 if (node.classList.contains(activeTeam)) {
-                     node.classList.add('active');
-                 }
-             });
-          }
-        };
-
-        input.addEventListener('input', updateState);
-        input.addEventListener('focus', updateState);
+          const team = input.dataset.team;
+          openScorePadForInput(tournament.id, viewRoundIndex, tableIndex, team);
+        });
       });
 
       $('activeRoundTables').querySelectorAll('[data-save-table]').forEach(button => {
@@ -5772,6 +6048,21 @@
     $('openPairingsBtn').addEventListener('click', () => openModal('pairings'));
     $('closePairingsModalBtn').addEventListener('click', closeModal);
     $('closeCounterModalBtn').addEventListener('click', () => closeCounterModal({ persistDraft: true }));
+    $('closeScorePadBtn').addEventListener('click', closeScorePad);
+    $('scorePadCancelBtn').addEventListener('click', closeScorePad);
+    $('scorePadApplyBtn').addEventListener('click', () => {
+      applyScorePadValueToDraft();
+      closeScorePad();
+    });
+    $('scorePadBackdrop').querySelectorAll('[data-scorepad-digit]').forEach(button => {
+      button.addEventListener('click', () => {
+        const digit = button.dataset.scorepadDigit;
+        updateScorePadValue(`${state.scorePad.value || ''}${digit}`);
+      });
+    });
+    $('scorePadBackdrop').querySelectorAll('[data-scorepad-action]').forEach(button => {
+      button.addEventListener('click', () => handleScorePadAction(button.dataset.scorepadAction));
+    });
     $('closePlayerDashboardBtn').addEventListener('click', closePlayerDashboard);
     $('closePlayerStatsBtn').addEventListener('click', closePlayerStatsModal);
     $('modalTabPairings').addEventListener('click', () => {
@@ -5792,6 +6083,11 @@
     $('counterModalBackdrop').addEventListener('click', (event) => {
       if (event.target === $('counterModalBackdrop')) {
         closeCounterModal({ persistDraft: true });
+      }
+    });
+    $('scorePadBackdrop').addEventListener('click', (event) => {
+      if (event.target === $('scorePadBackdrop')) {
+        closeScorePad();
       }
     });
 
@@ -5842,6 +6138,10 @@
       }
       if (event.key === 'Escape' && state.counterModal.open) {
         closeCounterModal({ persistDraft: true });
+        return;
+      }
+      if (event.key === 'Escape' && state.scorePad.open) {
+        closeScorePad();
         return;
       }
       if (event.key === 'Escape' && $('playerDashboardBackdrop').classList.contains('show')) {
