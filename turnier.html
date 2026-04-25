@@ -3271,8 +3271,10 @@
         );
       } catch (error) {
         console.error('Firebase konnte nicht initialisiert werden.', error);
+        state.firebase.ready = false;
         state.firebase.error = error;
         state.firebase.lastSnapshotAt = new Date().toISOString();
+        render();
       }
     }
 
