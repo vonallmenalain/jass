@@ -842,6 +842,21 @@
       line-height: 1.5;
     }
 
+    .debug-box {
+      margin-top: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(15, 23, 42, 0.45);
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .debug-box strong {
+      color: var(--text);
+    }
+
     .ranking-head {
       display: flex;
       align-items: center;
@@ -2612,7 +2627,9 @@
         ready: false,
         error: null,
         unsubscribe: null,
-        collectionName: 'turniere'
+        collectionName: 'turniere',
+        lastSnapshotSize: null,
+        lastSnapshotAt: null
       },
       setup: {
         tournamentId: null,
@@ -2703,6 +2720,11 @@
       } else {
         localStorage.removeItem(CURRENT_KEY);
       }
+    }
+
+    function getStoredTournamentCount(key) {
+      const parsed = parseStoredTournaments(localStorage.getItem(key));
+      return Array.isArray(parsed) ? parsed.length : 0;
     }
 
     function normalizeNameKey(value) {
@@ -3198,6 +3220,8 @@
         state.firebase.db = db;
         state.firebase.ready = true;
         state.firebase.error = null;
+        state.firebase.lastSnapshotSize = null;
+        state.firebase.lastSnapshotAt = null;
 
         if (state.firebase.unsubscribe) {
           state.firebase.unsubscribe();
@@ -3206,6 +3230,8 @@
         state.firebase.unsubscribe = onSnapshot(
           collection(db, state.firebase.collectionName),
           (snapshot) => {
+            state.firebase.lastSnapshotSize = snapshot.size;
+            state.firebase.lastSnapshotAt = new Date().toISOString();
             const remoteTournaments = snapshot.docs
               .map(docSnapshot => normalizeTournament({
                 id: docSnapshot.id,
@@ -3239,11 +3265,14 @@
           (error) => {
             console.error('Firebase-Listener konnte nicht gestartet werden.', error);
             state.firebase.error = error;
+            state.firebase.lastSnapshotAt = new Date().toISOString();
+            render();
           }
         );
       } catch (error) {
         console.error('Firebase konnte nicht initialisiert werden.', error);
         state.firebase.error = error;
+        state.firebase.lastSnapshotAt = new Date().toISOString();
       }
     }
 
@@ -4423,8 +4452,22 @@
 
     function renderSavedTournaments() {
       const container = $('savedTournamentList');
+      const debugHtml = `
+        <div class="debug-box">
+          <strong>Debug-Hinweis:</strong><br>
+          Sichtbare Turniere: <strong>${state.tournaments.length}</strong><br>
+          Firebase bereit: <strong>${state.firebase.ready ? 'ja' : 'nein'}</strong><br>
+          Firebase Collection: <strong>${escapeHtml(state.firebase.collectionName)}</strong><br>
+          Letzter Snapshot: <strong>${state.firebase.lastSnapshotSize === null ? 'noch keiner' : `${state.firebase.lastSnapshotSize} Dokument(e)`}</strong><br>
+          Snapshot-Zeit: <strong>${state.firebase.lastSnapshotAt ? escapeHtml(formatDate(state.firebase.lastSnapshotAt)) : '—'}</strong><br>
+          localStorage (primär): <strong>${getStoredTournamentCount(STORAGE_KEY)}</strong> ·
+          Backup: <strong>${getStoredTournamentCount(BACKUP_STORAGE_KEY)}</strong> ·
+          Legacy: <strong>${LEGACY_STORAGE_KEYS.map((key) => `${key}:${getStoredTournamentCount(key)}`).join(', ')}</strong><br>
+          Firebase-Fehler: <strong>${state.firebase.error ? escapeHtml(state.firebase.error.message || String(state.firebase.error)) : 'kein Fehler'}</strong>
+        </div>
+      `;
       if (!state.tournaments.length) {
-        container.innerHTML = '<div class="empty-state">Noch kein gespeichertes Turnier.</div>';
+        container.innerHTML = `<div class="empty-state">Noch kein gespeichertes Turnier.</div>${debugHtml}`;
         return;
       }
 
@@ -4459,7 +4502,7 @@
               </div>
             </div>
           `;
-        }).join('');
+        }).join('') + debugHtml;
 
       container.querySelectorAll('[data-open-id]').forEach(button => {
         button.addEventListener('click', () => {
