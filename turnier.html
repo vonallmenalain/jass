@@ -2275,6 +2275,11 @@
       letter-spacing: -0.03em;
     }
 
+    .points-pad-value.invalid {
+      border-color: rgba(248, 113, 113, 0.65);
+      background: rgba(248, 113, 113, 0.10);
+    }
+
     .points-pad-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2969,6 +2974,9 @@
         ...(state.drafts[key] || {}),
         ...patch
       };
+      if (Object.prototype.hasOwnProperty.call(patch, 'enteredPoints')) {
+        scheduleDraftTableLiveSync(tournamentId, roundIndex, tableIndex);
+      }
     }
 
     function clearTableDraft(tournamentId, roundIndex, tableIndex) {
@@ -3009,6 +3017,7 @@
           draftTable.result = null;
           return draftTournament;
         }, { renderAfter: false });
+        clearTableDraft(tournamentId, roundIndex, tableIndex);
         return;
       }
 
@@ -3032,6 +3041,7 @@
         };
         return draftTournament;
       }, { renderAfter: false });
+      clearTableDraft(tournamentId, roundIndex, tableIndex);
     }
 
     function scheduleDraftTableLiveSync(tournamentId, roundIndex, tableIndex) {
@@ -4718,8 +4728,7 @@
             </div>
             ${isLockedSavedResult
               ? ''
-              : `<div class="table-readonly-note" style="text-align:center;">Live-Sync aktiv: Die Eingabe wird automatisch auf allen Geräten aktualisiert.</div>
-                 <button class="btn btn-compact" type="button" data-save-table="${tableIdx}" data-round-index="${roundIndex}">Ergebnis bestätigen</button>`}
+              : `<button class="btn btn-compact" type="button" data-save-table="${tableIdx}" data-round-index="${roundIndex}">Ergebnis bestätigen</button>`}
           </div>
         `;
 
@@ -5189,6 +5198,28 @@
       };
     }
 
+    function appendCounterPadDigit(digit) {
+      const entry = getCounterModalEntry();
+      const current = String(entry.points ?? '');
+      const next = `${current}${String(digit)}`.replace(/^0+(?=\d)/, '');
+      if (!next) {
+        setCounterModalEntry({ points: '' });
+        renderCounterModal();
+        return;
+      }
+      const parsed = Number(next);
+      if (!Number.isFinite(parsed) || parsed > POINTS_PER_DEAL) return;
+      setCounterModalEntry({ points: next });
+      renderCounterModal();
+    }
+
+    function removeLastCounterPadDigit() {
+      const entry = getCounterModalEntry();
+      const current = String(entry.points ?? '');
+      setCounterModalEntry({ points: current.slice(0, -1) });
+      renderCounterModal();
+    }
+
     async function saveCounterDealFromModal() {
       const context = getOpenCounterContext();
       if (!context) return;
@@ -5225,11 +5256,6 @@
 
       setCounterModalEntry({ points: '' });
       render();
-      window.requestAnimationFrame(() => {
-        const input = $('counterEntryPointsInput');
-        input?.focus();
-        input?.select?.();
-      });
     }
 
     async function deleteCounterDealFromModal(dealIndex) {
@@ -5358,7 +5384,13 @@
             </div>
 
             <div class="counter-point-input-wrap">
-              <input id="counterEntryPointsInput" class="counter-point-input ${inputInvalid ? 'invalid' : ''}" type="number" inputmode="numeric" min="0" max="${POINTS_PER_DEAL}" step="1" placeholder="0 bis ${POINTS_PER_DEAL}" value="${escapeHtml(String(entry.points ?? ''))}" data-counter-input />
+              <div class="points-pad-value ${inputInvalid ? 'invalid' : ''}">${escapeHtml(String(entry.points === '' ? '–' : entry.points))}</div>
+              <div class="points-pad-grid">
+                ${[1,2,3,4,5,6,7,8,9].map(num => `<button class="points-pad-btn" type="button" data-counter-pad-digit="${num}">${num}</button>`).join('')}
+                <button class="points-pad-btn action" type="button" data-counter-pad-clear>CLR</button>
+                <button class="points-pad-btn" type="button" data-counter-pad-digit="0">0</button>
+                <button class="points-pad-btn action" type="button" data-counter-pad-backspace>⌫</button>
+              </div>
             </div>
 
             ${renderCounterModalPreview(team1Names, team2Names, entry)}
@@ -5403,25 +5435,20 @@
         });
       });
 
-      const pointsInput = $('counterEntryPointsInput');
-      if (pointsInput) {
-        pointsInput.addEventListener('input', (event) => {
-          setCounterModalEntry({ points: event.target.value });
-          const previewBuiltDeal = buildCounterDealFromEntry(getCounterModalEntry());
-          event.target.classList.toggle('invalid', previewBuiltDeal.invalid);
-          const previewHtml = renderCounterModalPreview(team1Names, team2Names, getCounterModalEntry());
-          const existingPreview = $('counterModalBody').querySelector('.counter-preview-box');
-          if (existingPreview) {
-            existingPreview.outerHTML = previewHtml;
-          }
+      $('counterModalBody').querySelectorAll('[data-counter-pad-digit]').forEach((button) => {
+        button.addEventListener('click', () => {
+          appendCounterPadDigit(button.dataset.counterPadDigit || '');
         });
+      });
 
-        pointsInput.addEventListener('keydown', (event) => {
-          if (event.key !== 'Enter') return;
-          event.preventDefault();
-          saveCounterDealFromModal();
-        });
-      }
+      $('counterModalBody').querySelector('[data-counter-pad-clear]')?.addEventListener('click', () => {
+        setCounterModalEntry({ points: '' });
+        renderCounterModal();
+      });
+
+      $('counterModalBody').querySelector('[data-counter-pad-backspace]')?.addEventListener('click', () => {
+        removeLastCounterPadDigit();
+      });
 
       $('saveCounterDealBtn')?.addEventListener('click', () => {
         saveCounterDealFromModal();
