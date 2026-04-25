@@ -4425,7 +4425,7 @@
         const allowDashboardLinks = tournament.status === 'finished';
 
         const renderPlayerNode = (name, teamClass, positionClass, teamKey, activeClass) => {
-          if (canEdit && !isCounterMode) {
+          if (canEdit && !isCounterMode && !isLockedSavedResult) {
             return `
               <div class="jass-player-node ${teamClass} ${positionClass} ${activeClass}" data-pick-team="${teamKey}" data-round-index="${roundIndex}" data-table-index="${tableIdx}">
                 ${escapeHtml(name)}
@@ -4451,7 +4451,7 @@
             ${renderPlayerNode(p_t1_1, 'team1', 'pos-top', 'team1', t1Class)}
             ${renderPlayerNode(p_t2_1, 'team2', 'pos-left', 'team2', t2Class)}
 
-            <div class="jass-table-center pos-center ${canEdit && !isCounterMode ? 'clickable' : ''}" ${canEdit && !isCounterMode ? `data-pick-team="${activeTeam === 'team1' ? 'team2' : 'team1'}" data-round-index="${roundIndex}" data-table-index="${tableIdx}" title="Team wechseln"` : ''}>
+            <div class="jass-table-center pos-center ${canEdit && !isCounterMode && !isLockedSavedResult ? 'clickable' : ''}" ${canEdit && !isCounterMode && !isLockedSavedResult ? `data-pick-team="${activeTeam === 'team1' ? 'team2' : 'team1'}" data-round-index="${roundIndex}" data-table-index="${tableIdx}" title="Team wechseln"` : ''}>
               <div class="table-suit-icon" style="color: ${iconColor}">${tableIcon}</div>
             </div>
 
@@ -4645,20 +4645,28 @@
       if (!table || table.entryMode === 'counter') return;
 
       const draft = getTableDraft(tournamentId, roundIndex, tableIndex);
+      const isEditingSavedResult = Boolean(draft.isEditingResult);
+      if (table.result && !isEditingSavedResult) return;
       const currentTeam = team === 'team2' ? 'team2' : 'team1';
       const selectedTeam = draft.entryTeam || table.entryTeam || (table.result ? table.result.enteredTeam : currentTeam);
       const total = totalPointsPerTable(tournament);
-      const hasDraftValue = draft.enteredPoints !== undefined && draft.enteredPoints !== null && draft.enteredPoints !== '';
+      const hasDraftValue = Object.prototype.hasOwnProperty.call(draft, 'enteredPoints');
       const hasResultValue = table.result && Number.isFinite(Number(table.result.enteredPoints));
       let currentValue = '';
       if (hasDraftValue) {
-        const parsed = Number(draft.enteredPoints);
-        if (Number.isFinite(parsed)) {
-          currentValue = String(selectedTeam === currentTeam ? parsed : total - parsed);
+        if (draft.enteredPoints === '' || draft.enteredPoints === null || draft.enteredPoints === undefined) {
+          currentValue = '';
+        } else {
+          const parsed = Number(draft.enteredPoints);
+          if (Number.isFinite(parsed)) {
+            currentValue = String(selectedTeam === currentTeam ? parsed : total - parsed);
+          }
         }
       } else if (hasResultValue) {
         const parsed = Number(table.result.enteredPoints);
-        currentValue = String((table.result.enteredTeam || 'team1') === currentTeam ? parsed : total - parsed);
+        if (Number.isFinite(parsed)) {
+          currentValue = String(selectedTeam === currentTeam ? parsed : total - parsed);
+        }
       }
 
       state.pointsPad = {
