@@ -3203,11 +3203,21 @@
 
             const previousLocal = state.tournaments.map(cloneData);
             state.firebase.hasReceivedSnapshot = true;
-            const shouldKeepLocalFallback = remoteTournaments.length === 0 && previousLocal.length > 0;
+            const mergedById = new Map();
+            previousLocal.forEach((item) => {
+              if (!item?.id) return;
+              mergedById.set(item.id, normalizeTournament(item));
+            });
+            remoteTournaments.forEach((item) => {
+              if (!item?.id) return;
+              mergedById.set(item.id, normalizeTournament(item));
+            });
+            const mergedTournaments = Array.from(mergedById.values())
+              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
             const wasMissing = state.currentTournamentId && !getTournament(state.currentTournamentId);
 
-            state.tournaments = shouldKeepLocalFallback ? previousLocal.map(normalizeTournament) : remoteTournaments;
+            state.tournaments = mergedTournaments;
             
             const nowExists = state.currentTournamentId && getTournament(state.currentTournamentId);
 
