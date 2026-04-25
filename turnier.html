@@ -6057,6 +6057,9 @@
     }
 
     function renderHome() {
+      if (!state.firebase.initAttempted) {
+        initFirebase();
+      }
       renderSavedTournaments();
     }
 
