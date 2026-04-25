@@ -2615,7 +2615,8 @@
         ready: false,
         error: null,
         unsubscribe: null,
-        collectionName: 'turniere'
+        collectionName: 'turniere',
+        hasReceivedSnapshot: false
       },
       setup: {
         tournamentId: null,
@@ -3184,6 +3185,7 @@
         state.firebase.db = db;
         state.firebase.ready = true;
         state.firebase.error = null;
+        state.firebase.hasReceivedSnapshot = false;
 
         if (state.firebase.unsubscribe) {
           state.firebase.unsubscribe();
@@ -3199,9 +3201,14 @@
               }))
               .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
+            const previousLocal = state.tournaments.map(cloneData);
+            const isFirstSnapshot = !state.firebase.hasReceivedSnapshot;
+            state.firebase.hasReceivedSnapshot = true;
+            const shouldKeepLocalFallback = isFirstSnapshot && remoteTournaments.length === 0 && previousLocal.length > 0;
+
             const wasMissing = state.currentTournamentId && !getTournament(state.currentTournamentId);
-            
-            state.tournaments = remoteTournaments;
+
+            state.tournaments = shouldKeepLocalFallback ? previousLocal.map(normalizeTournament) : remoteTournaments;
             
             const nowExists = state.currentTournamentId && getTournament(state.currentTournamentId);
 
