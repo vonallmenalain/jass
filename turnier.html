@@ -2628,6 +2628,7 @@
         error: null,
         unsubscribe: null,
         collectionName: 'turniere',
+        initAttempted: false,
         lastSnapshotSize: null,
         lastSnapshotAt: null
       },
@@ -3212,6 +3213,7 @@
     }
 
     function initFirebase() {
+      state.firebase.initAttempted = true;
       try {
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -4458,6 +4460,7 @@
         <div class="debug-box">
           <strong>Debug-Hinweis:</strong><br>
           Sichtbare Turniere: <strong>${state.tournaments.length}</strong><br>
+          Firebase Init versucht: <strong>${state.firebase.initAttempted ? 'ja' : 'nein'}</strong><br>
           Firebase bereit: <strong>${state.firebase.ready ? 'ja' : 'nein'}</strong><br>
           Firebase Collection: <strong>${escapeHtml(state.firebase.collectionName)}</strong><br>
           Letzter Snapshot: <strong>${state.firebase.lastSnapshotSize === null ? 'noch keiner' : `${state.firebase.lastSnapshotSize} Dokument(e)`}</strong><br>
@@ -6514,8 +6517,8 @@
       el.classList.toggle('active', key === state.screen);
     });
 
-    render();
     initFirebase();
+    render();
   </script>
   <script>
     if ('serviceWorker' in navigator) {
