@@ -6520,6 +6520,13 @@
       el.classList.toggle('active', key === state.screen);
     });
 
+    window.addEventListener('pageshow', () => {
+      if (!state.firebase.initAttempted) {
+        initFirebase();
+      }
+      render();
+    });
+
     initFirebase();
     render();
   </script>
