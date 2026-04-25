@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Jass</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-2: #111827;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-strong: rgba(255, 255, 255, 0.12);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #f59e0b;
+      --accent-2: #ef4444;
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --max: 760px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.22), transparent 34%),
+        radial-gradient(circle at top right, rgba(239, 68, 68, 0.16), transparent 28%),
+        linear-gradient(180deg, #0b1120 0%, #111827 100%);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,0.04) 0%, transparent 42%),
+        linear-gradient(300deg, rgba(255,255,255,0.025) 0%, transparent 35%);
+    }
+
+    button, a {
+      font: inherit;
+    }
+
+    .app {
+      width: min(100%, var(--max));
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: calc(16px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 4px 0 6px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      font-size: 18px;
+      box-shadow: 0 10px 22px rgba(239, 68, 68, 0.28);
+      flex-shrink: 0;
+    }
+
+    .eyebrow {
+      color: #fde68a;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    h1, h2 {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 30px;
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      font-size: 21px;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-xl);
+      padding: 16px;
+    }
+
+    .hero {
+      padding-top: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -44px;
+      bottom: -70px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, transparent 66%);
+      pointer-events: none;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn,
+    .btn-ghost,
+    .icon-btn,
+    .mode-link {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform .05s ease, background .18s ease, border-color .18s ease, opacity .18s ease;
+      touch-action: manipulation;
+      text-decoration: none;
+    }
+
+    .btn:active,
+    .btn-ghost:active,
+    .icon-btn:active,
+    .mode-link:active {
+      transform: scale(.99);
+    }
+
+    .btn,
+    .btn-ghost {
+      min-height: 54px;
+      padding: 0 16px;
+      font-weight: 800;
+      font-size: 16px;
+      width: 100%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      color: white;
+      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.06);
+    }
+
+    .icon-btn {
+      min-width: 44px;
+      min-height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+
+    .footer-space {
+      height: 10px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      background: rgba(2, 6, 23, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 560px;
+      border-radius: 26px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(15, 23, 42, 0.99));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 16px 16px 10px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .modal-body {
+      padding: 0 16px 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .mode-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .mode-link {
+      min-height: 60px;
+      padding: 14px 16px;
+      display: grid;
+      align-items: center;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      text-align: center;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .mode-link:hover {
+      border-color: rgba(245, 158, 11, 0.35);
+      background: rgba(255,255,255,0.08);
+    }
+
+    @media (min-width: 1040px) {
+      .app {
+        width: min(100%, 980px);
+        padding: 22px 22px calc(24px + env(safe-area-inset-bottom));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-badge">♣</div>
+        <div>
+          <div class="eyebrow">Jass</div>
+          <h1>Start</h1>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel hero">
+      <h2>Willkommen</h2>
+    </div>
+
+    <div class="panel stack">
+      <a class="btn" href="turnier.html">von Allmen Jass</a>
+      <button class="btn" id="openCounterModesBtn" type="button">Zähler auswählen</button>
+    </div>
+
+    <div class="footer-space"></div>
+  </div>
+
+  <div class="modal-backdrop" id="counterModesModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="counterModesTitle">
+      <div class="modal-header">
+        <div></div>
+        <button class="icon-btn" id="closeCounterModesBtn" type="button" aria-label="Schliessen">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="mode-list">
+          <a class="mode-link" href="schieber-zähler.html">Schieber</a>
+          <a class="mode-link" href="sidi-zähler.html">Sidi</a>
+          <a class="mode-link" href="coiffeur-zähler.html">Coiffeur</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const counterModesModal = document.getElementById('counterModesModal');
+    const openCounterModesBtn = document.getElementById('openCounterModesBtn');
+    const closeCounterModesBtn = document.getElementById('closeCounterModesBtn');
+
+    function openCounterModes() {
+      counterModesModal.classList.add('show');
+      counterModesModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeCounterModes() {
+      counterModesModal.classList.remove('show');
+      counterModesModal.setAttribute('aria-hidden', 'true');
+    }
+
+    openCounterModesBtn.addEventListener('click', openCounterModes);
+    closeCounterModesBtn.addEventListener('click', closeCounterModes);
+
+    counterModesModal.addEventListener('click', (event) => {
+      if (event.target === counterModesModal) {
+        closeCounterModes();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && counterModesModal.classList.contains('show')) {
+        closeCounterModes();
+      }
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('service-worker.js').catch(function (error) {
+          console.error('Service Worker konnte nicht registriert werden.', error);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

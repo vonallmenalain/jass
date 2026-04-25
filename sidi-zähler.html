@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Sidi Zähler</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-2: #111827;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-strong: rgba(255, 255, 255, 0.12);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #f59e0b;
+      --accent-2: #ef4444;
+      --success: #22c55e;
+      --danger: #f87171;
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --max: 560px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.22), transparent 34%),
+        radial-gradient(circle at top right, rgba(239, 68, 68, 0.16), transparent 28%),
+        linear-gradient(180deg, #0b1120 0%, #111827 100%);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,0.04) 0%, transparent 42%),
+        linear-gradient(300deg, rgba(255,255,255,0.025) 0%, transparent 35%);
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button:disabled,
+    input:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+
+    .app {
+      width: min(100%, var(--max));
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: calc(16px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+      position: relative;
+      z-index: 1;
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      min-height: calc(100vh - 36px);
+      min-height: calc(100dvh - 36px);
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 4px 0 6px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      font-size: 19px;
+      box-shadow: 0 10px 22px rgba(239, 68, 68, 0.28);
+      flex-shrink: 0;
+    }
+
+    .brand-text {
+      min-width: 0;
+    }
+
+    a.brand-badge {
+      text-decoration: none;
+    }
+
+
+    .eyebrow {
+      color: #fde68a;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 30px;
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      font-size: 22px;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .lead, .muted, .meta, .note {
+      color: var(--muted);
+    }
+
+    .lead {
+      font-size: 15px;
+      line-height: 1.55;
+      margin-top: 8px;
+    }
+
+    .meta, .note {
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-xl);
+      padding: 16px;
+    }
+
+    .panel.tight {
+      padding: 14px;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .actions-row, .inline-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn, .btn-ghost, .chip, .toggle-btn, .mini-btn, .list-btn, .mode-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform .05s ease, background .18s ease, border-color .18s ease, opacity .18s ease;
+      touch-action: manipulation;
+    }
+
+    .btn:active, .btn-ghost:active, .chip:active, .toggle-btn:active, .mini-btn:active, .list-btn:active, .mode-btn:active {
+      transform: scale(.99);
+    }
+
+    .btn, .btn-ghost {
+      min-height: 56px;
+      padding: 0 16px;
+      font-weight: 800;
+      font-size: 16px;
+      width: 100%;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      color: white;
+      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.06);
+    }
+
+    .list-btn {
+      min-height: 46px;
+      padding: 0 14px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .pill-row, .summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .input-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .input-group label,
+    .label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 0 14px;
+      outline: none;
+      transition: border-color .18s ease, background .18s ease;
+      font-size: 16px;
+    }
+
+    input::placeholder {
+      color: rgba(203, 213, 225, 0.7);
+    }
+
+    input:focus {
+      border-color: rgba(245, 158, 11, 0.6);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .segmented, .choice-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .segmented {
+      grid-template-columns: 1fr;
+    }
+
+    .choice-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .chip {
+      min-height: 52px;
+      padding: 10px 12px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 15px;
+      display: grid;
+      place-items: center;
+    }
+
+    .chip.active,
+    .toggle-btn.active,
+    .mini-btn.active,
+    .mode-btn.active {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.88), rgba(239, 68, 68, 0.88));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 10px 24px rgba(239, 68, 68, 0.2);
+    }
+
+    .rule-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .rule-row:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .rule-text strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .rule-text span {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-top: 2px;
+    }
+
+    .toggle-btn {
+      min-width: 86px;
+      min-height: 42px;
+      padding: 0 14px;
+      font-weight: 800;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .game-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+    }
+
+    .game-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .game-title {
+      font-size: 17px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .badge {
+      flex-shrink: 0;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid var(--border);
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.12);
+    }
+
+    .badge.done {
+      color: #bbf7d0;
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .game-meta {
+      display: grid;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .game-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .scoreboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .score-tile {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px;
+      min-height: 136px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }
+
+    .score-tile small {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .score-name {
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    .score-value {
+      font-size: 40px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      margin-top: 8px;
+    }
+
+    .score-sub {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .entry-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .team-pick {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mini-btn {
+      min-height: 56px;
+      padding: 8px 12px;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .point-input-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .point-input {
+      min-height: 72px !important;
+      font-size: 30px !important;
+      text-align: center;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .preview-box {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+    }
+
+    .preview-team {
+      text-align: center;
+      min-width: 0;
+    }
+
+    .preview-team strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .preview-team span {
+      display: block;
+      font-size: 28px;
+      font-weight: 900;
+      margin-top: 6px;
+      letter-spacing: -0.03em;
+    }
+
+    .preview-sep {
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .extra-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .bid-row {
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .mode-btn {
+      min-height: 54px;
+      padding: 0 12px;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .history-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border-radius: 18px;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+    }
+
+    .history-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .history-main strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .history-main span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .empty {
+      border-radius: 18px;
+      padding: 16px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.55;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .footer-space {
+      height: 6px;
+    }
+
+    @media (max-width: 390px) {
+      h1 { font-size: 27px; }
+      .score-value { font-size: 34px; }
+      .preview-team span { font-size: 24px; }
+      .bid-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section id="homeScreen" class="screen active">
+      <div class="topbar">
+        <div class="brand">
+          <a class="brand-badge" href="index.html" aria-label="Zur Startseite">♦</a>
+          <div class="brand-text">
+            <div class="eyebrow">Sidi Barani</div>
+            <h2>Zähler</h2>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel stack">
+        <button class="btn" id="newGameBtn">Neues Spiel starten</button>
+        <p class="note">Alle Spiele werden automatisch auf diesem Gerät gespeichert.</p>
+      </div>
+
+      <div class="panel stack">
+        <div>
+          <div class="section-title">Laufende Spiele</div>
+          <p class="meta">Tippe auf ein Spiel, um direkt weiterzuzählen.</p>
+        </div>
+        <div id="gamesList" class="stack"></div>
+      </div>
+
+      <div class="panel stack" id="finishedSection">
+        <div>
+          <div class="section-title">Beendete Spiele</div>
+          <p class="meta">Bereits abgeschlossene Partien bleiben als Verlauf gespeichert.</p>
+        </div>
+        <div id="finishedGamesList" class="stack"></div>
+      </div>
+      <div class="footer-space"></div>
+    </section>
+
+    <section id="setupScreen" class="screen">
+      <div class="topbar">
+        <a class="brand-badge" href="index.html" aria-label="Zur Startseite">♦</a>
+        <div class="pill">Vor dem Spiel festlegen</div>
+      </div>
+
+      <div class="panel stack">
+        <div>
+          <h2>Neues Spiel</h2>
+          <p class="lead">Lege zuerst Teams, Spielziel und Regeln fest. Während dem Spiel ist davon nichts mehr änderbar.</p>
+        </div>
+
+        <div class="input-group">
+          <label for="team1Input">Team 1</label>
+          <input id="team1Input" type="text" maxlength="30" placeholder="z. B. Müller / Meier" />
+        </div>
+
+        <div class="input-group">
+          <label for="team2Input">Team 2</label>
+          <input id="team2Input" type="text" maxlength="30" placeholder="z. B. Keller / Frei" />
+        </div>
+      </div>
+
+      <div class="panel stack">
+        <div>
+          <div class="section-title">Spielziel</div>
+          <p class="meta">Auf Punkte spielen.</p>
+        </div>
+
+        <div class="segmented" id="goalModeSegment">
+          <button class="chip active" type="button">Auf Punkte</button>
+        </div>
+
+        <div id="pointsGoalBlock" class="stack">
+          <div class="choice-grid" id="pointsGoalChoices">
+            <button class="chip active" data-goal-points="1000">1000</button>
+            <button class="chip" data-goal-points="1500">1500</button>
+            <button class="chip" data-goal-points="2500">2500</button>
+            <button class="chip" data-goal-points="custom">Eigene Zahl</button>
+          </div>
+          <div class="input-group" id="customPointsWrap" style="display:none;">
+            <label for="customPointsInput">Eigenes Punktziel</label>
+            <input id="customPointsInput" type="number" inputmode="numeric" min="1" step="1" placeholder="z. B. 2000" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel stack">
+        <div>
+          <div class="section-title">Regeln</div>
+          <p class="meta">Diese Regeln gelten für das ganze Spiel und werden danach nur noch angezeigt.</p>
+        </div>
+
+        <div class="rule-row">
+          <div class="rule-text">
+            <strong>Schreibsperre</strong>
+            <span>Keine Punkte mehr schreiben bei Erfolg Gegner 300 Punkte vor Ziel</span>
+          </div>
+          <button class="toggle-btn" id="toggleWriteLock">Ohne</button>
+        </div>
+      </div>
+
+      <div class="panel stack">
+        <button class="btn" id="startGameBtn">Spiel starten</button>
+      </div>
+      <div class="footer-space"></div>
+    </section>
+
+    <section id="gameScreen" class="screen">
+      <div class="topbar">
+        <a class="brand-badge" href="index.html" aria-label="Zur Startseite">♦</a>
+        <div class="pill" id="autosaveBadge">Automatisch gespeichert</div>
+      </div>
+
+      <div class="panel tight stack">
+        <div class="summary-row" id="gameSummary"></div>
+      </div>
+
+      <div class="scoreboard" id="scoreboard"></div>
+
+      <div class="panel entry-card">
+        <div>
+          <div class="section-title">Neue Runde</div>
+        </div>
+
+        <div class="team-pick" id="entryTeamPicker"></div>
+
+        <div class="point-input-wrap">
+          <label class="label" id="entryPointsLabel" for="entryPointsInput">Punkte eingeben</label>
+          <input id="entryPointsInput" class="point-input" type="number" inputmode="numeric" min="0" max="157" step="1" placeholder="0 bis 157" />
+        </div>
+
+        <div class="preview-box">
+          <div class="preview-team">
+            <strong id="previewTeamAName">Team 1</strong>
+            <span id="previewTeamAPoints">0</span>
+          </div>
+          <div class="preview-sep">:</div>
+          <div class="preview-team">
+            <strong id="previewTeamBName">Team 2</strong>
+            <span id="previewTeamBPoints">157</span>
+          </div>
+        </div>
+
+        <div class="extra-grid" id="bidBlock">
+          <div class="section-title" style="margin-bottom:0;">Geboten</div>
+
+          <div class="bid-row">
+            <div class="input-group">
+              <label for="bidTeam1Input" id="bidTeam1Label">Geboten Team 1</label>
+              <input id="bidTeam1Input" type="number" inputmode="numeric" min="0" max="157" step="1" placeholder="0 bis 157" value="0" />
+            </div>
+            <button class="mode-btn" id="toggleSidiTeam1">Sidi</button>
+          </div>
+
+          <div class="bid-row">
+            <div class="input-group">
+              <label for="bidTeam2Input" id="bidTeam2Label">Geboten Team 2</label>
+              <input id="bidTeam2Input" type="number" inputmode="numeric" min="0" max="157" step="1" placeholder="0 bis 157" value="0" />
+            </div>
+            <button class="mode-btn" id="toggleSidiTeam2">Sidi</button>
+          </div>
+        </div>
+
+        <div class="extra-grid">
+          <div class="section-title" style="margin-bottom:0;">Doppelte Punkte</div>
+          <button class="toggle-btn" id="toggleDoublePointsEntry">Ohne</button>
+        </div>
+
+        <button class="btn" id="saveRoundBtn">Runde speichern</button>
+      </div>
+
+      <div class="panel stack">
+        <div class="inline-actions">
+          <button class="btn-ghost" id="undoBtn">Letzte Runde rückgängig</button>
+        </div>
+      </div>
+
+      <div class="panel stack">
+        <div>
+          <div class="section-title">Runden</div>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+      <div class="footer-space"></div>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'jass-sidi-games-v1';
+    const CURRENT_KEY = 'jass-sidi-current-game-v1';
+
+    const state = {
+      screen: 'home',
+      games: [],
+      currentGameId: null,
+      setup: {
+        team1: '',
+        team2: '',
+        goalMode: 'points',
+        goalPoints: 1000,
+        goalPointsPreset: '1000',
+        goalRounds: 4,
+        withWriteLock: false
+      },
+      entry: {
+        scoringTeam: 'team1',
+        points: '',
+        bidTeam1: 0,
+        bidTeam2: 0,
+        sidiTeam1: false,
+        sidiTeam2: false,
+        doublePoints: false
+      }
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    const screens = {
+      home: $('homeScreen'),
+      setup: $('setupScreen'),
+      game: $('gameScreen')
+    };
+
+    function uid() {
+      return 'sidi_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    function loadGames() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        state.games = raw ? JSON.parse(raw) : [];
+      } catch (error) {
+        state.games = [];
+      }
+    }
+
+    function saveGames() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.games));
+      if (state.currentGameId) {
+        localStorage.setItem(CURRENT_KEY, state.currentGameId);
+      }
+      pulseAutosave();
+    }
+
+    function pulseAutosave() {
+      const badge = $('autosaveBadge');
+      if (!badge) return;
+      badge.textContent = 'Gespeichert';
+      clearTimeout(pulseAutosave._timer);
+      pulseAutosave._timer = setTimeout(() => {
+        badge.textContent = 'Automatisch gespeichert';
+      }, 1200);
+    }
+
+    function setScreen(name) {
+      state.screen = name;
+      Object.entries(screens).forEach(([key, el]) => {
+        el.classList.toggle('active', key === name);
+      });
+      if (name === 'home') renderHome();
+      if (name === 'setup') renderSetup();
+      if (name === 'game') renderGame();
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    function formatDate(ts) {
+      return new Intl.DateTimeFormat('de-CH', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(ts));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getCurrentGame() {
+      return state.games.find(game => game.id === state.currentGameId) || null;
+    }
+
+    function clampInt(value, min, max) {
+      let parsed = Number(value);
+      if (!Number.isFinite(parsed)) parsed = 0;
+      parsed = Math.round(parsed);
+      if (typeof min === 'number') parsed = Math.max(min, parsed);
+      if (typeof max === 'number') parsed = Math.min(max, parsed);
+      return parsed;
+    }
+
+    function getRawRoundValues(entry) {
+      const points = clampInt(entry.points, 0, 157);
+      if (entry.scoringTeam === 'team1') {
+        return { baseTeam1: points, baseTeam2: 157 - points };
+      }
+      return { baseTeam1: 157 - points, baseTeam2: points };
+    }
+
+    function getEntryPayload() {
+      return {
+        scoringTeam: state.entry.scoringTeam,
+        points: state.entry.points,
+        bidTeam1: state.entry.sidiTeam1 ? 257 : clampInt(state.entry.bidTeam1, 0, 157),
+        bidTeam2: state.entry.sidiTeam2 ? 257 : clampInt(state.entry.bidTeam2, 0, 157),
+        sidiTeam1: Boolean(state.entry.sidiTeam1),
+        sidiTeam2: Boolean(state.entry.sidiTeam2),
+        doublePoints: Boolean(state.entry.doublePoints)
+      };
+    }
+
+    function getSuccessBonus(bidValue, doublePoints) {
+      return bidValue * (doublePoints ? 2 : 1);
+    }
+
+    function remainingToGoal(game, score, teamKey) {
+      if (!game || game.goalMode !== 'points') return Infinity;
+      const goal = Number(game.goalPoints || 0);
+      return Math.max(0, goal - Number(score[teamKey] || 0));
+    }
+
+    function calculateRoundOutcome(payload, game, scoreBefore) {
+      const raw = getRawRoundValues(payload);
+      let team1 = raw.baseTeam1;
+      let team2 = raw.baseTeam2;
+      const extras = [];
+
+      const team1Bid = payload.sidiTeam1 ? 257 : clampInt(payload.bidTeam1, 0, 157);
+      const team2Bid = payload.sidiTeam2 ? 257 : clampInt(payload.bidTeam2, 0, 157);
+      const doublePoints = Boolean(payload.doublePoints);
+
+      const team1Success = team1Bid > 0 && (payload.sidiTeam1 ? raw.baseTeam1 === 157 : raw.baseTeam1 >= team1Bid);
+      const team2Success = team2Bid > 0 && (payload.sidiTeam2 ? raw.baseTeam2 === 157 : raw.baseTeam2 >= team2Bid);
+      const team1Failed = team1Bid > 0 && !team1Success;
+      const team2Failed = team2Bid > 0 && !team2Success;
+
+      const writeLockForTeam1 = Boolean(
+        game &&
+        game.withWriteLock &&
+        game.goalMode === 'points' &&
+        remainingToGoal(game, scoreBefore || { team1: 0, team2: 0 }, 'team1') <= 300
+      );
+
+      const writeLockForTeam2 = Boolean(
+        game &&
+        game.withWriteLock &&
+        game.goalMode === 'points' &&
+        remainingToGoal(game, scoreBefore || { team1: 0, team2: 0 }, 'team2') <= 300
+      );
+
+      if (team1Bid > 0) {
+        const bonus = getSuccessBonus(team1Bid, doublePoints);
+        if (team1Success) {
+          if (payload.sidiTeam1 && raw.baseTeam1 === 157) {
+            team1 += 100;
+          }
+          team1 += bonus;
+        } else {
+          team2 += bonus;
+        }
+      }
+
+      if (team2Bid > 0) {
+        const bonus = getSuccessBonus(team2Bid, doublePoints);
+        if (team2Success) {
+          if (payload.sidiTeam2 && raw.baseTeam2 === 157) {
+            team2 += 100;
+          }
+          team2 += bonus;
+        } else {
+          team1 += bonus;
+        }
+      }
+
+      const team1MayWrite = !writeLockForTeam1 || team1Success || team2Failed;
+      const team2MayWrite = !writeLockForTeam2 || team2Success || team1Failed;
+
+      if (!team1MayWrite) {
+        team1 = 0;
+        extras.push('Schreibsperre Team 1');
+      }
+
+      if (!team2MayWrite) {
+        team2 = 0;
+        extras.push('Schreibsperre Team 2');
+      }
+
+      return {
+        baseTeam1: raw.baseTeam1,
+        baseTeam2: raw.baseTeam2,
+        bidTeam1: team1Bid,
+        bidTeam2: team2Bid,
+        sidiTeam1: Boolean(payload.sidiTeam1),
+        sidiTeam2: Boolean(payload.sidiTeam2),
+        doublePoints,
+        totalTeam1: team1,
+        totalTeam2: team2,
+        writeLockBlockedTeam1: Boolean(writeLockForTeam1 && !team1MayWrite),
+        writeLockBlockedTeam2: Boolean(writeLockForTeam2 && !team2MayWrite),
+        extras
+      };
+    }
+
+    function getScore(game) {
+      return game.rounds.reduce((acc, round) => {
+        acc.team1 += Number(round.totalTeam1 || 0);
+        acc.team2 += Number(round.totalTeam2 || 0);
+        return acc;
+      }, { team1: 0, team2: 0 });
+    }
+
+    function isFinished(game) {
+      const score = getScore(game);
+      if (game.goalMode === 'rounds') {
+        return game.rounds.length >= game.goalRounds;
+      }
+      return score.team1 >= game.goalPoints || score.team2 >= game.goalPoints;
+    }
+
+    function getProgressLabel(game) {
+      const score = getScore(game);
+      if (game.goalMode === 'rounds') {
+        return `${game.rounds.length} / ${game.goalRounds} Runden`;
+      }
+      return `${score.team1} : ${score.team2} / ${game.goalPoints}`;
+    }
+
+    function resetSetup() {
+      state.setup = {
+        team1: '',
+        team2: '',
+        goalMode: 'points',
+        goalPoints: 1000,
+        goalPointsPreset: '1000',
+        goalRounds: 4,
+        withWriteLock: false
+      };
+    }
+
+    function resetEntry() {
+      state.entry = {
+        scoringTeam: 'team1',
+        points: '',
+        bidTeam1: 0,
+        bidTeam2: 0,
+        sidiTeam1: false,
+        sidiTeam2: false,
+        doublePoints: false
+      };
+    }
+
+    function createGameFromSetup() {
+      const team1 = (state.setup.team1 || '').trim() || 'Team 1';
+      const team2 = (state.setup.team2 || '').trim() || 'Team 2';
+      const now = Date.now();
+      return {
+        id: uid(),
+        team1,
+        team2,
+        goalMode: state.setup.goalMode,
+        goalPoints: state.setup.goalPoints,
+        goalRounds: state.setup.goalRounds,
+        withWriteLock: state.setup.withWriteLock,
+        rounds: [],
+        createdAt: now,
+        updatedAt: now
+      };
+    }
+
+    function renderHome() {
+      const gamesList = $('gamesList');
+      const finishedList = $('finishedGamesList');
+      const finishedSection = $('finishedSection');
+      const running = [...state.games].filter(game => !isFinished(game)).sort((a, b) => b.updatedAt - a.updatedAt);
+      const finished = [...state.games].filter(game => isFinished(game)).sort((a, b) => b.updatedAt - a.updatedAt);
+
+      if (!running.length) {
+        gamesList.innerHTML = '<div class="empty">Noch kein laufendes Spiel gespeichert.</div>';
+      } else {
+        gamesList.innerHTML = running.map(game => {
+          const score = getScore(game);
+          const modeText = game.goalMode === 'rounds' ? `${game.goalRounds} Runden` : `${game.goalPoints} Punkte`;
+          return `
+            <div class="game-card">
+              <div class="game-card-header">
+                <div>
+                  <div class="game-title">${escapeHtml(game.team1)} vs. ${escapeHtml(game.team2)}</div>
+                  <div class="game-meta">
+                    <span>${modeText}</span>
+                    <span>${game.withWriteLock ? 'Mit Schreibsperre' : 'Ohne Schreibsperre'}</span>
+                    <span>${getProgressLabel(game)}</span>
+                    <span>Zuletzt geändert: ${formatDate(game.updatedAt)}</span>
+                  </div>
+                </div>
+                <div class="badge">Laufend</div>
+              </div>
+              <div class="pill-row">
+                <div class="pill">${escapeHtml(game.team1)} ${score.team1}</div>
+                <div class="pill">${escapeHtml(game.team2)} ${score.team2}</div>
+              </div>
+              <div class="game-actions">
+                <button class="btn" onclick="resumeGame('${game.id}')">Weiterspielen</button>
+                <button class="list-btn" onclick="deleteGame('${game.id}')">Löschen</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      if (!finished.length) {
+        finishedSection.style.display = 'none';
+      } else {
+        finishedSection.style.display = 'flex';
+        finishedList.innerHTML = finished.map(game => {
+          const score = getScore(game);
+          return `
+            <div class="game-card">
+              <div class="game-card-header">
+                <div>
+                  <div class="game-title">${escapeHtml(game.team1)} vs. ${escapeHtml(game.team2)}</div>
+                  <div class="game-meta">
+                    <span>${game.goalMode === 'rounds' ? `${game.goalRounds} Runden` : `${game.goalPoints} Punkte`}</span>
+                    <span>Endstand: ${score.team1} : ${score.team2}</span>
+                    <span>Zuletzt geändert: ${formatDate(game.updatedAt)}</span>
+                  </div>
+                </div>
+                <div class="badge done">Beendet</div>
+              </div>
+              <div class="game-actions">
+                <button class="btn-ghost" onclick="resumeGame('${game.id}')">Ansehen</button>
+                <button class="list-btn" onclick="deleteGame('${game.id}')">Löschen</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function renderSetup() {
+      $('team1Input').value = state.setup.team1;
+      $('team2Input').value = state.setup.team2;
+
+      $('pointsGoalBlock').style.display = 'flex';
+
+      document.querySelectorAll('[data-goal-points]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.goalPoints === state.setup.goalPointsPreset);
+      });
+      $('customPointsWrap').style.display = state.setup.goalPointsPreset === 'custom' ? 'grid' : 'none';
+      $('customPointsInput').value = state.setup.goalPointsPreset === 'custom' ? (state.setup.goalPoints || '') : '';
+
+      $('toggleWriteLock').classList.toggle('active', state.setup.withWriteLock);
+      $('toggleWriteLock').textContent = state.setup.withWriteLock ? 'Mit' : 'Ohne';
+    }
+
+    function getPreviewOutcome() {
+      const game = getCurrentGame();
+      const payload = getEntryPayload();
+      const scoreBefore = game ? getScore(game) : { team1: 0, team2: 0 };
+      return calculateRoundOutcome(payload, game, scoreBefore);
+    }
+
+    function renderGame() {
+      const game = getCurrentGame();
+      if (!game) {
+        setScreen('home');
+        return;
+      }
+
+      const score = getScore(game);
+      const finished = isFinished(game);
+      const preview = getPreviewOutcome();
+
+      $('gameSummary').innerHTML = `
+        <div class="pill">${game.goalMode === 'rounds' ? `${game.goalRounds} Runden` : `${game.goalPoints} Punkte`}</div>
+        <div class="pill">${game.withWriteLock ? 'Mit Schreibsperre' : 'Ohne Schreibsperre'}</div>
+        <div class="pill">${finished ? 'Spiel beendet' : 'Laufendes Spiel'}</div>
+      `;
+
+      $('scoreboard').innerHTML = `
+        <div class="score-tile">
+          <div>
+            <small>Team 1</small>
+            <div class="score-name">${escapeHtml(game.team1)}</div>
+          </div>
+          <div>
+            <div class="score-value">${score.team1}</div>
+            <div class="score-sub">${game.goalMode === 'rounds' ? `${game.rounds.length} gespielte Runden` : `Ziel: ${game.goalPoints}`}</div>
+          </div>
+        </div>
+        <div class="score-tile">
+          <div>
+            <small>Team 2</small>
+            <div class="score-name">${escapeHtml(game.team2)}</div>
+          </div>
+          <div>
+            <div class="score-value">${score.team2}</div>
+            <div class="score-sub">${game.goalMode === 'rounds' ? `${Math.max(game.goalRounds - game.rounds.length, 0)} Runden offen` : `Ziel: ${game.goalPoints}`}</div>
+          </div>
+        </div>
+      `;
+
+      $('entryTeamPicker').innerHTML = `
+        <button class="mini-btn ${state.entry.scoringTeam === 'team1' ? 'active' : ''}" onclick="setScoringTeam('team1')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team1)}</button>
+        <button class="mini-btn ${state.entry.scoringTeam === 'team2' ? 'active' : ''}" onclick="setScoringTeam('team2')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team2)}</button>
+      `;
+
+      $('entryPointsLabel').textContent = `Punkte für ${state.entry.scoringTeam === 'team1' ? game.team1 : game.team2}`;
+      $('entryPointsInput').value = state.entry.points;
+      $('entryPointsInput').disabled = finished;
+
+      $('previewTeamAName').textContent = game.team1;
+      $('previewTeamBName').textContent = game.team2;
+      $('previewTeamAPoints').textContent = preview.totalTeam1;
+      $('previewTeamBPoints').textContent = preview.totalTeam2;
+
+      $('bidTeam1Label').textContent = `Geboten ${game.team1}`;
+      $('bidTeam2Label').textContent = `Geboten ${game.team2}`;
+      $('bidTeam1Input').value = state.entry.sidiTeam1 ? 257 : state.entry.bidTeam1;
+      $('bidTeam2Input').value = state.entry.sidiTeam2 ? 257 : state.entry.bidTeam2;
+      $('bidTeam1Input').disabled = finished || state.entry.sidiTeam1;
+      $('bidTeam2Input').disabled = finished || state.entry.sidiTeam2;
+      $('toggleSidiTeam1').disabled = finished;
+      $('toggleSidiTeam2').disabled = finished;
+      $('toggleSidiTeam1').classList.toggle('active', state.entry.sidiTeam1);
+      $('toggleSidiTeam2').classList.toggle('active', state.entry.sidiTeam2);
+      $('toggleSidiTeam1').textContent = 'Sidi';
+      $('toggleSidiTeam2').textContent = 'Sidi';
+
+      $('toggleDoublePointsEntry').disabled = finished;
+      $('toggleDoublePointsEntry').classList.toggle('active', state.entry.doublePoints);
+      $('toggleDoublePointsEntry').textContent = state.entry.doublePoints ? 'Mit' : 'Ohne';
+
+      $('saveRoundBtn').disabled = finished;
+      $('saveRoundBtn').textContent = finished ? 'Spiel beendet' : 'Runde speichern';
+
+      $('undoBtn').disabled = game.rounds.length === 0;
+      $('undoBtn').style.opacity = game.rounds.length === 0 ? '.55' : '1';
+
+      const historyList = $('historyList');
+      if (!game.rounds.length) {
+        historyList.innerHTML = '<div class="empty">Noch keine Runde gespeichert.</div>';
+      } else {
+        historyList.innerHTML = [...game.rounds].reverse().map((round, reverseIndex) => {
+          const realIndex = game.rounds.length - 1 - reverseIndex;
+          const extras = [];
+          if (round.bidTeam1) extras.push(`${escapeHtml(game.team1)} ${round.sidiTeam1 ? 'Sidi' : `Gebot ${round.bidTeam1}`}`);
+          if (round.bidTeam2) extras.push(`${escapeHtml(game.team2)} ${round.sidiTeam2 ? 'Sidi' : `Gebot ${round.bidTeam2}`}`);
+          if (round.doublePoints) extras.push('Doppelte Punkte');
+          if (round.writeLockBlockedTeam1) extras.push('Schreibsperre Team 1');
+          if (round.writeLockBlockedTeam2) extras.push('Schreibsperre Team 2');
+          return `
+            <div class="history-item">
+              <div class="history-main">
+                <strong>Runde ${realIndex + 1}: ${escapeHtml(game.team1)} ${round.totalTeam1} · ${escapeHtml(game.team2)} ${round.totalTeam2}</strong>
+                <span>Basis 157: ${round.baseTeam1} : ${round.baseTeam2}${extras.length ? ' · ' + extras.join(' · ') : ''}</span>
+              </div>
+              <div class="history-actions">
+                <button class="list-btn" onclick="deleteRound(${realIndex})">Löschen</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function resumeGame(gameId) {
+      state.currentGameId = gameId;
+      resetEntry();
+      saveGames();
+      setScreen('game');
+    }
+
+    function deleteGame(gameId) {
+      const game = state.games.find(item => item.id === gameId);
+      if (!game) return;
+      const ok = window.confirm(`Spiel "${game.team1} vs. ${game.team2}" löschen?`);
+      if (!ok) return;
+      state.games = state.games.filter(item => item.id !== gameId);
+      if (state.currentGameId === gameId) {
+        state.currentGameId = null;
+        localStorage.removeItem(CURRENT_KEY);
+      }
+      saveGames();
+      renderHome();
+    }
+
+    function setScoringTeam(teamKey) {
+      state.entry.scoringTeam = teamKey;
+      renderGame();
+    }
+
+    function toggleSidi(teamKey) {
+      if (teamKey === 'team1') {
+        state.entry.sidiTeam1 = !state.entry.sidiTeam1;
+        state.entry.bidTeam1 = state.entry.sidiTeam1 ? 257 : 0;
+      } else {
+        state.entry.sidiTeam2 = !state.entry.sidiTeam2;
+        state.entry.bidTeam2 = state.entry.sidiTeam2 ? 257 : 0;
+      }
+      renderGame();
+    }
+
+    function toggleDoublePointsEntry() {
+      state.entry.doublePoints = !state.entry.doublePoints;
+      renderGame();
+    }
+
+    function saveCurrentGameMutation(mutator) {
+      const game = getCurrentGame();
+      if (!game) return;
+      mutator(game);
+      game.updatedAt = Date.now();
+      saveGames();
+      renderGame();
+    }
+
+    function deleteRound(index) {
+      const game = getCurrentGame();
+      if (!game || !game.rounds[index]) return;
+      const ok = window.confirm(`Runde ${index + 1} wirklich löschen?`);
+      if (!ok) return;
+      saveCurrentGameMutation((current) => {
+        current.rounds.splice(index, 1);
+      });
+    }
+
+    function undoLastRound() {
+      const game = getCurrentGame();
+      if (!game || !game.rounds.length) return;
+      const ok = window.confirm('Letzte Runde wirklich rückgängig machen?');
+      if (!ok) return;
+      saveCurrentGameMutation((current) => {
+        current.rounds.pop();
+      });
+    }
+
+    function startNewGame() {
+      let goalPoints = state.setup.goalPoints;
+      if (state.setup.goalMode === 'points') {
+        if (state.setup.goalPointsPreset === 'custom') {
+          goalPoints = Number($('customPointsInput').value);
+        }
+        if (!Number.isFinite(goalPoints) || goalPoints <= 0) {
+          alert('Bitte ein gültiges Punktziel eingeben.');
+          return;
+        }
+      }
+
+      state.setup.team1 = $('team1Input').value.trim();
+      state.setup.team2 = $('team2Input').value.trim();
+      state.setup.goalPoints = Math.round(goalPoints || 1000);
+
+      const game = createGameFromSetup();
+      state.games.unshift(game);
+      state.currentGameId = game.id;
+      saveGames();
+      resetEntry();
+      setScreen('game');
+    }
+
+    function saveRound() {
+      const game = getCurrentGame();
+      if (!game) return;
+
+      const payload = getEntryPayload();
+      const raw = getRawRoundValues(payload);
+      if (raw.baseTeam1 < 0 || raw.baseTeam1 > 157 || raw.baseTeam2 < 0 || raw.baseTeam2 > 157) {
+        alert('Bitte einen Wert zwischen 0 und 157 eingeben.');
+        return;
+      }
+
+      const scoreBefore = getScore(game);
+      const outcome = calculateRoundOutcome(payload, game, scoreBefore);
+
+      saveCurrentGameMutation((current) => {
+        current.rounds.push({
+          ...outcome,
+          scoringTeam: payload.scoringTeam,
+          enteredPoints: clampInt(payload.points, 0, 157),
+          createdAt: Date.now()
+        });
+      });
+
+      resetEntry();
+      renderGame();
+    }
+
+    function attachEvents() {
+      $('newGameBtn').addEventListener('click', () => {
+        resetSetup();
+        renderSetup();
+        setScreen('setup');
+      });
+
+      const backToHomeFromSetup = $('backToHomeFromSetup');
+      if (backToHomeFromSetup) {
+        backToHomeFromSetup.addEventListener('click', () => setScreen('home'));
+      }
+
+      const backHomeFromGame = $('backHomeFromGame');
+      if (backHomeFromGame) {
+        backHomeFromGame.addEventListener('click', () => setScreen('home'));
+      }
+
+      $('startGameBtn').addEventListener('click', startNewGame);
+      $('saveRoundBtn').addEventListener('click', saveRound);
+      $('undoBtn').addEventListener('click', undoLastRound);
+
+      $('team1Input').addEventListener('input', (e) => state.setup.team1 = e.target.value);
+      $('team2Input').addEventListener('input', (e) => state.setup.team2 = e.target.value);
+      $('customPointsInput').addEventListener('input', (e) => {
+        const value = Number(e.target.value);
+        if (Number.isFinite(value) && value > 0) state.setup.goalPoints = Math.round(value);
+      });
+
+      document.querySelectorAll('[data-goal-points]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.setup.goalPointsPreset = btn.dataset.goalPoints;
+          if (btn.dataset.goalPoints !== 'custom') {
+            state.setup.goalPoints = Number(btn.dataset.goalPoints);
+          }
+          renderSetup();
+        });
+      });
+
+      $('toggleWriteLock').addEventListener('click', () => {
+        state.setup.withWriteLock = !state.setup.withWriteLock;
+        renderSetup();
+      });
+
+      $('entryPointsInput').addEventListener('input', (e) => {
+        state.entry.points = e.target.value;
+        renderGame();
+      });
+
+      $('bidTeam1Input').addEventListener('input', (e) => {
+        state.entry.bidTeam1 = clampInt(e.target.value, 0, 157);
+        renderGame();
+      });
+
+      $('bidTeam2Input').addEventListener('input', (e) => {
+        state.entry.bidTeam2 = clampInt(e.target.value, 0, 157);
+        renderGame();
+      });
+
+      $('toggleSidiTeam1').addEventListener('click', () => toggleSidi('team1'));
+      $('toggleSidiTeam2').addEventListener('click', () => toggleSidi('team2'));
+      $('toggleDoublePointsEntry').addEventListener('click', toggleDoublePointsEntry);
+    }
+
+    window.resumeGame = resumeGame;
+    window.deleteGame = deleteGame;
+    window.setScoringTeam = setScoringTeam;
+    window.deleteRound = deleteRound;
+
+    function init() {
+      loadGames();
+      attachEvents();
+      const lastGameId = localStorage.getItem(CURRENT_KEY);
+      if (lastGameId && state.games.some(game => game.id === lastGameId)) {
+        state.currentGameId = lastGameId;
+      }
+      setScreen('home');
+    }
+
+    init();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('service-worker.js').catch(function (error) {
+          console.error('Service Worker konnte nicht registriert werden.', error);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
