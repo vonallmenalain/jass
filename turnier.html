@@ -2564,6 +2564,8 @@
     };
 
     const STORAGE_KEY = 'jass-turniere-v1';
+    const BACKUP_STORAGE_KEY = 'jass-turniere-backup-v1';
+    const LEGACY_STORAGE_KEYS = ['jass-turniere', 'jass-turniere-v0'];
     const CURRENT_KEY = 'jass-turniere-current-v1';
 
     const state = {
@@ -2656,11 +2658,30 @@
       return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     }
 
-    function loadTournaments() {
+    function parseStoredTournaments(raw) {
+      if (!raw) return [];
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        state.tournaments = raw ? JSON.parse(raw) : [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
       } catch (error) {
+        return [];
+      }
+    }
+
+    function loadTournaments() {
+      const fromPrimary = parseStoredTournaments(localStorage.getItem(STORAGE_KEY));
+      const fromBackup = parseStoredTournaments(localStorage.getItem(BACKUP_STORAGE_KEY));
+      const fromLegacy = LEGACY_STORAGE_KEYS
+        .map((key) => parseStoredTournaments(localStorage.getItem(key)))
+        .find((items) => items.length > 0) || [];
+
+      if (fromPrimary.length > 0) {
+        state.tournaments = fromPrimary;
+      } else if (fromBackup.length > 0) {
+        state.tournaments = fromBackup;
+      } else if (fromLegacy.length > 0) {
+        state.tournaments = fromLegacy;
+      } else {
         state.tournaments = [];
       }
       state.tournaments = state.tournaments.map(normalizeTournament);
@@ -2674,6 +2695,9 @@
 
     function saveTournaments() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tournaments));
+      if (state.tournaments.length > 0) {
+        localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(state.tournaments));
+      }
       if (state.currentTournamentId) {
         localStorage.setItem(CURRENT_KEY, state.currentTournamentId);
       } else {
