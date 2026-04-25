@@ -3202,9 +3202,8 @@
               .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
             const previousLocal = state.tournaments.map(cloneData);
-            const isFirstSnapshot = !state.firebase.hasReceivedSnapshot;
             state.firebase.hasReceivedSnapshot = true;
-            const shouldKeepLocalFallback = isFirstSnapshot && remoteTournaments.length === 0 && previousLocal.length > 0;
+            const shouldKeepLocalFallback = remoteTournaments.length === 0 && previousLocal.length > 0;
 
             const wasMissing = state.currentTournamentId && !getTournament(state.currentTournamentId);
 
