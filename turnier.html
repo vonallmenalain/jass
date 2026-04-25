@@ -2411,6 +2411,7 @@
       roundViews: {},
       finishedRoundPanels: {},
       drafts: {},
+      liveSyncTimers: {},
       showdownPendingReveal: {},
       dashboard: {
         selectedPlayerName: '',
@@ -2464,6 +2465,7 @@
     const ROUND_OPTIONS = [2, 3, 4];
     const YES_NO_OPTIONS = [0, 1];
     const SHOWDOWN_ORDER_OPTIONS = ['top', 'bottom'];
+    const LIVE_SYNC_DEBOUNCE_MS = 320;
 
     const $ = (id) => document.getElementById(id);
 
@@ -2800,11 +2802,84 @@
       delete state.drafts[getDraftKey(tournamentId, roundIndex, tableIndex)];
     }
 
+    function getLiveSyncKey(tournamentId, roundIndex, tableIndex) {
+      return `${tournamentId}__${roundIndex}__${tableIndex}`;
+    }
+
+    function clearLiveSyncTimer(tournamentId, roundIndex, tableIndex) {
+      const key = getLiveSyncKey(tournamentId, roundIndex, tableIndex);
+      const timer = state.liveSyncTimers[key];
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+      delete state.liveSyncTimers[key];
+    }
+
+    async function syncDraftTableResultLive(tournamentId, roundIndex, tableIndex) {
+      const tournament = getTournament(tournamentId);
+      if (!tournament) return;
+      if (!canEditViewedRound(tournament, roundIndex)) return;
+
+      const tableEntry = tournament.rounds?.[roundIndex]?.tables?.[tableIndex];
+      if (!tableEntry || tableEntry.entryMode === 'counter') return;
+
+      const total = totalPointsPerTable(tournament);
+      const draft = getTableDraft(tournamentId, roundIndex, tableIndex);
+      const selectedTeam = draft.entryTeam || tableEntry.entryTeam || (tableEntry.result ? tableEntry.result.enteredTeam : 'team1');
+      const rawValue = draft.enteredPoints;
+
+      if (rawValue === '' || rawValue === null || rawValue === undefined) {
+        if (!tableEntry.result) return;
+        await mutateTournament(tournamentId, (draftTournament) => {
+          const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[tableIndex];
+          if (!draftTable) return draftTournament;
+          draftTable.result = null;
+          return draftTournament;
+        }, { renderAfter: false });
+        return;
+      }
+
+      const entered = Number(rawValue);
+      if (!Number.isFinite(entered) || entered < 0 || entered > total) return;
+
+      const team1Points = selectedTeam === 'team1' ? entered : total - entered;
+      const team2Points = total - team1Points;
+
+      await mutateTournament(tournamentId, (draftTournament) => {
+        const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[tableIndex];
+        if (!draftTable) return draftTournament;
+        draftTable.entryMode = 'manual';
+        draftTable.entryTeam = selectedTeam;
+        draftTable.counter = normalizeCounterState(null, draftTournament.dealsPerRound);
+        draftTable.result = {
+          enteredTeam: selectedTeam,
+          enteredPoints: entered,
+          team1Points,
+          team2Points
+        };
+        return draftTournament;
+      }, { renderAfter: false });
+    }
+
+    function scheduleDraftTableLiveSync(tournamentId, roundIndex, tableIndex) {
+      clearLiveSyncTimer(tournamentId, roundIndex, tableIndex);
+      const key = getLiveSyncKey(tournamentId, roundIndex, tableIndex);
+      state.liveSyncTimers[key] = window.setTimeout(() => {
+        delete state.liveSyncTimers[key];
+        syncDraftTableResultLive(tournamentId, roundIndex, tableIndex);
+      }, LIVE_SYNC_DEBOUNCE_MS);
+    }
+
     function clearTournamentDrafts(tournamentId) {
       Object.keys(state.drafts).forEach(key => {
         if (key.startsWith(`${tournamentId}__`)) {
           delete state.drafts[key];
         }
+      });
+      Object.keys(state.liveSyncTimers).forEach(key => {
+        if (!key.startsWith(`${tournamentId}__`)) return;
+        window.clearTimeout(state.liveSyncTimers[key]);
+        delete state.liveSyncTimers[key];
       });
     }
 
@@ -4454,7 +4529,8 @@
             </div>
             ${isLockedSavedResult
               ? ''
-              : `<button class="btn btn-compact" type="button" data-save-table="${tableIdx}" data-round-index="${roundIndex}">Ergebnis speichern</button>`}
+              : `<div class="table-readonly-note" style="text-align:center;">Live-Sync aktiv: Die Eingabe wird automatisch auf allen Geräten aktualisiert.</div>
+                 <button class="btn btn-compact" type="button" data-save-table="${tableIdx}" data-round-index="${roundIndex}">Ergebnis bestätigen</button>`}
           </div>
         `;
 
@@ -4947,6 +5023,7 @@
             entryTeam: activeTeam,
             enteredPoints: input.value
           });
+          scheduleDraftTableLiveSync(activeTournament.id, viewRoundIndex, tableIndex);
 
           const otherTeam = activeTeam === 'team1' ? 'team2' : 'team1';
           const otherInput = $(`points_${otherTeam}_${viewRoundIndex}_${tableIndex}`);
@@ -4987,6 +5064,7 @@
           if (!activeTournament) return;
 
           if (!canEditViewedRound(activeTournament, viewRoundIndex)) return;
+          clearLiveSyncTimer(activeTournament.id, viewRoundIndex, tableIndex);
 
           const tableEntry = activeTournament.rounds[viewRoundIndex].tables[tableIndex];
           const draft = getTableDraft(activeTournament.id, viewRoundIndex, tableIndex);
