@@ -630,6 +630,19 @@
       .preview-team span { font-size: 24px; }
       .match-grid { grid-template-columns: 1fr; }
     }
+
+    .tap-input { caret-color: transparent; user-select: none; -webkit-user-select: none; cursor: pointer; }
+    .tap-input::selection { background: transparent; }
+    .keypad-backdrop { position: fixed; inset: 0; display: none; align-items: flex-end; justify-content: center; background: rgba(3,7,18,.58); z-index: 80; padding: 12px; }
+    .keypad-backdrop.show { display: flex; }
+    .keypad-sheet { width: min(100%, 420px); border-radius: 22px; border: 1px solid var(--border); background: rgba(15,23,42,.96); padding: 14px; display: grid; gap: 12px; }
+    .keypad-head { display:flex; align-items:center; justify-content:space-between; }
+    .keypad-title { font-size:13px; color:var(--muted); font-weight:700; }
+    .keypad-display { min-height:66px; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; font-size:34px; font-weight:900; }
+    .keypad-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+    .keypad-btn { min-height:56px; border-radius:14px; font-size:22px; font-weight:900; }
+    .keypad-btn.action { font-size:16px; font-weight:800; }
+    .keypad-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   </style>
 </head>
 <body>
@@ -717,7 +730,7 @@
           </div>
           <div class="input-group" id="customPointsWrap" style="display:none;">
             <label for="customPointsInput">Eigenes Punktziel</label>
-            <input id="customPointsInput" type="number" inputmode="numeric" min="1" step="1" placeholder="z. B. 2000" />
+            <input id="customPointsInput" class="tap-input" type="text" inputmode="none" placeholder="z. B. 2000" readonly />
           </div>
         </div>
 
@@ -786,7 +799,7 @@
 
         <div class="point-input-wrap">
           <label class="label" id="entryPointsLabel" for="entryPointsInput">Punkte eingeben</label>
-          <input id="entryPointsInput" class="point-input" type="number" inputmode="numeric" min="0" max="157" step="1" placeholder="0 bis 157" />
+          <input id="entryPointsInput" class="point-input tap-input" type="text" inputmode="none" placeholder="0 bis 157" readonly />
         </div>
 
         <div class="preview-box">
@@ -805,11 +818,11 @@
           <div class="section-title" style="margin-bottom:0;">Weisen</div>
           <div class="input-group">
             <label for="weisenTeam1Input" id="weisenTeam1Label">Weisen Team 1</label>
-            <input id="weisenTeam1Input" type="number" inputmode="numeric" min="0" step="1" placeholder="0" value="0" />
+            <input id="weisenTeam1Input" class="tap-input" type="text" inputmode="none" placeholder="0" value="0" readonly />
           </div>
           <div class="input-group">
             <label for="weisenTeam2Input" id="weisenTeam2Label">Weisen Team 2</label>
-            <input id="weisenTeam2Input" type="number" inputmode="numeric" min="0" step="1" placeholder="0" value="0" />
+            <input id="weisenTeam2Input" class="tap-input" type="text" inputmode="none" placeholder="0" value="0" readonly />
           </div>
         </div>
 
@@ -837,6 +850,26 @@
       </div>
       <div class="footer-space"></div>
     </section>
+  </div>
+
+  <div class="keypad-backdrop" id="mobileKeypadBackdrop" aria-hidden="true">
+    <div class="keypad-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileKeypadTitle">
+      <div class="keypad-head">
+        <div class="keypad-title" id="mobileKeypadTitle">Punkte eingeben</div>
+        <button class="icon-btn" type="button" id="mobileKeypadCloseBtn">×</button>
+      </div>
+      <div class="keypad-display" id="mobileKeypadDisplay">0</div>
+      <div class="keypad-grid">
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="1">1</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="2">2</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="3">3</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="4">4</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="5">5</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="6">6</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="7">7</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="8">8</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="9">9</button>
+        <button class="btn-ghost keypad-btn action" type="button" data-keypad-clear>C</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="0">0</button><button class="btn-ghost keypad-btn action" type="button" data-keypad-backspace>⌫</button>
+      </div>
+      <div class="keypad-actions">
+        <button class="btn-ghost" type="button" id="mobileKeypadCancelBtn">Abbrechen</button>
+        <button class="btn" type="button" id="mobileKeypadDoneBtn">Übernehmen</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -867,6 +900,43 @@
     };
 
     const $ = (id) => document.getElementById(id);
+    let keypadSession = null;
+
+    function closeMobileKeypad() {
+      keypadSession = null;
+      $('mobileKeypadBackdrop').classList.remove('show');
+      $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'true');
+    }
+    function openMobileKeypad(inputId, title, maxValue = null) {
+      const input = $(inputId);
+      if (!input || input.disabled) return;
+      keypadSession = { inputId, maxValue: Number.isFinite(maxValue) ? maxValue : null, value: String(input.value || '').replace(/[^\d]/g, '') };
+      $('mobileKeypadTitle').textContent = title || 'Punkte eingeben';
+      $('mobileKeypadDisplay').textContent = keypadSession.value || '0';
+      $('mobileKeypadBackdrop').classList.add('show');
+      $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'false');
+    }
+    function syncKeypadValue(closeAfter = false) {
+      if (!keypadSession) return;
+      const input = $(keypadSession.inputId);
+      if (!input) return closeMobileKeypad();
+      input.value = keypadSession.value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      if (closeAfter) closeMobileKeypad();
+    }
+    function setKeypadValue(raw) {
+      if (!keypadSession) return;
+      const normalized = String(raw || '').replace(/[^\d]/g, '');
+      if (!normalized) {
+        keypadSession.value = '';
+      } else {
+        const numeric = Number(normalized);
+        if (Number.isFinite(keypadSession.maxValue) && numeric > keypadSession.maxValue) return;
+        keypadSession.value = String(numeric);
+      }
+      $('mobileKeypadDisplay').textContent = keypadSession.value || '0';
+      syncKeypadValue(false);
+    }
 
     const screens = {
       home: $('homeScreen'),
@@ -1442,6 +1512,23 @@
       });
       $('weisenTeam2Input').addEventListener('input', (e) => {
         state.entry.weisenTeam2 = Math.max(0, Number(e.target.value) || 0);
+      });
+
+      $('customPointsInput').addEventListener('click', () => openMobileKeypad('customPointsInput', 'Punktziel'));
+      $('entryPointsInput').addEventListener('click', () => openMobileKeypad('entryPointsInput', 'Rundenpunkte', 157));
+      $('weisenTeam1Input').addEventListener('click', () => openMobileKeypad('weisenTeam1Input', 'Weisen Team 1'));
+      $('weisenTeam2Input').addEventListener('click', () => openMobileKeypad('weisenTeam2Input', 'Weisen Team 2'));
+      $('mobileKeypadBackdrop').addEventListener('click', (event) => {
+        if (event.target === $('mobileKeypadBackdrop')) closeMobileKeypad();
+      });
+      $('mobileKeypadCloseBtn').addEventListener('click', closeMobileKeypad);
+      $('mobileKeypadCancelBtn').addEventListener('click', closeMobileKeypad);
+      $('mobileKeypadDoneBtn').addEventListener('click', () => syncKeypadValue(true));
+      document.querySelectorAll('[data-keypad-digit]').forEach((btn) => btn.addEventListener('click', () => setKeypadValue(`${keypadSession?.value || ''}${btn.dataset.keypadDigit}`)));
+      document.querySelector('[data-keypad-clear]').addEventListener('click', () => setKeypadValue(''));
+      document.querySelector('[data-keypad-backspace]').addEventListener('click', () => setKeypadValue((keypadSession?.value || '').slice(0, -1)));
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && $('mobileKeypadBackdrop').classList.contains('show')) closeMobileKeypad();
       });
     }
 
