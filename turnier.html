@@ -3142,7 +3142,21 @@
             }
 
             saveTournaments();
-            if (state.screen !== 'players') {
+
+            if (state.screen === 'players') {
+              const current = state.currentTournamentId ? getTournament(state.currentTournamentId) : null;
+              const activeElement = document.activeElement;
+              const isTypingPlayerName = Boolean(
+                activeElement &&
+                activeElement.matches &&
+                activeElement.matches('#playerInputs [data-player-index]')
+              );
+
+              if (current && !current.started && !isTypingPlayerName) {
+                loadSetupFromTournament(current);
+                render();
+              }
+            } else {
               render();
             }
           },
