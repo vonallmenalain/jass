@@ -1793,6 +1793,17 @@
       background: rgba(248, 113, 113, 0.10);
     }
 
+    .tap-input {
+      caret-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+    }
+
+    .tap-input::selection {
+      background: transparent;
+    }
+
     .counter-preview-box {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -2155,6 +2166,84 @@
       .pairings-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .jass-table-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
+
+    .keypad-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      background: rgba(3, 7, 18, 0.58);
+      z-index: 80;
+      padding: 12px;
+    }
+
+    .keypad-backdrop.show {
+      display: flex;
+    }
+
+    .keypad-sheet {
+      width: min(100%, 420px);
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .keypad-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .keypad-title {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .keypad-display {
+      min-height: 66px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .keypad-btn {
+      min-height: 56px;
+      border-radius: 14px;
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .keypad-btn.action {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .keypad-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
   </style>
 </head>
 <body>
@@ -2385,6 +2474,34 @@
     </div>
   </div>
 
+  <div class="keypad-backdrop" id="mobileKeypadBackdrop" aria-hidden="true">
+    <div class="keypad-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileKeypadTitle">
+      <div class="keypad-head">
+        <div class="keypad-title" id="mobileKeypadTitle">Punkte eingeben</div>
+        <button class="icon-btn" type="button" id="mobileKeypadCloseBtn" aria-label="Schliessen">×</button>
+      </div>
+      <div class="keypad-display" id="mobileKeypadDisplay">0</div>
+      <div class="keypad-grid">
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="1">1</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="2">2</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="3">3</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="4">4</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="5">5</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="6">6</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="7">7</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="8">8</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="9">9</button>
+        <button class="btn-ghost keypad-btn action" type="button" data-keypad-clear>C</button>
+        <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="0">0</button>
+        <button class="btn-ghost keypad-btn action" type="button" data-keypad-backspace>⌫</button>
+      </div>
+      <div class="keypad-actions">
+        <button class="btn-ghost" type="button" id="mobileKeypadCancelBtn">Abbrechen</button>
+        <button class="btn" type="button" id="mobileKeypadDoneBtn">Übernehmen</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -2476,6 +2593,7 @@
 
     let setupSyncTimer = null;
     let counterModalSyncTimer = null;
+    let keypadSession = null;
 
     function uid(prefix = 'id') {
       return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -2521,6 +2639,70 @@
 
     function cloneData(value) {
       return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    }
+
+    function parseKeypadNumber(value, fallback = 0) {
+      const normalized = String(value ?? '').replace(/[^\d]/g, '');
+      if (!normalized) return fallback;
+      const numeric = Number(normalized);
+      return Number.isFinite(numeric) ? numeric : fallback;
+    }
+
+    function updateMobileKeypadDisplay() {
+      const display = $('mobileKeypadDisplay');
+      if (!display) return;
+      const value = keypadSession?.value ?? '';
+      display.textContent = value === '' ? '0' : value;
+    }
+
+    function closeMobileKeypad() {
+      keypadSession = null;
+      $('mobileKeypadBackdrop').classList.remove('show');
+      $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'true');
+    }
+
+    function applyMobileKeypadValue(closeAfterApply = false) {
+      if (!keypadSession) return;
+      const target = $(keypadSession.targetId);
+      if (!target) {
+        closeMobileKeypad();
+        return;
+      }
+      target.value = keypadSession.value;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      if (closeAfterApply) closeMobileKeypad();
+    }
+
+    function openMobileKeypad(options) {
+      const { inputId, title, maxValue = null } = options;
+      const target = $(inputId);
+      if (!target) return;
+      const currentRaw = String(target.value ?? '').replace(/[^\d]/g, '');
+      keypadSession = {
+        targetId: inputId,
+        title: title || 'Punkte eingeben',
+        maxValue: Number.isFinite(maxValue) ? maxValue : null,
+        value: currentRaw
+      };
+      $('mobileKeypadTitle').textContent = keypadSession.title;
+      updateMobileKeypadDisplay();
+      $('mobileKeypadBackdrop').classList.add('show');
+      $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'false');
+      target.dispatchEvent(new Event('focus', { bubbles: true }));
+    }
+
+    function setKeypadValue(nextValue) {
+      if (!keypadSession) return;
+      const normalized = String(nextValue ?? '').replace(/[^\d]/g, '');
+      if (normalized === '') {
+        keypadSession.value = '';
+      } else {
+        const numberValue = parseKeypadNumber(normalized, 0);
+        if (Number.isFinite(keypadSession.maxValue) && numberValue > keypadSession.maxValue) return;
+        keypadSession.value = String(numberValue);
+      }
+      updateMobileKeypadDisplay();
+      applyMobileKeypadValue(false);
     }
 
     function defaultProtectionTargets(source = {}) {
@@ -4444,11 +4626,11 @@
             <div class="score-input-container"${isLockedSavedResult ? ' style="opacity: 0.85;"' : ''}>
               <div class="score-side team1-side ${activeTeam === 'team1' ? 'active-side' : ''}">
                 <div class="score-names">${renderDashboardNameList([p_t1_1, p_t1_2], allowDashboardLinks)}</div>
-                <input id="points_team1_${roundIndex}_${tableIdx}" type="number" inputmode="numeric" min="0" max="${total}" step="1" value="${valT1}" class="score-input" data-team="team1" data-table-index="${tableIdx}" data-round-index="${roundIndex}" ${isLockedSavedResult ? 'readonly tabindex="-1"' : ''} />
+                <input id="points_team1_${roundIndex}_${tableIdx}" type="text" inputmode="none" value="${valT1}" class="score-input tap-input" data-locked="${isLockedSavedResult ? 'true' : 'false'}" data-team="team1" data-table-index="${tableIdx}" data-round-index="${roundIndex}" readonly ${isLockedSavedResult ? 'tabindex="-1"' : ''} />
               </div>
               <div class="score-vs">:</div>
               <div class="score-side team2-side ${activeTeam === 'team2' ? 'active-side' : ''}">
-                <input id="points_team2_${roundIndex}_${tableIdx}" type="number" inputmode="numeric" min="0" max="${total}" step="1" value="${valT2}" class="score-input" data-team="team2" data-table-index="${tableIdx}" data-round-index="${roundIndex}" ${isLockedSavedResult ? 'readonly tabindex="-1"' : ''} />
+                <input id="points_team2_${roundIndex}_${tableIdx}" type="text" inputmode="none" value="${valT2}" class="score-input tap-input" data-locked="${isLockedSavedResult ? 'true' : 'false'}" data-team="team2" data-table-index="${tableIdx}" data-round-index="${roundIndex}" readonly ${isLockedSavedResult ? 'tabindex="-1"' : ''} />
                 <div class="score-names">${renderDashboardNameList([p_t2_1, p_t2_2], allowDashboardLinks)}</div>
               </div>
             </div>
@@ -4521,6 +4703,7 @@
 
     function closeCounterModal(options = {}) {
       clearCounterModalSyncTimer();
+      closeMobileKeypad();
 
       state.counterModal = {
         open: false,
@@ -4782,7 +4965,7 @@
             </div>
 
             <div class="counter-point-input-wrap">
-              <input id="counterEntryPointsInput" class="counter-point-input ${inputInvalid ? 'invalid' : ''}" type="number" inputmode="numeric" min="0" max="${POINTS_PER_DEAL}" step="1" placeholder="0 bis ${POINTS_PER_DEAL}" value="${escapeHtml(String(entry.points ?? ''))}" data-counter-input />
+              <input id="counterEntryPointsInput" class="counter-point-input tap-input ${inputInvalid ? 'invalid' : ''}" type="text" inputmode="none" placeholder="0 bis ${POINTS_PER_DEAL}" value="${escapeHtml(String(entry.points ?? ''))}" data-counter-input readonly />
             </div>
 
             ${renderCounterModalPreview(team1Names, team2Names, entry)}
@@ -4829,6 +5012,13 @@
 
       const pointsInput = $('counterEntryPointsInput');
       if (pointsInput) {
+        pointsInput.addEventListener('click', () => {
+          openMobileKeypad({
+            inputId: 'counterEntryPointsInput',
+            title: 'Austeilrunde · Punkte',
+            maxValue: POINTS_PER_DEAL
+          });
+        });
         pointsInput.addEventListener('input', (event) => {
           setCounterModalEntry({ points: event.target.value });
           const previewBuiltDeal = buildCounterDealFromEntry(getCounterModalEntry());
@@ -4840,11 +5030,6 @@
           }
         });
 
-        pointsInput.addEventListener('keydown', (event) => {
-          if (event.key !== 'Enter') return;
-          event.preventDefault();
-          saveCounterDealFromModal();
-        });
       }
 
       $('saveCounterDealBtn')?.addEventListener('click', () => {
@@ -4895,9 +5080,12 @@
           const team = button.dataset.pickTeam;
           
           const input = $(`points_${team}_${viewRoundIndex}_${tableIndex}`);
-          if (input && !input.readOnly) {
-              input.focus(); 
-          }
+          if (!input || input.dataset.locked === 'true') return;
+          openMobileKeypad({
+            inputId: input.id,
+            title: 'Direkte Eingabe',
+            maxValue: total
+          });
         });
       });
 
@@ -4935,7 +5123,14 @@
       });
 
       $('activeRoundTables').querySelectorAll('input.score-input').forEach(input => {
-        if (input.readOnly) return;
+        if (input.dataset.locked === 'true') return;
+        input.addEventListener('click', () => {
+          openMobileKeypad({
+            inputId: input.id,
+            title: 'Direkte Eingabe',
+            maxValue: total
+          });
+        });
         const updateState = () => {
           const tableIndex = Number(input.dataset.tableIndex);
           const viewRoundIndex = Number(input.dataset.roundIndex);
@@ -5836,6 +6031,10 @@
     });
 
     document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && $('mobileKeypadBackdrop').classList.contains('show')) {
+        closeMobileKeypad();
+        return;
+      }
       if (event.key === 'Escape' && $('passwordPromptBackdrop').classList.contains('show')) {
         closePasswordPrompt(null);
         return;
@@ -5855,6 +6054,28 @@
       if (event.key === 'Escape' && $('pairingsModalBackdrop').classList.contains('show')) {
         closeModal();
       }
+    });
+
+    $('mobileKeypadBackdrop').addEventListener('click', (event) => {
+      if (event.target === $('mobileKeypadBackdrop')) closeMobileKeypad();
+    });
+    $('mobileKeypadCloseBtn').addEventListener('click', closeMobileKeypad);
+    $('mobileKeypadCancelBtn').addEventListener('click', closeMobileKeypad);
+    $('mobileKeypadDoneBtn').addEventListener('click', () => {
+      applyMobileKeypadValue(true);
+    });
+    document.querySelectorAll('[data-keypad-digit]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!keypadSession) return;
+        const rawDigit = String(button.dataset.keypadDigit || '');
+        if (!/^\d$/.test(rawDigit)) return;
+        setKeypadValue(`${keypadSession.value}${rawDigit}`);
+      });
+    });
+    document.querySelector('[data-keypad-clear]')?.addEventListener('click', () => setKeypadValue(''));
+    document.querySelector('[data-keypad-backspace]')?.addEventListener('click', () => {
+      if (!keypadSession) return;
+      setKeypadValue(keypadSession.value.slice(0, -1));
     });
 
     // --- INITIALISIERUNG ---
