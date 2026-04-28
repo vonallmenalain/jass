@@ -1840,6 +1840,63 @@
       font-weight: 900;
     }
 
+    .variable-counter-entry {
+      display: flex;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .variable-counter-team-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .variable-counter-team-block.team1-block {
+      align-items: flex-start;
+    }
+
+    .variable-counter-team-block.team2-block {
+      align-items: flex-end;
+    }
+
+    .variable-counter-team-name {
+      font-size: 14px;
+      font-weight: 700;
+      word-break: break-word;
+      line-height: 1.2;
+    }
+
+    .variable-counter-team-block.team2-block .variable-counter-team-name {
+      text-align: right;
+    }
+
+    .variable-counter-field {
+      width: 100%;
+    }
+
+    .variable-counter-field .counter-point-input {
+      width: 100%;
+    }
+
+    .match-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .match-btn.match-active {
+      background: rgba(34, 197, 94, 0.18);
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #22c55e;
+    }
+
+    .weisen-input-disabled {
+      opacity: 0.38;
+      pointer-events: none;
+      cursor: default;
+    }
+
     .counter-history-list {
       display: grid;
       gap: 10px;
@@ -1914,6 +1971,16 @@
 
       .counter-preview-sep {
         display: none;
+      }
+
+      .variable-counter-entry {
+        flex-direction: column;
+      }
+
+      .variable-counter-team-block.team1-block,
+      .variable-counter-team-block.team2-block {
+        align-items: flex-start;
+        width: 100%;
       }
     }
 
@@ -2303,6 +2370,11 @@
         </div>
 
         <div>
+          <div class="section-title">Turniermodus</div>
+          <div id="tournamentModeGrid" class="chip-grid"></div>
+        </div>
+
+        <div>
           <div class="section-title">Passwortschutz</div>
           <div id="passwordProtectionGrid" class="chip-grid rounds"></div>
         </div>
@@ -2544,7 +2616,13 @@
         tableIndex: null,
         entry: {
           scoringTeam: 'team1',
-          points: ''
+          points: '',
+          team1Points: '',
+          team2Points: '',
+          team1Match: false,
+          team2Match: false,
+          team1Weisen: 0,
+          team2Weisen: 0
         }
       },
       firebase: {
@@ -2563,6 +2641,7 @@
         playerCount: 8,
         dealsPerRound: 8,
         roundCount: 3,
+        tournamentMode: 'fixed157',
         passwordProtectionEnabled: false,
         protectionTargets: {
           ranking: false,
@@ -2582,6 +2661,7 @@
     const ROUND_OPTIONS = [2, 3, 4];
     const YES_NO_OPTIONS = [0, 1];
     const SHOWDOWN_ORDER_OPTIONS = ['top', 'bottom'];
+    const TOURNAMENT_MODE_OPTIONS = ['fixed157', 'variable'];
 
     const $ = (id) => document.getElementById(id);
 
@@ -2722,6 +2802,7 @@
         playerCount: 8,
         dealsPerRound: 8,
         roundCount: 3,
+        tournamentMode: 'fixed157',
         passwordProtectionEnabled: false,
         protectionTargets: defaultProtectionTargets(),
         protectionPassword: '',
@@ -2745,6 +2826,7 @@
         playerCount: tournament.playerCount || 8,
         dealsPerRound: tournament.dealsPerRound || 8,
         roundCount: tournament.roundCount || 3,
+        tournamentMode: tournament.tournamentMode === 'variable' ? 'variable' : 'fixed157',
         passwordProtectionEnabled: Boolean(tournament.passwordProtectionEnabled),
         protectionTargets: defaultProtectionTargets(tournament.protectionTargets || {}),
         protectionPassword: tournament.passwordProtectionEnabled ? String(tournament.protectionPassword || '') : '',
@@ -2777,6 +2859,7 @@
         playerCount: state.setup.playerCount,
         dealsPerRound: state.setup.dealsPerRound,
         roundCount: state.setup.roundCount,
+        tournamentMode: state.setup.tournamentMode === 'variable' ? 'variable' : 'fixed157',
         passwordProtectionEnabled: Boolean(state.setup.passwordProtectionEnabled),
         protectionTargets: defaultProtectionTargets(state.setup.protectionTargets),
         protectionPassword: state.setup.passwordProtectionEnabled ? String(state.setup.protectionPassword || '').trim() : '',
@@ -3201,6 +3284,11 @@
     }
 
     const POINTS_PER_DEAL = 157;
+    const MATCH_BONUS_POINTS = 257;
+
+    function isVariableMode(tournament) {
+      return tournament && tournament.tournamentMode === 'variable';
+    }
 
     function totalPointsPerTable(tournament) {
       return tournament.dealsPerRound * POINTS_PER_DEAL;
@@ -3221,6 +3309,13 @@
       return Math.max(0, Math.min(max, Math.round(parsed)));
     }
 
+    function clampCounterPointsVariable(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.max(0, Math.round(parsed));
+    }
+
     function parseCounterInputPoints(value) {
       if (value === '' || value === null || value === undefined) return null;
       const parsed = Number(value);
@@ -3234,17 +3329,40 @@
       return !Number.isFinite(parsed) || parsed < 0 || parsed > max;
     }
 
-    function isCounterDealComplete(deal) {
+    function isCounterInputValueInvalidVariable(value) {
+      if (value === '' || value === null || value === undefined) return false;
+      const parsed = Number(value);
+      return !Number.isFinite(parsed) || parsed < 0;
+    }
+
+    function isCounterDealComplete(deal, tournamentMode) {
+      if (tournamentMode === 'variable') {
+        return Number.isFinite(deal?.team1Points) && Number.isFinite(deal?.team2Points);
+      }
       return Number.isFinite(deal?.team1Points)
         && Number.isFinite(deal?.team2Points)
         && Number(deal.team1Points) + Number(deal.team2Points) === POINTS_PER_DEAL;
     }
 
-    function normalizeCounterState(counter, dealCount, fallbackFinalised = false) {
+    function normalizeCounterState(counter, dealCount, tournamentMode, fallbackFinalised = false) {
       const base = createEmptyCounterState(dealCount);
       const sourceDeals = Array.isArray(counter?.deals) ? counter.deals : [];
       const deals = Array.from({ length: dealCount }, (_, dealIndex) => {
         const rawDeal = sourceDeals[dealIndex] || {};
+
+        if (tournamentMode === 'variable') {
+          const team1Points = clampCounterPointsVariable(rawDeal.team1Points);
+          const team2Points = clampCounterPointsVariable(rawDeal.team2Points);
+          return {
+            team1Points,
+            team2Points,
+            team1Match: Boolean(rawDeal.team1Match),
+            team2Match: Boolean(rawDeal.team2Match),
+            team1Weisen: rawDeal.team1Weisen !== undefined ? (Number.isFinite(Number(rawDeal.team1Weisen)) ? Number(rawDeal.team1Weisen) : 0) : 0,
+            team2Weisen: rawDeal.team2Weisen !== undefined ? (Number.isFinite(Number(rawDeal.team2Weisen)) ? Number(rawDeal.team2Weisen) : 0) : 0
+          };
+        }
+
         let team1Points = clampCounterPoints(rawDeal.team1Points);
         let team2Points = clampCounterPoints(rawDeal.team2Points);
 
@@ -3267,16 +3385,20 @@
       };
     }
 
-    function summarizeCounterState(counter) {
+    function summarizeCounterState(counter, tournamentMode) {
       return (counter?.deals || []).reduce((summary, deal) => {
         const hasAnyValue = Number.isFinite(deal?.team1Points) || Number.isFinite(deal?.team2Points);
         if (hasAnyValue) {
           summary.hasStarted = true;
         }
-        if (isCounterDealComplete(deal)) {
+        if (isCounterDealComplete(deal, tournamentMode)) {
           summary.completedDeals += 1;
           summary.team1Points += Number(deal.team1Points);
           summary.team2Points += Number(deal.team2Points);
+          if (tournamentMode === 'variable') {
+            summary.team1Points += Number(deal.team1Weisen || 0);
+            summary.team2Points += Number(deal.team2Weisen || 0);
+          }
         }
         return summary;
       }, {
@@ -3297,8 +3419,8 @@
       };
     }
 
-    function buildResultFromCounter(counter, expectedDeals) {
-      const summary = summarizeCounterState(counter);
+    function buildResultFromCounter(counter, expectedDeals, tournamentMode) {
+      const summary = summarizeCounterState(counter, tournamentMode);
       if (summary.completedDeals !== expectedDeals) return null;
       return buildResultFromPoints(summary.team1Points, summary.team2Points);
     }
@@ -3309,13 +3431,14 @@
       const normalizedTargets = defaultProtectionTargets(tournament.protectionTargets || {});
       const currentRoundIndex = Number.isFinite(Number(tournament.currentRoundIndex)) ? Number(tournament.currentRoundIndex) : 0;
       const normalizedDealCount = Number.isFinite(Number(tournament.dealsPerRound)) ? Math.max(1, Number(tournament.dealsPerRound)) : 8;
+      const normalizedTournamentMode = tournament.tournamentMode === 'variable' ? 'variable' : 'fixed157';
       const normalizedRounds = (tournament.rounds || []).map((round, roundIndex) => ({
         ...round,
         roundIndex: typeof round.roundIndex === 'number' ? round.roundIndex : roundIndex,
         tables: (round.tables || []).map((table, tableIndex) => {
-          const counter = normalizeCounterState(table.counter, normalizedDealCount);
+          const counter = normalizeCounterState(table.counter, normalizedDealCount, normalizedTournamentMode);
           const entryMode = table.entryMode === 'counter' ? 'counter' : 'manual';
-          const derivedCounterResult = counter.finalised ? buildResultFromCounter(counter, normalizedDealCount) : null;
+          const derivedCounterResult = counter.finalised ? buildResultFromCounter(counter, normalizedDealCount, normalizedTournamentMode) : null;
           return {
             ...table,
             tableIndex: typeof table.tableIndex === 'number' ? table.tableIndex : tableIndex + 1,
@@ -3339,6 +3462,7 @@
         currentRoundIndex: started ? currentRoundIndex : 0,
         started,
         status: tournament.status === 'finished' ? 'finished' : 'active',
+        tournamentMode: tournament.tournamentMode === 'variable' ? 'variable' : 'fixed157',
         passwordProtectionEnabled: Boolean(tournament.passwordProtectionEnabled),
         protectionTargets: normalizedTargets,
         protectionPassword: tournament.passwordProtectionEnabled ? String(tournament.protectionPassword || '') : '',
@@ -3551,6 +3675,7 @@
         playerCount: state.setup.playerCount,
         dealsPerRound: state.setup.dealsPerRound,
         roundCount: state.setup.roundCount,
+        tournamentMode: state.setup.tournamentMode === 'variable' ? 'variable' : 'fixed157',
         passwordProtectionEnabled: Boolean(state.setup.passwordProtectionEnabled),
         protectionTargets: defaultProtectionTargets(state.setup.protectionTargets),
         protectionPassword: state.setup.passwordProtectionEnabled ? String(state.setup.protectionPassword || '').trim() : '',
@@ -4423,12 +4548,15 @@
     }
 
     function renderTournamentSummary(tournament) {
+      const variableMode = isVariableMode(tournament);
       const total = totalPointsPerTable(tournament);
       $('tournamentSummary').innerHTML = `
         <div class="pill">${tournament.playerCount} Spieler</div>
         <div class="pill">${tournament.dealsPerRound}x austeilen</div>
         <div class="pill">${tournament.roundCount} Runden</div>
-        <div class="pill">${total} Punkte pro Tisch</div>
+        ${variableMode
+          ? '<div class="pill">Variable Punkte</div>'
+          : `<div class="pill">${total} Punkte pro Tisch</div>`}
         ${hasActivePasswordProtection(tournament) ? '<div class="pill">Passwortschutz</div>' : ''}
         ${tournament.status === 'finished' ? '<div class="pill">Abgeschlossen</div>' : ''}
       `;
@@ -4480,6 +4608,7 @@
 
     function renderRoundTables(tournament, roundIndex) {
       const total = totalPointsPerTable(tournament);
+      const variableMode = isVariableMode(tournament);
       const round = tournament.rounds[roundIndex];
       const canEdit = canEditViewedRound(tournament, roundIndex);
 
@@ -4491,8 +4620,8 @@
 
         const draft = getTableDraft(tournament.id, roundIndex, tableIdx);
         const activeTeam = draft.entryTeam || table.entryTeam || (table.result ? table.result.enteredTeam : 'team1');
-        const counter = normalizeCounterState(table.counter, tournament.dealsPerRound);
-        const counterSummary = summarizeCounterState(counter);
+        const counter = normalizeCounterState(table.counter, tournament.dealsPerRound, tournament.tournamentMode);
+        const counterSummary = summarizeCounterState(counter, tournament.tournamentMode);
         const isCounterMode = table.entryMode === 'counter';
         const isEditingSavedResult = Boolean(draft.isEditingResult);
         const isLockedSavedResult = Boolean(table.result) && !isEditingSavedResult;
@@ -4509,6 +4638,17 @@
             valT1 = table.result.team1Points;
             valT2 = table.result.team2Points;
           }
+        } else if (variableMode) {
+          if (table.result) {
+            valT1 = table.result.team1Points;
+            valT2 = table.result.team2Points;
+          }
+          if (draft.enteredPoints !== undefined && draft.enteredPoints !== '') {
+            if (draft.entryTeam === 'team1') valT1 = draft.enteredPoints;
+            else valT2 = draft.enteredPoints;
+          }
+          if (draft.enteredPointsT1 !== undefined) valT1 = draft.enteredPointsT1;
+          if (draft.enteredPointsT2 !== undefined) valT2 = draft.enteredPointsT2;
         } else {
           const enteredPoints = draft.enteredPoints ?? (table.result ? table.result.enteredPoints : '');
           if (enteredPoints !== '') {
@@ -4640,12 +4780,12 @@
         const manualControlsHtml = `
           <div class="compact-controls">
             <div class="score-input-container"${isLockedSavedResult ? ' style="opacity: 0.85;"' : ''}>
-              <div class="score-side team1-side ${activeTeam === 'team1' ? 'active-side' : ''}">
+              <div class="score-side team1-side ${variableMode ? 'active-side' : (activeTeam === 'team1' ? 'active-side' : '')}">
                 <div class="score-names">${renderDashboardNameList([p_t1_1, p_t1_2], allowDashboardLinks)}</div>
                 <input id="points_team1_${roundIndex}_${tableIdx}" type="text" inputmode="none" value="${valT1}" class="score-input tap-input" data-locked="${isLockedSavedResult ? 'true' : 'false'}" data-team="team1" data-table-index="${tableIdx}" data-round-index="${roundIndex}" readonly ${isLockedSavedResult ? 'tabindex="-1"' : ''} />
               </div>
               <div class="score-vs">:</div>
-              <div class="score-side team2-side ${activeTeam === 'team2' ? 'active-side' : ''}">
+              <div class="score-side team2-side ${variableMode ? 'active-side' : (activeTeam === 'team2' ? 'active-side' : '')}">
                 <input id="points_team2_${roundIndex}_${tableIdx}" type="text" inputmode="none" value="${valT2}" class="score-input tap-input" data-locked="${isLockedSavedResult ? 'true' : 'false'}" data-team="team2" data-table-index="${tableIdx}" data-round-index="${roundIndex}" readonly ${isLockedSavedResult ? 'tabindex="-1"' : ''} />
                 <div class="score-names">${renderDashboardNameList([p_t2_1, p_t2_2], allowDashboardLinks)}</div>
               </div>
@@ -4681,7 +4821,7 @@
 
       const hasManualDraft = Boolean((getTableDraft(tournamentId, roundIndex, tableIndex) || {}).enteredPoints !== undefined);
       const hasManualResult = table.entryMode !== 'counter' && Boolean(table.result);
-      const hasCounterProgress = summarizeCounterState(normalizeCounterState(table.counter, tournament.dealsPerRound)).hasStarted;
+      const hasCounterProgress = summarizeCounterState(normalizeCounterState(table.counter, tournament.dealsPerRound, tournament.tournamentMode), tournament.tournamentMode).hasStarted;
 
       const proceed = async () => {
         if (table.entryMode !== 'counter') {
@@ -4689,7 +4829,7 @@
             const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[tableIndex];
             if (!draftTable) return draftTournament;
             draftTable.entryMode = 'counter';
-            draftTable.counter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound);
+            draftTable.counter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound, draftTournament.tournamentMode);
             draftTable.result = null;
             return draftTournament;
           });
@@ -4703,7 +4843,13 @@
           tableIndex,
           entry: {
             scoringTeam: table.entryTeam === 'team2' ? 'team2' : 'team1',
-            points: ''
+            points: '',
+            team1Points: '',
+            team2Points: '',
+            team1Match: false,
+            team2Match: false,
+            team1Weisen: 0,
+            team2Weisen: 0
           }
         };
         render();
@@ -4728,7 +4874,13 @@
         tableIndex: null,
         entry: {
           scoringTeam: 'team1',
-          points: ''
+          points: '',
+          team1Points: '',
+          team2Points: '',
+          team1Match: false,
+          team2Match: false,
+          team1Weisen: 0,
+          team2Weisen: 0
         }
       };
       $('counterModalBackdrop').classList.remove('show');
@@ -4771,7 +4923,13 @@
       const entry = state.counterModal.entry || {};
       return {
         scoringTeam: entry.scoringTeam === 'team2' ? 'team2' : 'team1',
-        points: entry.points ?? ''
+        points: entry.points ?? '',
+        team1Points: entry.team1Points ?? '',
+        team2Points: entry.team2Points ?? '',
+        team1Match: Boolean(entry.team1Match),
+        team2Match: Boolean(entry.team2Match),
+        team1Weisen: entry.team1Weisen !== undefined ? entry.team1Weisen : 0,
+        team2Weisen: entry.team2Weisen !== undefined ? entry.team2Weisen : 0
       };
     }
 
@@ -4782,17 +4940,94 @@
       };
     }
 
-    function getNextCounterDealIndex(counter) {
-      return counter.deals.findIndex((deal) => !isCounterDealComplete(deal));
+    function getNextCounterDealIndex(counter, tournamentMode) {
+      return counter.deals.findIndex((deal) => !isCounterDealComplete(deal, tournamentMode));
     }
 
-    function getCounterRecordedDeals(counter) {
+    function getCounterRecordedDeals(counter, tournamentMode) {
       return counter.deals
         .map((deal, index) => ({ ...deal, index }))
-        .filter((deal) => isCounterDealComplete(deal));
+        .filter((deal) => isCounterDealComplete(deal, tournamentMode));
     }
 
-    function buildCounterDealFromEntry(entry) {
+    function buildCounterDealFromEntry(entry, tournamentMode) {
+      if (tournamentMode === 'variable') {
+        const t1Match = Boolean(entry.team1Match);
+        const t2Match = Boolean(entry.team2Match);
+
+        // When one team has Match: the other gets 0, no Weisen for either
+        if (t1Match) {
+          return {
+            invalid: false,
+            deal: {
+              team1Points: MATCH_BONUS_POINTS,
+              team2Points: 0,
+              team1Match: true,
+              team2Match: false,
+              team1Weisen: 0,
+              team2Weisen: 0
+            }
+          };
+        }
+        if (t2Match) {
+          return {
+            invalid: false,
+            deal: {
+              team1Points: 0,
+              team2Points: MATCH_BONUS_POINTS,
+              team1Match: false,
+              team2Match: true,
+              team1Weisen: 0,
+              team2Weisen: 0
+            }
+          };
+        }
+
+        // No Match: one team enters their points, opponent is auto-complemented to 157
+        const t1Invalid = isCounterInputValueInvalidVariable(entry.team1Points);
+        const t2Invalid = isCounterInputValueInvalidVariable(entry.team2Points);
+
+        // Determine which field has a value
+        const t1Raw = entry.team1Points !== '' && entry.team1Points !== null && entry.team1Points !== undefined ? parseCounterInputPoints(entry.team1Points) : null;
+        const t2Raw = entry.team2Points !== '' && entry.team2Points !== null && entry.team2Points !== undefined ? parseCounterInputPoints(entry.team2Points) : null;
+
+        if (t1Invalid || t2Invalid) {
+          return { invalid: true, deal: null };
+        }
+        if (t1Raw === null && t2Raw === null) {
+          return { invalid: false, deal: null };
+        }
+
+        const team1Weisen = Number.isFinite(Number(entry.team1Weisen)) ? Math.max(0, Math.round(Number(entry.team1Weisen))) : 0;
+        const team2Weisen = Number.isFinite(Number(entry.team2Weisen)) ? Math.max(0, Math.round(Number(entry.team2Weisen))) : 0;
+
+        // Auto-complement: if only one side is filled, compute the other from 157
+        let team1Points, team2Points;
+        if (t1Raw !== null && t2Raw === null) {
+          team1Points = clampCounterPoints(t1Raw);
+          team2Points = POINTS_PER_DEAL - team1Points;
+        } else if (t2Raw !== null && t1Raw === null) {
+          team2Points = clampCounterPoints(t2Raw);
+          team1Points = POINTS_PER_DEAL - team2Points;
+        } else {
+          // Both filled: use them as-is (allow manual override of both sides)
+          team1Points = clampCounterPoints(t1Raw);
+          team2Points = clampCounterPoints(t2Raw);
+        }
+
+        return {
+          invalid: false,
+          deal: {
+            team1Points,
+            team2Points,
+            team1Match: false,
+            team2Match: false,
+            team1Weisen,
+            team2Weisen
+          }
+        };
+      }
+
       if (isCounterInputValueInvalid(entry.points)) {
         return { invalid: true, deal: null, enteredPoints: null };
       }
@@ -4816,25 +5051,30 @@
       const context = getOpenCounterContext();
       if (!context) return;
       const { tournament, roundIndex, tableIndex } = context;
-      const counter = normalizeCounterState(context.table.counter, tournament.dealsPerRound);
-      const nextDealIndex = getNextCounterDealIndex(counter);
+      const tournamentMode = tournament.tournamentMode;
+      const counter = normalizeCounterState(context.table.counter, tournament.dealsPerRound, tournamentMode);
+      const nextDealIndex = getNextCounterDealIndex(counter, tournamentMode);
       if (nextDealIndex === -1) {
         window.alert('Alle Austeilrunden sind bereits erfasst. Du kannst die Runde jetzt abschliessen.');
         return;
       }
 
       const entry = getCounterModalEntry();
-      const builtDeal = buildCounterDealFromEntry(entry);
-      if (builtDeal.invalid || builtDeal.enteredPoints === null || !builtDeal.deal) {
-        window.alert(`Bitte einen Wert zwischen 0 und ${POINTS_PER_DEAL} eingeben.`);
+      const builtDeal = buildCounterDealFromEntry(entry, tournamentMode);
+      if (builtDeal.invalid || !builtDeal.deal) {
+        if (tournamentMode === 'variable') {
+          window.alert('Bitte gültige Punktwerte (≥ 0) eingeben.');
+        } else {
+          window.alert(`Bitte einen Wert zwischen 0 und ${POINTS_PER_DEAL} eingeben.`);
+        }
         return;
       }
 
       await mutateTournament(tournament.id, (draftTournament) => {
         const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[tableIndex];
         if (!draftTable) return draftTournament;
-        const draftCounter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound);
-        const draftNextDealIndex = getNextCounterDealIndex(draftCounter);
+        const draftCounter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound, draftTournament.tournamentMode);
+        const draftNextDealIndex = getNextCounterDealIndex(draftCounter, draftTournament.tournamentMode);
         if (draftNextDealIndex === -1) return draftTournament;
         draftCounter.deals[draftNextDealIndex] = builtDeal.deal;
         draftCounter.finalised = false;
@@ -4842,14 +5082,18 @@
         draftTable.entryMode = 'counter';
         draftTable.counter = draftCounter;
         draftTable.result = null;
-        draftTable.entryTeam = entry.scoringTeam;
+        draftTable.entryTeam = entry.scoringTeam || 'team1';
         return draftTournament;
       });
 
-      setCounterModalEntry({ points: '' });
+      if (tournamentMode === 'variable') {
+        setCounterModalEntry({ team1Points: '', team2Points: '', team1Match: false, team2Match: false, team1Weisen: 0, team2Weisen: 0 });
+      } else {
+        setCounterModalEntry({ points: '' });
+      }
       render();
       window.requestAnimationFrame(() => {
-        const input = $('counterEntryPointsInput');
+        const input = tournamentMode === 'variable' ? $('counterEntryTeam1PointsInput') : $('counterEntryPointsInput');
         input?.focus();
         input?.select?.();
       });
@@ -4865,14 +5109,11 @@
       await mutateTournament(tournament.id, (draftTournament) => {
         const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[tableIndex];
         if (!draftTable) return draftTournament;
-        const existingCounter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound);
-        const remainingDeals = existingCounter.deals.filter((deal, index) => index !== dealIndex && isCounterDealComplete(deal));
+        const existingCounter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound, draftTournament.tournamentMode);
+        const remainingDeals = existingCounter.deals.filter((deal, index) => index !== dealIndex && isCounterDealComplete(deal, draftTournament.tournamentMode));
         const compactCounter = createEmptyCounterState(draftTournament.dealsPerRound);
         remainingDeals.forEach((deal, index) => {
-          compactCounter.deals[index] = {
-            team1Points: deal.team1Points,
-            team2Points: deal.team2Points
-          };
+          compactCounter.deals[index] = { ...deal };
         });
         compactCounter.finalised = false;
         compactCounter.updatedAt = new Date().toISOString();
@@ -4889,8 +5130,9 @@
       const context = getOpenCounterContext();
       if (!context) return;
       const { tournament, roundIndex, tableIndex } = context;
-      const counter = normalizeCounterState(context.table.counter, tournament.dealsPerRound);
-      const summary = summarizeCounterState(counter);
+      const tournamentMode = tournament.tournamentMode;
+      const counter = normalizeCounterState(context.table.counter, tournament.dealsPerRound, tournamentMode);
+      const summary = summarizeCounterState(counter, tournamentMode);
       if (summary.completedDeals !== tournament.dealsPerRound) {
         window.alert('Bitte zuerst alle Austeilrunden vollständig erfassen.');
         return;
@@ -4899,11 +5141,11 @@
       await mutateTournament(tournament.id, (draftTournament) => {
         const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[tableIndex];
         if (!draftTable) return draftTournament;
-        const draftCounter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound);
+        const draftCounter = normalizeCounterState(draftTable.counter, draftTournament.dealsPerRound, draftTournament.tournamentMode);
         draftCounter.finalised = true;
         draftCounter.updatedAt = new Date().toISOString();
         draftTable.counter = draftCounter;
-        draftTable.result = buildResultFromCounter(draftCounter, draftTournament.dealsPerRound);
+        draftTable.result = buildResultFromCounter(draftCounter, draftTournament.dealsPerRound, draftTournament.tournamentMode);
         draftTable.entryMode = 'manual';
         if (draftTable.result) {
           draftTable.entryTeam = draftTable.result.enteredTeam;
@@ -4914,10 +5156,10 @@
       closeCounterModal({ persistDraft: false });
     }
 
-    function renderCounterModalPreview(team1Names, team2Names, entry) {
-      const builtDeal = buildCounterDealFromEntry(entry);
-      const team1Points = builtDeal.deal ? builtDeal.deal.team1Points : '–';
-      const team2Points = builtDeal.deal ? builtDeal.deal.team2Points : '–';
+    function renderCounterModalPreview(team1Names, team2Names, entry, tournamentMode) {
+      const builtDeal = buildCounterDealFromEntry(entry, tournamentMode);
+      const team1Points = builtDeal.deal ? builtDeal.deal.team1Points + (builtDeal.deal.team1Weisen || 0) : '–';
+      const team2Points = builtDeal.deal ? builtDeal.deal.team2Points + (builtDeal.deal.team2Weisen || 0) : '–';
       return `
         <div class="counter-preview-box">
           <div class="counter-preview-team">
@@ -4933,6 +5175,56 @@
       `;
     }
 
+    function renderCounterEntryFormVariable(team1Names, team2Names, entry, inputInvalid) {
+      const t1Match = Boolean(entry.team1Match);
+      const t2Match = Boolean(entry.team2Match);
+      const eitherMatch = t1Match || t2Match;
+
+      // Auto-compute displayed values based on match/complement logic
+      const builtPreview = buildCounterDealFromEntry(entry, 'variable');
+      const t1DisplayPoints = t1Match ? String(MATCH_BONUS_POINTS) : (builtPreview.deal ? String(builtPreview.deal.team1Points) : (entry.team1Points ?? ''));
+      const t2DisplayPoints = t2Match ? String(MATCH_BONUS_POINTS) : (builtPreview.deal ? String(builtPreview.deal.team2Points) : (entry.team2Points ?? ''));
+
+      // Weisen: locked to 0 if opponent has Match (their Weisen are annulled)
+      const t1WeisenLocked = t2Match;
+      const t2WeisenLocked = t1Match;
+      const t1Weisen = t1WeisenLocked ? 0 : (entry.team1Weisen !== undefined ? entry.team1Weisen : 0);
+      const t2Weisen = t2WeisenLocked ? 0 : (entry.team2Weisen !== undefined ? entry.team2Weisen : 0);
+
+      // Points fields: locked when match is active for that team (shows auto-value)
+      const t1PointsLocked = t1Match || t2Match;
+      const t2PointsLocked = t1Match || t2Match;
+
+      return `
+        <div class="variable-counter-entry">
+          <div class="variable-counter-team-block team1-block">
+            <div class="variable-counter-team-name">${escapeHtml(team1Names)}</div>
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam1PointsInput" class="counter-point-input tap-input ${inputInvalid && !eitherMatch ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t1PointsLocked && t1DisplayPoints !== '' ? String(t1DisplayPoints) : (t1DisplayPoints !== '' ? String(t1DisplayPoints) : ''))}" data-counter-input data-variable-team="team1" ${t1PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
+            </div>
+            <div class="variable-counter-field">
+              <button class="mini-btn match-btn ${t1Match ? 'active match-active' : ''}" type="button" id="team1MatchBtn" data-variable-match="team1">Match${t1Match ? ' ✓' : ''}</button>
+            </div>
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam1Weisen1Input" class="counter-point-input tap-input ${t1WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="Weisen" value="${escapeHtml(t1Weisen > 0 ? String(t1Weisen) : '')}" ${t1WeisenLocked ? '' : 'data-counter-input data-variable-weisen="team1"'} readonly ${t1WeisenLocked ? 'tabindex="-1"' : ''} />
+            </div>
+          </div>
+          <div class="variable-counter-team-block team2-block">
+            <div class="variable-counter-team-name">${escapeHtml(team2Names)}</div>
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam2PointsInput" class="counter-point-input tap-input ${inputInvalid && !eitherMatch ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t2DisplayPoints !== '' ? String(t2DisplayPoints) : '')}" data-counter-input data-variable-team="team2" ${t2PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
+            </div>
+            <div class="variable-counter-field">
+              <button class="mini-btn match-btn ${t2Match ? 'active match-active' : ''}" type="button" id="team2MatchBtn" data-variable-match="team2">Match${t2Match ? ' ✓' : ''}</button>
+            </div>
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam2Weisen1Input" class="counter-point-input tap-input ${t2WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="Weisen" value="${escapeHtml(t2Weisen > 0 ? String(t2Weisen) : '')}" ${t2WeisenLocked ? '' : 'data-counter-input data-variable-weisen="team2"'} readonly ${t2WeisenLocked ? 'tabindex="-1"' : ''} />
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function renderCounterModal() {
       const context = getOpenCounterContext();
       if (!context) {
@@ -4942,14 +5234,16 @@
       }
 
       const { tournament, roundIndex, table } = context;
-      const counter = normalizeCounterState(table.counter, tournament.dealsPerRound);
-      const summary = summarizeCounterState(counter);
+      const tournamentMode = tournament.tournamentMode;
+      const variableMode = tournamentMode === 'variable';
+      const counter = normalizeCounterState(table.counter, tournament.dealsPerRound, tournamentMode);
+      const summary = summarizeCounterState(counter, tournamentMode);
       const team1Names = `${tournament.players[table.team1[0]]} & ${tournament.players[table.team1[1]]}`;
       const team2Names = `${tournament.players[table.team2[0]]} & ${tournament.players[table.team2[1]]}`;
       const entry = getCounterModalEntry();
-      const nextDealIndex = getNextCounterDealIndex(counter);
-      const recordedDeals = getCounterRecordedDeals(counter);
-      const builtDeal = buildCounterDealFromEntry(entry);
+      const nextDealIndex = getNextCounterDealIndex(counter, tournamentMode);
+      const recordedDeals = getCounterRecordedDeals(counter, tournamentMode);
+      const builtDeal = buildCounterDealFromEntry(entry, tournamentMode);
       const inputInvalid = builtDeal.invalid;
       const allDealsComplete = summary.completedDeals === tournament.dealsPerRound;
       const titleSuffix = counter.finalised ? ' · abgeschlossen' : '';
@@ -4974,36 +5268,49 @@
         <div class="counter-entry-card">
           <div class="section-title">${allDealsComplete ? 'Alle Austeilrunden erfasst' : `Austeilrunde ${nextDealIndex + 1} von ${tournament.dealsPerRound}`}</div>
 
-          ${allDealsComplete ? '' : `
-            <div class="counter-team-pick" id="counterEntryTeamPicker">
-              <button class="mini-btn ${entry.scoringTeam === 'team1' ? 'active' : ''}" type="button" data-counter-scoring-team="team1">${escapeHtml(team1Names)}</button>
-              <button class="mini-btn ${entry.scoringTeam === 'team2' ? 'active' : ''}" type="button" data-counter-scoring-team="team2">${escapeHtml(team2Names)}</button>
-            </div>
+          ${allDealsComplete ? '' : (variableMode
+            ? renderCounterEntryFormVariable(team1Names, team2Names, entry, inputInvalid)
+            : `
+              <div class="counter-team-pick" id="counterEntryTeamPicker">
+                <button class="mini-btn ${entry.scoringTeam === 'team1' ? 'active' : ''}" type="button" data-counter-scoring-team="team1">${escapeHtml(team1Names)}</button>
+                <button class="mini-btn ${entry.scoringTeam === 'team2' ? 'active' : ''}" type="button" data-counter-scoring-team="team2">${escapeHtml(team2Names)}</button>
+              </div>
 
-            <div class="counter-point-input-wrap">
-              <input id="counterEntryPointsInput" class="counter-point-input tap-input ${inputInvalid ? 'invalid' : ''}" type="text" inputmode="none" placeholder="0 bis ${POINTS_PER_DEAL}" value="${escapeHtml(String(entry.points ?? ''))}" data-counter-input readonly />
-            </div>
+              <div class="counter-point-input-wrap">
+                <input id="counterEntryPointsInput" class="counter-point-input tap-input ${inputInvalid ? 'invalid' : ''}" type="text" inputmode="none" placeholder="0 bis ${POINTS_PER_DEAL}" value="${escapeHtml(String(entry.points ?? ''))}" data-counter-input readonly />
+              </div>
 
-            ${renderCounterModalPreview(team1Names, team2Names, entry)}
+              ${renderCounterModalPreview(team1Names, team2Names, entry, tournamentMode)}
+            `
+          )}
 
-            <button class="btn" type="button" id="saveCounterDealBtn">Austeilrunde speichern</button>
-          `}
+          ${allDealsComplete ? '' : `<button class="btn" type="button" id="saveCounterDealBtn">Austeilrunde speichern</button>`}
         </div>
 
         <div class="counter-history-section">
           <div class="section-title">Erfasste Austeilrunden</div>
           <div class="counter-history-list">
             ${recordedDeals.length
-              ? recordedDeals.slice().reverse().map((deal) => `
-                  <div class="counter-history-item">
-                    <div class="counter-history-main">
-                      <strong>Austeilrunde ${deal.index + 1}: ${escapeHtml(team1Names)} ${deal.team1Points} · ${escapeHtml(team2Names)} ${deal.team2Points}</strong>
+              ? recordedDeals.slice().reverse().map((deal) => {
+                  const t1Total = Number(deal.team1Points) + (variableMode ? Number(deal.team1Weisen || 0) : 0);
+                  const t2Total = Number(deal.team2Points) + (variableMode ? Number(deal.team2Weisen || 0) : 0);
+                  const matchInfo = variableMode
+                    ? `${deal.team1Match ? ' [Match]' : ''}${deal.team2Match ? ' [Match]' : ''}`
+                    : '';
+                  const weisenInfo = variableMode
+                    ? ` (Weisen: ${deal.team1Weisen || 0} / ${deal.team2Weisen || 0})`
+                    : '';
+                  return `
+                    <div class="counter-history-item">
+                      <div class="counter-history-main">
+                        <strong>Austeilrunde ${deal.index + 1}: ${escapeHtml(team1Names)} ${t1Total} · ${escapeHtml(team2Names)} ${t2Total}${matchInfo}${weisenInfo}</strong>
+                      </div>
+                      <div class="counter-history-actions">
+                        <button class="mini-btn danger" type="button" data-counter-delete-deal="${deal.index}">Löschen</button>
+                      </div>
                     </div>
-                    <div class="counter-history-actions">
-                      <button class="mini-btn danger" type="button" data-counter-delete-deal="${deal.index}">Löschen</button>
-                    </div>
-                  </div>
-                `).join('')
+                  `;
+                }).join('')
               : '<div class="counter-empty">Noch keine Austeilrunde gespeichert.</div>'}
           </div>
         </div>
@@ -5019,33 +5326,127 @@
       $('counterModalBackdrop').classList.add('show');
       $('counterModalBackdrop').setAttribute('aria-hidden', 'false');
 
-      $('counterModalBody').querySelectorAll('[data-counter-scoring-team]').forEach((button) => {
-        button.addEventListener('click', () => {
-          setCounterModalEntry({ scoringTeam: button.dataset.counterScoringTeam === 'team2' ? 'team2' : 'team1' });
-          renderCounterModal();
-        });
-      });
-
-      const pointsInput = $('counterEntryPointsInput');
-      if (pointsInput) {
-        pointsInput.addEventListener('click', () => {
-          openMobileKeypad({
-            inputId: 'counterEntryPointsInput',
-            title: 'Austeilrunde · Punkte',
-            maxValue: POINTS_PER_DEAL
+      if (variableMode) {
+        $('counterModalBody').querySelectorAll('[data-variable-team]').forEach((input) => {
+          const teamKey = input.dataset.variableTeam;
+          if (input.tabIndex === -1) return;
+          input.addEventListener('click', () => {
+            const e = getCounterModalEntry();
+            if (e.team1Match || e.team2Match) return;
+            openMobileKeypad({
+              inputId: input.id,
+              title: `${teamKey === 'team1' ? escapeHtml(team1Names) : escapeHtml(team2Names)} · Punkte`,
+              maxValue: POINTS_PER_DEAL
+            });
+          });
+          input.addEventListener('input', (event) => {
+            const val = event.target.value;
+            const e = getCounterModalEntry();
+            if (e.team1Match || e.team2Match) return;
+            if (teamKey === 'team1') {
+              const parsed = parseCounterInputPoints(val);
+              const otherVal = parsed !== null ? String(POINTS_PER_DEAL - clampCounterPoints(parsed)) : '';
+              setCounterModalEntry({ team1Points: val, team2Points: otherVal });
+              const otherInput = $('counterEntryTeam2PointsInput');
+              if (otherInput) otherInput.value = otherVal;
+            } else {
+              const parsed = parseCounterInputPoints(val);
+              const otherVal = parsed !== null ? String(POINTS_PER_DEAL - clampCounterPoints(parsed)) : '';
+              setCounterModalEntry({ team2Points: val, team1Points: otherVal });
+              const otherInput = $('counterEntryTeam1PointsInput');
+              if (otherInput) otherInput.value = otherVal;
+            }
           });
         });
-        pointsInput.addEventListener('input', (event) => {
-          setCounterModalEntry({ points: event.target.value });
-          const previewBuiltDeal = buildCounterDealFromEntry(getCounterModalEntry());
-          event.target.classList.toggle('invalid', previewBuiltDeal.invalid);
-          const previewHtml = renderCounterModalPreview(team1Names, team2Names, getCounterModalEntry());
-          const existingPreview = $('counterModalBody').querySelector('.counter-preview-box');
-          if (existingPreview) {
-            existingPreview.outerHTML = previewHtml;
-          }
+
+        $('counterModalBody').querySelectorAll('[data-variable-weisen]').forEach((input) => {
+          const teamKey = input.dataset.variableWeisen;
+          if (input.tabIndex === -1) return;
+          input.addEventListener('click', () => {
+            openMobileKeypad({
+              inputId: input.id,
+              title: `${teamKey === 'team1' ? escapeHtml(team1Names) : escapeHtml(team2Names)} · Weisen`,
+              maxValue: 9999
+            });
+          });
+          input.addEventListener('input', (event) => {
+            const v = Number(event.target.value);
+            const patch = teamKey === 'team1' ? { team1Weisen: Number.isFinite(v) ? Math.max(0, v) : 0 } : { team2Weisen: Number.isFinite(v) ? Math.max(0, v) : 0 };
+            setCounterModalEntry(patch);
+          });
         });
 
+        $('team1MatchBtn')?.addEventListener('click', () => {
+          const current = Boolean(getCounterModalEntry().team1Match);
+          if (!current) {
+            // Activate match for team1: team1=257, team2=0, clear Weisen for both
+            setCounterModalEntry({
+              team1Match: true,
+              team2Match: false,
+              team1Points: String(MATCH_BONUS_POINTS),
+              team2Points: '0',
+              team1Weisen: 0,
+              team2Weisen: 0
+            });
+          } else {
+            // Deactivate match: clear auto-set values
+            setCounterModalEntry({
+              team1Match: false,
+              team1Points: '',
+              team2Points: ''
+            });
+          }
+          renderCounterModal();
+        });
+        $('team2MatchBtn')?.addEventListener('click', () => {
+          const current = Boolean(getCounterModalEntry().team2Match);
+          if (!current) {
+            // Activate match for team2: team2=257, team1=0, clear Weisen for both
+            setCounterModalEntry({
+              team2Match: true,
+              team1Match: false,
+              team2Points: String(MATCH_BONUS_POINTS),
+              team1Points: '0',
+              team1Weisen: 0,
+              team2Weisen: 0
+            });
+          } else {
+            setCounterModalEntry({
+              team2Match: false,
+              team2Points: '',
+              team1Points: ''
+            });
+          }
+          renderCounterModal();
+        });
+      } else {
+        $('counterModalBody').querySelectorAll('[data-counter-scoring-team]').forEach((button) => {
+          button.addEventListener('click', () => {
+            setCounterModalEntry({ scoringTeam: button.dataset.counterScoringTeam === 'team2' ? 'team2' : 'team1' });
+            renderCounterModal();
+          });
+        });
+
+        const pointsInput = $('counterEntryPointsInput');
+        if (pointsInput) {
+          pointsInput.addEventListener('click', () => {
+            openMobileKeypad({
+              inputId: 'counterEntryPointsInput',
+              title: 'Austeilrunde · Punkte',
+              maxValue: POINTS_PER_DEAL
+            });
+          });
+          pointsInput.addEventListener('input', (event) => {
+            setCounterModalEntry({ points: event.target.value });
+            const previewBuiltDeal = buildCounterDealFromEntry(getCounterModalEntry(), tournamentMode);
+            event.target.classList.toggle('invalid', previewBuiltDeal.invalid);
+            const previewHtml = renderCounterModalPreview(team1Names, team2Names, getCounterModalEntry(), tournamentMode);
+            const existingPreview = $('counterModalBody').querySelector('.counter-preview-box');
+            if (existingPreview) {
+              existingPreview.outerHTML = previewHtml;
+            }
+          });
+        }
       }
 
       $('saveCounterDealBtn')?.addEventListener('click', () => {
@@ -5070,7 +5471,7 @@
           const draftTable = draftTournament.rounds?.[roundIndex]?.tables?.[context.tableIndex];
           if (!draftTable) return draftTournament;
           draftTable.entryMode = 'manual';
-          draftTable.counter = normalizeCounterState(null, draftTournament.dealsPerRound);
+          draftTable.counter = normalizeCounterState(null, draftTournament.dealsPerRound, draftTournament.tournamentMode);
           draftTable.result = null;
           draftTable.entryTeam = 'team1';
           return draftTournament;
@@ -5082,6 +5483,8 @@
 
     function bindRoundTableEvents(tournament, roundIndex) {
       const total = totalPointsPerTable(tournament);
+      const variableMode = isVariableMode(tournament);
+      const keypadMax = variableMode ? 9999 : total;
 
       $('activeRoundTables').querySelectorAll('[data-open-counter]').forEach(button => {
         button.addEventListener('click', () => {
@@ -5100,7 +5503,7 @@
           openMobileKeypad({
             inputId: input.id,
             title: 'Direkte Eingabe',
-            maxValue: total
+            maxValue: keypadMax
           });
         });
       });
@@ -5116,8 +5519,8 @@
           const tableEntry = activeTournament.rounds?.[viewRoundIndex]?.tables?.[tableIndex];
           if (!tableEntry || !tableEntry.result) return;
 
-          const counter = normalizeCounterState(tableEntry.counter, activeTournament.dealsPerRound);
-          const counterSummary = summarizeCounterState(counter);
+          const counter = normalizeCounterState(tableEntry.counter, activeTournament.dealsPerRound, activeTournament.tournamentMode);
+          const counterSummary = summarizeCounterState(counter, activeTournament.tournamentMode);
           if (counterSummary.hasStarted || counter.finalised) {
             await openCounterModalForTable(activeTournament.id, viewRoundIndex, tableIndex);
             return;
@@ -5144,7 +5547,7 @@
           openMobileKeypad({
             inputId: input.id,
             title: 'Direkte Eingabe',
-            maxValue: total
+            maxValue: keypadMax
           });
         });
         const updateState = () => {
@@ -5159,14 +5562,15 @@
             enteredPoints: input.value
           });
 
-          const otherTeam = activeTeam === 'team1' ? 'team2' : 'team1';
-          const otherInput = $(`points_${otherTeam}_${viewRoundIndex}_${tableIndex}`);
-          
-          if (input.value === '') {
-             if (otherInput && document.activeElement !== otherInput) otherInput.value = '';
-          } else {
-             const entered = Math.max(0, Math.min(total, Number(input.value || 0)));
-             if (otherInput && document.activeElement !== otherInput) otherInput.value = total - entered;
+          if (!variableMode) {
+            const otherTeam = activeTeam === 'team1' ? 'team2' : 'team1';
+            const otherInput = $(`points_${otherTeam}_${viewRoundIndex}_${tableIndex}`);
+            if (input.value === '') {
+              if (otherInput && document.activeElement !== otherInput) otherInput.value = '';
+            } else {
+              const entered = Math.max(0, Math.min(total, Number(input.value || 0)));
+              if (otherInput && document.activeElement !== otherInput) otherInput.value = total - entered;
+            }
           }
 
           const container = input.closest('.score-input-container');
@@ -5201,6 +5605,66 @@
 
           const tableEntry = activeTournament.rounds[viewRoundIndex].tables[tableIndex];
           const draft = getTableDraft(activeTournament.id, viewRoundIndex, tableIndex);
+
+          if (variableMode) {
+            const inputT1 = $(`points_team1_${viewRoundIndex}_${tableIndex}`);
+            const inputT2 = $(`points_team2_${viewRoundIndex}_${tableIndex}`);
+            const val1 = inputT1 ? inputT1.value : '';
+            const val2 = inputT2 ? inputT2.value : '';
+
+            if (val1 === '' && val2 === '') {
+              if (tableEntry.result) {
+                await mutateTournament(activeTournament.id, (draftTournament) => {
+                  const draftRound = draftTournament.rounds[viewRoundIndex];
+                  if (draftRound && draftRound.tables[tableIndex]) {
+                    draftRound.tables[tableIndex].result = null;
+                  }
+                  return draftTournament;
+                });
+                clearTableDraft(activeTournament.id, viewRoundIndex, tableIndex);
+                render();
+                return;
+              } else {
+                window.alert('Bitte Punkte eingeben.');
+                inputT1 && inputT1.focus();
+                return;
+              }
+            }
+
+            const t1 = val1 !== '' ? Number(val1) : 0;
+            const t2 = val2 !== '' ? Number(val2) : 0;
+
+            if (!Number.isFinite(t1) || !Number.isFinite(t2)) {
+              window.alert('Bitte gültige Punkte eingeben.');
+              return;
+            }
+            if (t1 < 0 || t2 < 0) {
+              window.alert('Punkte dürfen nicht negativ sein.');
+              return;
+            }
+
+            await mutateTournament(activeTournament.id, (draftTournament) => {
+              const draftRound = draftTournament.rounds[viewRoundIndex];
+              if (!draftRound) return draftTournament;
+              const draftTable = draftRound.tables[tableIndex];
+              if (!draftTable) return draftTournament;
+              draftTable.entryMode = 'manual';
+              draftTable.entryTeam = t1 >= t2 ? 'team1' : 'team2';
+              draftTable.counter = normalizeCounterState(null, draftTournament.dealsPerRound, draftTournament.tournamentMode);
+              draftTable.result = {
+                enteredTeam: t1 >= t2 ? 'team1' : 'team2',
+                enteredPoints: t1 >= t2 ? t1 : t2,
+                team1Points: t1,
+                team2Points: t2
+              };
+              return draftTournament;
+            });
+
+            clearTableDraft(activeTournament.id, viewRoundIndex, tableIndex);
+            render();
+            return;
+          }
+
           const selectedTeam = draft.entryTeam || tableEntry.entryTeam || (tableEntry.result ? tableEntry.result.enteredTeam : 'team1');
           const input = $(`points_${selectedTeam}_${viewRoundIndex}_${tableIndex}`);
           
@@ -5247,7 +5711,7 @@
 
             draftTable.entryMode = 'manual';
             draftTable.entryTeam = selectedTeam;
-            draftTable.counter = normalizeCounterState(null, draftTournament.dealsPerRound);
+            draftTable.counter = normalizeCounterState(null, draftTournament.dealsPerRound, draftTournament.tournamentMode);
             draftTable.result = {
               enteredTeam: selectedTeam,
               enteredPoints: entered,
@@ -5683,6 +6147,10 @@
         state.setup.roundCount = value;
         renderSetup();
       }, value => value);
+      renderChoiceGridStrings('tournamentModeGrid', TOURNAMENT_MODE_OPTIONS, state.setup.tournamentMode, value => {
+        state.setup.tournamentMode = value;
+        renderSetup();
+      }, value => value === 'variable' ? 'Variable Punkte' : '157 Punkte pro Austeilrunde');
       renderChoiceGrid('passwordProtectionGrid', YES_NO_OPTIONS, state.setup.passwordProtectionEnabled ? 1 : 0, value => {
         state.setup.passwordProtectionEnabled = Boolean(value);
         if (!state.setup.passwordProtectionEnabled) {
