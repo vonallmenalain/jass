@@ -855,7 +855,7 @@
           <div class="preview-sep">:</div>
           <div class="preview-team">
             <strong id="previewTeamBName">Team 2</strong>
-            <span id="previewTeamBPoints">157</span>
+            <span id="previewTeamBPoints">0</span>
           </div>
         </div>
 
@@ -1103,7 +1103,7 @@
       const t2Raw = entry.team2Points !== '' && entry.team2Points != null ? parseCounterInputPoints(entry.team2Points) : null;
 
       if (t1Raw === null && t2Raw === null) {
-        return { baseTeam1: 0, baseTeam2: POINTS_PER_DEAL };
+        return { baseTeam1: NaN, baseTeam2: NaN };
       }
 
       let baseTeam1;
@@ -1130,7 +1130,11 @@
     }
 
     function getRawRoundValues(payload) {
-      const points = clampInt(payload.points, 0, POINTS_PER_DEAL);
+      const pointsRaw = payload.points;
+      if (pointsRaw === '' || pointsRaw === null || pointsRaw === undefined) {
+        return { baseTeam1: NaN, baseTeam2: NaN };
+      }
+      const points = clampInt(pointsRaw, 0, POINTS_PER_DEAL);
       return { baseTeam1: points, baseTeam2: POINTS_PER_DEAL - points };
     }
 
@@ -1185,10 +1189,10 @@
 
     function getEntryPayload() {
       const raw = getRawRoundValuesFromEntry(state.entry);
-      const team1CardPoints = Number.isFinite(raw.baseTeam1) ? raw.baseTeam1 : 0;
+      const hasCardPoints = Number.isFinite(raw.baseTeam1) && Number.isFinite(raw.baseTeam2);
       return {
         scoringTeam: 'team1',
-        points: String(team1CardPoints),
+        points: hasCardPoints ? String(raw.baseTeam1) : '',
         bidTeam1: state.entry.sidiTeam1 ? 257 : clampInt(state.entry.bidTeam1, 0, POINTS_PER_DEAL),
         bidTeam2: state.entry.sidiTeam2 ? 257 : clampInt(state.entry.bidTeam2, 0, POINTS_PER_DEAL),
         sidiTeam1: Boolean(state.entry.sidiTeam1),
@@ -1209,6 +1213,25 @@
 
     function calculateRoundOutcome(payload, game, scoreBefore) {
       const raw = getRawRoundValues(payload);
+      if (!Number.isFinite(raw.baseTeam1) || !Number.isFinite(raw.baseTeam2)) {
+        const team1Bid = payload.sidiTeam1 ? 257 : clampInt(payload.bidTeam1, 0, POINTS_PER_DEAL);
+        const team2Bid = payload.sidiTeam2 ? 257 : clampInt(payload.bidTeam2, 0, POINTS_PER_DEAL);
+        return {
+          baseTeam1: raw.baseTeam1,
+          baseTeam2: raw.baseTeam2,
+          bidTeam1: team1Bid,
+          bidTeam2: team2Bid,
+          sidiTeam1: Boolean(payload.sidiTeam1),
+          sidiTeam2: Boolean(payload.sidiTeam2),
+          doublePoints: Boolean(payload.doublePoints),
+          totalTeam1: 0,
+          totalTeam2: 0,
+          writeLockBlockedTeam1: false,
+          writeLockBlockedTeam2: false,
+          extras: []
+        };
+      }
+
       let team1 = raw.baseTeam1;
       let team2 = raw.baseTeam2;
       const extras = [];
