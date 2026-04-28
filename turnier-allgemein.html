@@ -2553,7 +2553,8 @@
         ready: false,
         error: null,
         unsubscribe: null,
-        collectionName: 'turniere-allgemein'
+        collectionName: 'turniere',
+        docPrefix: 'allgemein_'
       },
       setup: {
         tournamentId: null,
@@ -2767,7 +2768,7 @@
     function buildSetupTournamentDraft(existingTournament = null) {
       const customTitle = (state.setup.title || '').trim().replace(/\s+/g, ' ');
       return {
-        id: existingTournament?.id || state.setup.tournamentId || uid('turnier'),
+        id: existingTournament?.id || state.setup.tournamentId || uid('allgemein_turnier'),
         createdAt: existingTournament?.createdAt || state.setup.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'active',
@@ -3117,6 +3118,7 @@
           collection(db, state.firebase.collectionName),
           (snapshot) => {
             const remoteTournaments = snapshot.docs
+              .filter(docSnapshot => docSnapshot.id.startsWith(state.firebase.docPrefix))
               .map(docSnapshot => normalizeTournament({
                 id: docSnapshot.id,
                 ...docSnapshot.data()
@@ -3540,7 +3542,7 @@
       const generated = generateSchedule(state.setup.playerCount, state.setup.roundCount);
       const customTitle = (state.setup.title || '').trim().replace(/\s+/g, ' ');
       return {
-        id: existingTournament?.id || state.setup.tournamentId || uid('turnier'),
+        id: existingTournament?.id || state.setup.tournamentId || uid('allgemein_turnier'),
         createdAt: existingTournament?.createdAt || state.setup.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'active',
