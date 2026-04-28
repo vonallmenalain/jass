@@ -710,6 +710,14 @@
     .keypad-head { display:flex; align-items:center; justify-content:space-between; }
     .keypad-title { font-size:13px; color:var(--muted); font-weight:700; }
     .keypad-display { min-height:66px; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; font-size:34px; font-weight:900; }
+    .keypad-quick-row { display: none; gap: 10px; }
+    .keypad-quick-row.show { display: grid; grid-template-columns: 1fr; }
+    .keypad-btn.keypad-quick {
+      min-height: 48px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
     .keypad-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
     .keypad-btn { min-height:56px; border-radius:14px; font-size:22px; font-weight:900; }
     .keypad-btn.action { font-size:16px; font-weight:800; }
@@ -881,6 +889,9 @@
         <button class="icon-btn" type="button" id="mobileKeypadCloseBtn">×</button>
       </div>
       <div class="keypad-display" id="mobileKeypadDisplay">0</div>
+      <div class="keypad-quick-row" id="keypadQuick157Row" aria-hidden="true">
+        <button class="btn-ghost keypad-btn keypad-quick" type="button" id="keypadQuick157Btn">157</button>
+      </div>
       <div class="keypad-grid">
         <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="1">1</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="2">2</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="3">3</button>
         <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="4">4</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="5">5</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="6">6</button>
@@ -926,17 +937,32 @@
 
     const $ = (id) => document.getElementById(id);
     let keypadSession = null;
+    function setKeypadQuick157Visible(visible) {
+      const quickRow = $('keypadQuick157Row');
+      if (!quickRow) return;
+      quickRow.classList.toggle('show', visible);
+      quickRow.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    }
+
     function closeMobileKeypad() {
       keypadSession = null;
+      setKeypadQuick157Visible(false);
       $('mobileKeypadBackdrop').classList.remove('show');
       $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'true');
     }
-    function openMobileKeypad(inputId, title, maxValue = null) {
+    function openMobileKeypad(inputId, title, maxValue = null, options = {}) {
       const input = $(inputId);
       if (!input || input.disabled) return;
-      keypadSession = { inputId, maxValue: Number.isFinite(maxValue) ? maxValue : null, value: String(input.value || '').replace(/[^\d]/g, '') };
+      const showQuick157 = Boolean(options.showQuick157);
+      keypadSession = {
+        inputId,
+        maxValue: Number.isFinite(maxValue) ? maxValue : null,
+        value: String(input.value || '').replace(/[^\d]/g, ''),
+        showQuick157
+      };
       $('mobileKeypadTitle').textContent = title || 'Punkte eingeben';
       $('mobileKeypadDisplay').textContent = keypadSession.value || '0';
+      setKeypadQuick157Visible(showQuick157);
       $('mobileKeypadBackdrop').classList.add('show');
       $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'false');
     }
@@ -959,6 +985,11 @@
       }
       $('mobileKeypadDisplay').textContent = keypadSession.value || '0';
       syncKeypadValue(false);
+    }
+
+    function keyPadFillMaxPoints() {
+      if (!keypadSession || !keypadSession.showQuick157) return;
+      setKeypadValue(String(POINTS_PER_DEAL));
     }
 
     const screens = {
@@ -1440,8 +1471,8 @@
         }
       }
 
-      const bid1Val = e.sidiTeam1 ? 257 : e.bidTeam1;
-      const bid2Val = e.sidiTeam2 ? 257 : e.bidTeam2;
+      const bid1Shown = e.sidiTeam1 ? '257' : (e.bidTeam1 > 0 ? String(e.bidTeam1) : '');
+      const bid2Shown = e.sidiTeam2 ? '257' : (e.bidTeam2 > 0 ? String(e.bidTeam2) : '');
 
       return `
         <div class="variable-counter-entry">
@@ -1451,7 +1482,7 @@
               <input id="entryTeam1PointsInput" class="counter-point-input tap-input ${invalidPreview ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t1Display)}" data-sidi-team-points="team1" readonly ${finished ? 'disabled' : ''} />
             </div>
             <div class="variable-counter-field">
-              <input id="bidTeam1Input" class="counter-point-input tap-input" type="text" inputmode="none" placeholder="Geboten" value="${escapeHtml(String(bid1Val))}" data-sidi-bid="team1" readonly ${finished || e.sidiTeam1 ? 'disabled' : ''} />
+              <input id="bidTeam1Input" class="counter-point-input tap-input" type="text" inputmode="none" placeholder="Gebot" value="${escapeHtml(bid1Shown)}" data-sidi-bid="team1" readonly ${finished || e.sidiTeam1 ? 'disabled' : ''} />
             </div>
             <div class="variable-counter-field">
               <button class="mini-btn match-btn ${e.sidiTeam1 ? 'sidi-btn-active' : ''}" type="button" id="toggleSidiTeam1" ${finished ? 'disabled' : ''}>Sidi${e.sidiTeam1 ? ' ✓' : ''}</button>
@@ -1463,7 +1494,7 @@
               <input id="entryTeam2PointsInput" class="counter-point-input tap-input ${invalidPreview ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t2Display)}" data-sidi-team-points="team2" readonly ${finished ? 'disabled' : ''} />
             </div>
             <div class="variable-counter-field">
-              <input id="bidTeam2Input" class="counter-point-input tap-input" type="text" inputmode="none" placeholder="Geboten" value="${escapeHtml(String(bid2Val))}" data-sidi-bid="team2" readonly ${finished || e.sidiTeam2 ? 'disabled' : ''} />
+              <input id="bidTeam2Input" class="counter-point-input tap-input" type="text" inputmode="none" placeholder="Gebot" value="${escapeHtml(bid2Shown)}" data-sidi-bid="team2" readonly ${finished || e.sidiTeam2 ? 'disabled' : ''} />
             </div>
             <div class="variable-counter-field">
               <button class="mini-btn match-btn ${e.sidiTeam2 ? 'sidi-btn-active' : ''}" type="button" id="toggleSidiTeam2" ${finished ? 'disabled' : ''}>Sidi${e.sidiTeam2 ? ' ✓' : ''}</button>
@@ -1481,7 +1512,7 @@
         const teamKey = input.dataset.sidiTeamPoints;
         input.addEventListener('click', () => {
           if (input.disabled) return;
-          openMobileKeypad(input.id, `${teamKey === 'team1' ? game.team1 : game.team2} · Punkte`, POINTS_PER_DEAL);
+          openMobileKeypad(input.id, `${teamKey === 'team1' ? game.team1 : game.team2} · Punkte`, POINTS_PER_DEAL, { showQuick157: true });
         });
         input.addEventListener('input', (event) => {
           const val = event.target.value;
@@ -1778,6 +1809,7 @@
       $('toggleDoublePointsEntry').addEventListener('click', toggleDoublePointsEntry);
 
       $('customPointsInput').addEventListener('click', () => openMobileKeypad('customPointsInput', 'Punktziel'));
+      $('keypadQuick157Btn')?.addEventListener('click', keyPadFillMaxPoints);
       $('mobileKeypadBackdrop').addEventListener('click', (event) => {
         if (event.target === $('mobileKeypadBackdrop')) closeMobileKeypad();
       });
