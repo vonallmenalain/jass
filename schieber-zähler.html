@@ -565,6 +565,89 @@
       gap: 10px;
     }
 
+    .variable-counter-entry {
+      display: flex;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .variable-counter-team-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .variable-counter-team-block.team1-block {
+      align-items: flex-start;
+    }
+
+    .variable-counter-team-block.team2-block {
+      align-items: flex-end;
+    }
+
+    .variable-counter-team-name {
+      font-size: 14px;
+      font-weight: 700;
+      word-break: break-word;
+      line-height: 1.2;
+    }
+
+    .variable-counter-team-block.team2-block .variable-counter-team-name {
+      text-align: right;
+    }
+
+    .variable-counter-field {
+      width: 100%;
+    }
+
+    .variable-counter-field .counter-point-input {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 0 14px;
+      outline: none;
+      font-size: 16px;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .variable-counter-field .counter-point-input.invalid {
+      border-color: rgba(248, 113, 113, 0.65);
+    }
+
+    .match-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .match-btn.match-active {
+      background: rgba(34, 197, 94, 0.18);
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #22c55e;
+    }
+
+    .weisen-input-disabled {
+      opacity: 0.38;
+      pointer-events: none;
+      cursor: default;
+    }
+
+    @media (max-width: 390px) {
+      .variable-counter-entry {
+        flex-direction: column;
+      }
+
+      .variable-counter-team-block.team1-block,
+      .variable-counter-team-block.team2-block {
+        align-items: flex-start;
+        width: 100%;
+      }
+    }
+
     .history-list {
       display: grid;
       gap: 10px;
@@ -795,12 +878,7 @@
           
         </div>
 
-        <div class="team-pick" id="entryTeamPicker"></div>
-
-        <div class="point-input-wrap">
-          <label class="label" id="entryPointsLabel" for="entryPointsInput">Punkte eingeben</label>
-          <input id="entryPointsInput" class="point-input tap-input" type="text" inputmode="none" placeholder="0 bis 157" readonly />
-        </div>
+        <div id="entryFormRoot"></div>
 
         <div class="preview-box">
           <div class="preview-team">
@@ -812,23 +890,6 @@
             <strong id="previewTeamBName">Team 2</strong>
             <span id="previewTeamBPoints">0</span>
           </div>
-        </div>
-
-        <div class="extra-grid" id="weisenBlock" style="display:none;">
-          <div class="section-title" style="margin-bottom:0;">Weisen</div>
-          <div class="input-group">
-            <label for="weisenTeam1Input" id="weisenTeam1Label">Weisen Team 1</label>
-            <input id="weisenTeam1Input" class="tap-input" type="text" inputmode="none" placeholder="0" value="0" readonly />
-          </div>
-          <div class="input-group">
-            <label for="weisenTeam2Input" id="weisenTeam2Label">Weisen Team 2</label>
-            <input id="weisenTeam2Input" class="tap-input" type="text" inputmode="none" placeholder="0" value="0" readonly />
-          </div>
-        </div>
-
-        <div class="extra-grid" id="matchBlock" style="display:none;">
-          <div class="section-title" style="margin-bottom:0;">Matchbonus</div>
-          <div class="match-grid" id="matchGrid"></div>
         </div>
 
         <button class="btn" id="saveRoundBtn">Runde speichern</button>
@@ -876,6 +937,9 @@
     const STORAGE_KEY = 'jass-schieber-games-v3';
     const CURRENT_KEY = 'jass-schieber-current-game-v3';
 
+    const POINTS_PER_DEAL = 157;
+    const MATCH_BONUS_POINTS = 257;
+
     const state = {
       screen: 'home',
       games: [],
@@ -893,9 +957,12 @@
       entry: {
         scoringTeam: 'team1',
         points: '',
+        team1Points: '',
+        team2Points: '',
+        team1Match: false,
+        team2Match: false,
         weisenTeam1: 0,
-        weisenTeam2: 0,
-        matchTeam: 'none'
+        weisenTeam2: 0
       }
     };
 
@@ -948,6 +1015,20 @@
       return 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     }
 
+    function normalizeSchieberRound(round) {
+      if (!round || typeof round !== 'object') return round;
+      if ((round.matchTeam === 'team1' || round.matchTeam === 'team2') && round.matchStored257 !== true) {
+        const b1 = Number(round.baseTeam1 || 0);
+        const b2 = Number(round.baseTeam2 || 0);
+        if (round.matchTeam === 'team1' && b1 === MATCH_BONUS_POINTS && b2 === 0) {
+          round.matchStored257 = true;
+        } else if (round.matchTeam === 'team2' && b2 === MATCH_BONUS_POINTS && b1 === 0) {
+          round.matchStored257 = true;
+        }
+      }
+      return round;
+    }
+
     function loadGames() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -955,6 +1036,11 @@
       } catch (error) {
         state.games = [];
       }
+      state.games.forEach((game) => {
+        if (Array.isArray(game.rounds)) {
+          game.rounds = game.rounds.map(normalizeSchieberRound);
+        }
+      });
     }
 
     function saveGames() {
@@ -1000,10 +1086,187 @@
       return state.games.find(game => game.id === state.currentGameId) || null;
     }
 
-    function roundTotals(round) {
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function gameUsesMatchWeisenUI(game) {
+      return Boolean(game && (game.withWeisen || game.withMatchbonus));
+    }
+
+    function clampCounterPoints(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.max(0, Math.min(POINTS_PER_DEAL, Math.round(parsed)));
+    }
+
+    function parseCounterInputPoints(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.round(parsed);
+    }
+
+    function isCounterInputValueInvalid(value, max = POINTS_PER_DEAL) {
+      if (value === '' || value === null || value === undefined) return false;
+      const parsed = Number(value);
+      return !Number.isFinite(parsed) || parsed < 0 || parsed > max;
+    }
+
+    function isCounterInputValueInvalidVariable(value) {
+      if (value === '' || value === null || value === undefined) return false;
+      const parsed = Number(value);
+      return !Number.isFinite(parsed) || parsed < 0;
+    }
+
+    function buildRoundFromEntry(game) {
+      const entry = state.entry;
+      if (!gameUsesMatchWeisenUI(game)) {
+        const points = Math.round(Number(String(entry.points || '').replace(/[^\d.-]/g, '')) || 0);
+        if (!Number.isFinite(points) || points < 0 || points > POINTS_PER_DEAL) {
+          return { ok: false, error: 'Bitte einen Wert zwischen 0 und 157 eingeben.' };
+        }
+        let baseTeam1 = 0;
+        let baseTeam2 = 0;
+        if (entry.scoringTeam === 'team1') {
+          baseTeam1 = points;
+          baseTeam2 = POINTS_PER_DEAL - points;
+        } else {
+          baseTeam2 = points;
+          baseTeam1 = POINTS_PER_DEAL - points;
+        }
+        return {
+          ok: true,
+          round: {
+            baseTeam1,
+            baseTeam2,
+            weisenTeam1: 0,
+            weisenTeam2: 0,
+            matchTeam: 'none',
+            matchStored257: false
+          }
+        };
+      }
+
+      const t1Match = Boolean(entry.team1Match);
+      const t2Match = Boolean(entry.team2Match);
+
+      if (t1Match) {
+        return {
+          ok: true,
+          round: {
+            baseTeam1: MATCH_BONUS_POINTS,
+            baseTeam2: 0,
+            weisenTeam1: 0,
+            weisenTeam2: 0,
+            matchTeam: 'team1',
+            matchStored257: true
+          }
+        };
+      }
+      if (t2Match) {
+        return {
+          ok: true,
+          round: {
+            baseTeam1: 0,
+            baseTeam2: MATCH_BONUS_POINTS,
+            weisenTeam1: 0,
+            weisenTeam2: 0,
+            matchTeam: 'team2',
+            matchStored257: true
+          }
+        };
+      }
+
+      const t1Invalid = isCounterInputValueInvalidVariable(entry.team1Points);
+      const t2Invalid = isCounterInputValueInvalidVariable(entry.team2Points);
+      if (t1Invalid || t2Invalid) {
+        return { ok: false, error: 'Bitte gültige Punktwerte (≥ 0) eingeben.' };
+      }
+
+      const t1Raw = entry.team1Points !== '' && entry.team1Points != null
+        ? parseCounterInputPoints(entry.team1Points)
+        : null;
+      const t2Raw = entry.team2Points !== '' && entry.team2Points != null
+        ? parseCounterInputPoints(entry.team2Points)
+        : null;
+
+      if (t1Raw === null && t2Raw === null) {
+        return { ok: false, error: 'Bitte Punkte für mindestens ein Team eingeben.' };
+      }
+
+      let team1Points;
+      let team2Points;
+      if (t1Raw !== null && t2Raw === null) {
+        team1Points = clampCounterPoints(t1Raw);
+        team2Points = POINTS_PER_DEAL - team1Points;
+      } else if (t2Raw !== null && t1Raw === null) {
+        team2Points = clampCounterPoints(t2Raw);
+        team1Points = POINTS_PER_DEAL - team2Points;
+      } else {
+        team1Points = clampCounterPoints(t1Raw);
+        team2Points = clampCounterPoints(t2Raw);
+        if (team1Points === null || team2Points === null) {
+          return { ok: false, error: 'Bitte gültige Punktwerte für beide Teams eingeben (0–157).' };
+        }
+        if (team1Points + team2Points !== POINTS_PER_DEAL) {
+          return { ok: false, error: `Die Summe muss ${POINTS_PER_DEAL} ergeben (aktuell ${team1Points + team2Points}).` };
+        }
+      }
+
+      if (team1Points === null || team2Points === null) {
+        return { ok: false, error: 'Bitte gültige Punktwerte eingeben.' };
+      }
+
+      let weisenTeam1 = 0;
+      let weisenTeam2 = 0;
+      if (game.withWeisen) {
+        weisenTeam1 = Math.max(0, Math.round(Number(entry.weisenTeam1) || 0));
+        weisenTeam2 = Math.max(0, Math.round(Number(entry.weisenTeam2) || 0));
+      }
+
       return {
-        team1: round.baseTeam1 + round.weisenTeam1 + (round.matchTeam === 'team1' ? 100 : 0),
-        team2: round.baseTeam2 + round.weisenTeam2 + (round.matchTeam === 'team2' ? 100 : 0)
+        ok: true,
+        round: {
+          baseTeam1: team1Points,
+          baseTeam2: team2Points,
+          weisenTeam1,
+          weisenTeam2,
+          matchTeam: 'none',
+          matchStored257: false
+        }
+      };
+    }
+
+    function schieberVariableEntryLooksEmpty() {
+      const e = state.entry;
+      if (e.team1Match || e.team2Match) return false;
+      return String(e.team1Points ?? '').trim() === '' && String(e.team2Points ?? '').trim() === '';
+    }
+
+    function roundTotals(round) {
+      let baseT1 = Number(round.baseTeam1 || 0);
+      let baseT2 = Number(round.baseTeam2 || 0);
+      let bonusT1 = 0;
+      let bonusT2 = 0;
+
+      if (round.matchStored257) {
+        // Basis speichert bereits 257 : 0 — kein zusätzlicher Bonus
+      } else if (round.matchTeam === 'team1') {
+        bonusT1 = 100;
+      } else if (round.matchTeam === 'team2') {
+        bonusT2 = 100;
+      }
+
+      return {
+        team1: baseT1 + (round.weisenTeam1 || 0) + bonusT1,
+        team2: baseT2 + (round.weisenTeam2 || 0) + bonusT2
       };
     }
 
@@ -1049,9 +1312,12 @@
       state.entry = {
         scoringTeam: 'team1',
         points: '',
+        team1Points: '',
+        team2Points: '',
+        team1Match: false,
+        team2Match: false,
         weisenTeam1: 0,
-        weisenTeam2: 0,
-        matchTeam: 'none'
+        weisenTeam2: 0
       };
     }
 
@@ -1174,23 +1440,223 @@
       const currentGame = getCurrentGame();
       const team1Name = currentGame ? currentGame.team1 : 'Team 1';
       const team2Name = currentGame ? currentGame.team2 : 'Team 2';
-      const rawPoints = String(state.entry.points ?? '').trim();
 
-      if (!rawPoints) {
+      if (!currentGame || !gameUsesMatchWeisenUI(currentGame)) {
+        const rawPoints = String(state.entry.points ?? '').trim();
+        if (!rawPoints) {
+          return { team1Name, team2Name, team1Points: 0, team2Points: 0 };
+        }
+        let points = Number(rawPoints);
+        if (!Number.isFinite(points)) {
+          return { team1Name, team2Name, team1Points: 0, team2Points: 0 };
+        }
+        points = Math.max(0, Math.min(POINTS_PER_DEAL, Math.round(points)));
+        const scoringTeam = state.entry.scoringTeam;
+        if (scoringTeam === 'team1') {
+          return { team1Name, team2Name, team1Points: points, team2Points: POINTS_PER_DEAL - points };
+        }
+        return { team1Name, team2Name, team1Points: POINTS_PER_DEAL - points, team2Points: points };
+      }
+
+      const e = state.entry;
+      const t1Match = Boolean(e.team1Match);
+      const t2Match = Boolean(e.team2Match);
+      const withW = currentGame.withWeisen;
+
+      if (t1Match || t2Match) {
+        return {
+          team1Name,
+          team2Name,
+          team1Points: t1Match ? MATCH_BONUS_POINTS : 0,
+          team2Points: t2Match ? MATCH_BONUS_POINTS : 0
+        };
+      }
+
+      const t1Raw = e.team1Points !== '' && e.team1Points != null ? parseCounterInputPoints(e.team1Points) : null;
+      const t2Raw = e.team2Points !== '' && e.team2Points != null ? parseCounterInputPoints(e.team2Points) : null;
+
+      let b1 = null;
+      let b2 = null;
+      if (t1Raw !== null && t2Raw === null) {
+        b1 = clampCounterPoints(t1Raw);
+        b2 = b1 !== null ? POINTS_PER_DEAL - b1 : null;
+      } else if (t2Raw !== null && t1Raw === null) {
+        b2 = clampCounterPoints(t2Raw);
+        b1 = b2 !== null ? POINTS_PER_DEAL - b2 : null;
+      } else if (t1Raw !== null && t2Raw !== null) {
+        b1 = clampCounterPoints(t1Raw);
+        b2 = clampCounterPoints(t2Raw);
+      }
+
+      if (b1 === null || b2 === null) {
         return { team1Name, team2Name, team1Points: 0, team2Points: 0 };
       }
 
-      let points = Number(rawPoints);
-      if (!Number.isFinite(points)) {
-        return { team1Name, team2Name, team1Points: 0, team2Points: 0 };
+      const w1 = withW ? Math.max(0, Math.round(Number(e.weisenTeam1) || 0)) : 0;
+      const w2 = withW ? Math.max(0, Math.round(Number(e.weisenTeam2) || 0)) : 0;
+      return { team1Name, team2Name, team1Points: b1 + w1, team2Points: b2 + w2 };
+    }
+
+    function renderSchieberVariableEntryForm(game, finished) {
+      const e = state.entry;
+      const t1Match = Boolean(e.team1Match);
+      const t2Match = Boolean(e.team2Match);
+      const eitherMatch = t1Match || t2Match;
+      const builtPreview = buildRoundFromEntry(game);
+      const entryEmpty = schieberVariableEntryLooksEmpty();
+      const invalidPreview = !eitherMatch && !entryEmpty && builtPreview.ok === false;
+
+      const t1DisplayPoints = t1Match
+        ? String(MATCH_BONUS_POINTS)
+        : (builtPreview.ok && builtPreview.round
+          ? String(builtPreview.round.baseTeam1)
+          : String(e.team1Points ?? ''));
+      const t2DisplayPoints = t2Match
+        ? String(MATCH_BONUS_POINTS)
+        : (builtPreview.ok && builtPreview.round
+          ? String(builtPreview.round.baseTeam2)
+          : String(e.team2Points ?? ''));
+
+      const t1WeisenLocked = t2Match;
+      const t2WeisenLocked = t1Match;
+      const t1Weisen = t1WeisenLocked ? 0 : (e.weisenTeam1 !== undefined ? e.weisenTeam1 : 0);
+      const t2Weisen = t2WeisenLocked ? 0 : (e.weisenTeam2 !== undefined ? e.weisenTeam2 : 0);
+
+      const t1PointsLocked = eitherMatch;
+      const t2PointsLocked = eitherMatch;
+
+      const showWeisen = game.withWeisen;
+      const showMatchBtn = game.withMatchbonus;
+
+      return `
+        <div class="variable-counter-entry">
+          <div class="variable-counter-team-block team1-block">
+            <div class="variable-counter-team-name">${escapeHtml(game.team1)}</div>
+            <div class="variable-counter-field">
+              <input id="entryTeam1PointsInput" class="counter-point-input tap-input ${invalidPreview ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t1DisplayPoints !== '' && t1DisplayPoints !== 'undefined' ? String(t1DisplayPoints) : '')}" data-schieber-team-points="team1" ${t1PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
+            </div>
+            ${showMatchBtn ? `
+            <div class="variable-counter-field">
+              <button class="mini-btn match-btn ${t1Match ? 'active match-active' : ''}" type="button" id="schieberTeam1MatchBtn" ${finished ? 'disabled' : ''}>Match${t1Match ? ' ✓' : ''}</button>
+            </div>` : ''}
+            ${showWeisen ? `
+            <div class="variable-counter-field">
+              <input id="weisenTeam1Input" class="counter-point-input tap-input ${t1WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="Weisen" value="${escapeHtml(t1Weisen > 0 ? String(t1Weisen) : '')}" ${t1WeisenLocked ? '' : 'data-schieber-weisen="team1"'} readonly ${t1WeisenLocked ? 'tabindex="-1"' : ''} />
+            </div>` : ''}
+          </div>
+          <div class="variable-counter-team-block team2-block">
+            <div class="variable-counter-team-name">${escapeHtml(game.team2)}</div>
+            <div class="variable-counter-field">
+              <input id="entryTeam2PointsInput" class="counter-point-input tap-input ${invalidPreview ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t2DisplayPoints !== '' && t2DisplayPoints !== 'undefined' ? String(t2DisplayPoints) : '')}" data-schieber-team-points="team2" ${t2PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
+            </div>
+            ${showMatchBtn ? `
+            <div class="variable-counter-field">
+              <button class="mini-btn match-btn ${t2Match ? 'active match-active' : ''}" type="button" id="schieberTeam2MatchBtn" ${finished ? 'disabled' : ''}>Match${t2Match ? ' ✓' : ''}</button>
+            </div>` : ''}
+            ${showWeisen ? `
+            <div class="variable-counter-field">
+              <input id="weisenTeam2Input" class="counter-point-input tap-input ${t2WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="Weisen" value="${escapeHtml(t2Weisen > 0 ? String(t2Weisen) : '')}" ${t2WeisenLocked ? '' : 'data-schieber-weisen="team2"'} readonly ${t2WeisenLocked ? 'tabindex="-1"' : ''} />
+            </div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function bindSchieberGameEntryEvents(game, finished) {
+      const root = $('entryFormRoot');
+      if (!root || finished) return;
+
+      if (!gameUsesMatchWeisenUI(game)) {
+        const pointsInput = $('entryPointsInput');
+        if (pointsInput) {
+          pointsInput.addEventListener('click', () => openMobileKeypad('entryPointsInput', 'Rundenpunkte', POINTS_PER_DEAL));
+          pointsInput.addEventListener('input', (ev) => {
+            state.entry.points = ev.target.value;
+            renderGame();
+          });
+        }
+        return;
       }
 
-      points = Math.max(0, Math.min(157, Math.round(points)));
-      const scoringTeam = state.entry.scoringTeam;
-      if (scoringTeam === 'team1') {
-        return { team1Name, team2Name, team1Points: points, team2Points: 157 - points };
-      }
-      return { team1Name, team2Name, team1Points: 157 - points, team2Points: points };
+      root.querySelectorAll('[data-schieber-team-points]').forEach((input) => {
+        const teamKey = input.dataset.schieberTeamPoints;
+        if (input.tabIndex === -1) return;
+        input.addEventListener('click', () => {
+          const e = state.entry;
+          if (e.team1Match || e.team2Match) return;
+          openMobileKeypad(input.id, `${teamKey === 'team1' ? game.team1 : game.team2} · Punkte`, POINTS_PER_DEAL);
+        });
+        input.addEventListener('input', (event) => {
+          const val = event.target.value;
+          const e = state.entry;
+          if (e.team1Match || e.team2Match) return;
+          if (teamKey === 'team1') {
+            const parsed = parseCounterInputPoints(val);
+            const otherVal = parsed !== null ? String(POINTS_PER_DEAL - clampCounterPoints(parsed)) : '';
+            state.entry.team1Points = val;
+            state.entry.team2Points = otherVal;
+            const otherInput = $('entryTeam2PointsInput');
+            if (otherInput) otherInput.value = otherVal;
+          } else {
+            const parsed = parseCounterInputPoints(val);
+            const otherVal = parsed !== null ? String(POINTS_PER_DEAL - clampCounterPoints(parsed)) : '';
+            state.entry.team2Points = val;
+            state.entry.team1Points = otherVal;
+            const otherInput = $('entryTeam1PointsInput');
+            if (otherInput) otherInput.value = otherVal;
+          }
+          renderGame();
+        });
+      });
+
+      root.querySelectorAll('[data-schieber-weisen]').forEach((input) => {
+        const teamKey = input.dataset.schieberWeisen;
+        if (input.tabIndex === -1) return;
+        input.addEventListener('click', () => {
+          openMobileKeypad(input.id, `${teamKey === 'team1' ? game.team1 : game.team2} · Weisen`, 9999);
+        });
+        input.addEventListener('input', (event) => {
+          const v = Number(event.target.value);
+          const n = Number.isFinite(v) ? Math.max(0, v) : 0;
+          if (teamKey === 'team1') state.entry.weisenTeam1 = n;
+          else state.entry.weisenTeam2 = n;
+          renderGame();
+        });
+      });
+
+      $('schieberTeam1MatchBtn')?.addEventListener('click', () => {
+        const current = Boolean(state.entry.team1Match);
+        if (!current) {
+          state.entry.team1Match = true;
+          state.entry.team2Match = false;
+          state.entry.team1Points = String(MATCH_BONUS_POINTS);
+          state.entry.team2Points = '0';
+          state.entry.weisenTeam1 = 0;
+          state.entry.weisenTeam2 = 0;
+        } else {
+          state.entry.team1Match = false;
+          state.entry.team1Points = '';
+          state.entry.team2Points = '';
+        }
+        renderGame();
+      });
+
+      $('schieberTeam2MatchBtn')?.addEventListener('click', () => {
+        const current = Boolean(state.entry.team2Match);
+        if (!current) {
+          state.entry.team2Match = true;
+          state.entry.team1Match = false;
+          state.entry.team2Points = String(MATCH_BONUS_POINTS);
+          state.entry.team1Points = '0';
+          state.entry.weisenTeam1 = 0;
+          state.entry.weisenTeam2 = 0;
+        } else {
+          state.entry.team2Match = false;
+          state.entry.team2Points = '';
+          state.entry.team1Points = '';
+        }
+        renderGame();
+      });
     }
 
     function renderGame() {
@@ -1202,6 +1668,7 @@
 
       const score = getScore(game);
       const finished = isFinished(game);
+      const useVariableUI = gameUsesMatchWeisenUI(game);
 
       $('gameSummary').innerHTML = `
         <div class="pill">${game.goalMode === 'rounds' ? `${game.goalRounds} Runden` : `${game.goalPoints} Punkte`}</div>
@@ -1233,14 +1700,22 @@
         </div>
       `;
 
-      $('entryTeamPicker').innerHTML = `
-        <button class="mini-btn ${state.entry.scoringTeam === 'team1' ? 'active' : ''}" onclick="setScoringTeam('team1')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team1)}</button>
-        <button class="mini-btn ${state.entry.scoringTeam === 'team2' ? 'active' : ''}" onclick="setScoringTeam('team2')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team2)}</button>
-      `;
-
-      $('entryPointsLabel').textContent = `Punkte für ${state.entry.scoringTeam === 'team1' ? game.team1 : game.team2}`;
-      $('entryPointsInput').value = state.entry.points;
-      $('entryPointsInput').disabled = finished;
+      if (useVariableUI) {
+        $('entryFormRoot').innerHTML = renderSchieberVariableEntryForm(game, finished);
+      } else {
+        $('entryFormRoot').innerHTML = `
+          <div class="team-pick" id="entryTeamPicker">
+            <button class="mini-btn ${state.entry.scoringTeam === 'team1' ? 'active' : ''}" onclick="setScoringTeam('team1')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team1)}</button>
+            <button class="mini-btn ${state.entry.scoringTeam === 'team2' ? 'active' : ''}" onclick="setScoringTeam('team2')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team2)}</button>
+          </div>
+          <div class="point-input-wrap">
+            <label class="label" id="entryPointsLabel" for="entryPointsInput">Punkte eingeben</label>
+            <input id="entryPointsInput" class="point-input tap-input" type="text" inputmode="none" placeholder="0 bis 157" readonly ${finished ? 'disabled' : ''} />
+          </div>
+        `;
+        $('entryPointsLabel').textContent = `Punkte für ${state.entry.scoringTeam === 'team1' ? game.team1 : game.team2}`;
+        $('entryPointsInput').value = state.entry.points;
+      }
 
       const preview = getPreviewValues();
       $('previewTeamAName').textContent = preview.team1Name;
@@ -1248,23 +1723,7 @@
       $('previewTeamAPoints').textContent = preview.team1Points;
       $('previewTeamBPoints').textContent = preview.team2Points;
 
-      $('weisenBlock').style.display = game.withWeisen ? 'grid' : 'none';
-      $('matchBlock').style.display = game.withMatchbonus ? 'grid' : 'none';
-
-      if (game.withWeisen) {
-        $('weisenTeam1Label').textContent = `Weisen ${game.team1}`;
-        $('weisenTeam2Label').textContent = `Weisen ${game.team2}`;
-        $('weisenTeam1Input').value = state.entry.weisenTeam1;
-        $('weisenTeam2Input').value = state.entry.weisenTeam2;
-        $('weisenTeam1Input').disabled = finished;
-        $('weisenTeam2Input').disabled = finished;
-      }
-
-      if (game.withMatchbonus) {
-        $('matchGrid').innerHTML = `
-          <button class="mini-btn ${state.entry.matchTeam === 'auto' ? 'active' : ''}" onclick="toggleMatchbonusEntry()" ${finished ? 'disabled' : ''}>${state.entry.matchTeam === 'auto' ? 'Match' : 'Kein Match'}</button>
-        `;
-      }
+      bindSchieberGameEntryEvents(game, finished);
 
       $('saveRoundBtn').disabled = finished;
       $('saveRoundBtn').textContent = finished ? 'Spiel beendet' : 'Runde speichern';
@@ -1282,13 +1741,22 @@
           const extras = [];
           if (round.weisenTeam1) extras.push(`${escapeHtml(game.team1)} Weisen +${round.weisenTeam1}`);
           if (round.weisenTeam2) extras.push(`${escapeHtml(game.team2)} Weisen +${round.weisenTeam2}`);
-          if (round.matchTeam === 'team1') extras.push(`${escapeHtml(game.team1)} Match +100`);
-          if (round.matchTeam === 'team2') extras.push(`${escapeHtml(game.team2)} Match +100`);
+          if (round.matchTeam === 'team1') {
+            extras.push(round.matchStored257
+              ? `${escapeHtml(game.team1)} Match (${MATCH_BONUS_POINTS})`
+              : `${escapeHtml(game.team1)} Match +100`);
+          }
+          if (round.matchTeam === 'team2') {
+            extras.push(round.matchStored257
+              ? `${escapeHtml(game.team2)} Match (${MATCH_BONUS_POINTS})`
+              : `${escapeHtml(game.team2)} Match +100`);
+          }
+          const basisLabel = round.matchStored257 ? 'Basis (Speicher)' : 'Basis 157';
           return `
             <div class="history-item">
               <div class="history-main">
                 <strong>Runde ${realIndex + 1}: ${escapeHtml(game.team1)} ${totals.team1} · ${escapeHtml(game.team2)} ${totals.team2}</strong>
-                <span>Basis 157: ${round.baseTeam1} : ${round.baseTeam2}${extras.length ? ' · ' + extras.join(' · ') : ''}</span>
+                <span>${basisLabel}: ${round.baseTeam1} : ${round.baseTeam2}${extras.length ? ' · ' + extras.join(' · ') : ''}</span>
               </div>
               <div class="history-actions">
                 <button class="list-btn" onclick="deleteRound(${realIndex})">Löschen</button>
@@ -1297,15 +1765,6 @@
           `;
         }).join('');
       }
-    }
-
-    function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
     }
 
     function resumeGame(gameId) {
@@ -1331,11 +1790,6 @@
 
     function setScoringTeam(teamKey) {
       state.entry.scoringTeam = teamKey;
-      renderGame();
-    }
-
-    function toggleMatchbonusEntry() {
-      state.entry.matchTeam = state.entry.matchTeam === 'auto' ? 'none' : 'auto';
       renderGame();
     }
 
@@ -1396,49 +1850,15 @@
       const game = getCurrentGame();
       if (!game) return;
 
-      let points = Number($('entryPointsInput').value);
-      if (!Number.isFinite(points) || points < 0 || points > 157) {
-        alert('Bitte einen Wert zwischen 0 und 157 eingeben.');
+      const built = buildRoundFromEntry(game);
+      if (!built.ok) {
+        alert(built.error || 'Runde konnte nicht gespeichert werden.');
         return;
-      }
-      points = Math.round(points);
-
-      let baseTeam1 = 0;
-      let baseTeam2 = 0;
-      if (state.entry.scoringTeam === 'team1') {
-        baseTeam1 = points;
-        baseTeam2 = 157 - points;
-      } else {
-        baseTeam2 = points;
-        baseTeam1 = 157 - points;
-      }
-
-      let weisenTeam1 = 0;
-      let weisenTeam2 = 0;
-      if (game.withWeisen) {
-        weisenTeam1 = Math.max(0, Math.round(Number($('weisenTeam1Input').value) || 0));
-        weisenTeam2 = Math.max(0, Math.round(Number($('weisenTeam2Input').value) || 0));
-      }
-
-      let matchTeam = 'none';
-      if (game.withMatchbonus && state.entry.matchTeam === 'auto') {
-        if (baseTeam1 === 157) {
-          matchTeam = 'team1';
-        } else if (baseTeam2 === 157) {
-          matchTeam = 'team2';
-        } else {
-          alert('Matchbonus ist nur möglich, wenn ein Team 157 Punkte schreibt.');
-          return;
-        }
       }
 
       saveCurrentGameMutation((current) => {
         current.rounds.push({
-          baseTeam1,
-          baseTeam2,
-          weisenTeam1,
-          weisenTeam2,
-          matchTeam,
+          ...built.round,
           createdAt: Date.now()
         });
       });
@@ -1502,22 +1922,7 @@
         renderSetup();
       });
 
-      $('entryPointsInput').addEventListener('input', (e) => {
-        state.entry.points = e.target.value;
-        renderGame();
-      });
-
-      $('weisenTeam1Input').addEventListener('input', (e) => {
-        state.entry.weisenTeam1 = Math.max(0, Number(e.target.value) || 0);
-      });
-      $('weisenTeam2Input').addEventListener('input', (e) => {
-        state.entry.weisenTeam2 = Math.max(0, Number(e.target.value) || 0);
-      });
-
       $('customPointsInput').addEventListener('click', () => openMobileKeypad('customPointsInput', 'Punktziel'));
-      $('entryPointsInput').addEventListener('click', () => openMobileKeypad('entryPointsInput', 'Rundenpunkte', 157));
-      $('weisenTeam1Input').addEventListener('click', () => openMobileKeypad('weisenTeam1Input', 'Weisen Team 1'));
-      $('weisenTeam2Input').addEventListener('click', () => openMobileKeypad('weisenTeam2Input', 'Weisen Team 2'));
       $('mobileKeypadBackdrop').addEventListener('click', (event) => {
         if (event.target === $('mobileKeypadBackdrop')) closeMobileKeypad();
       });
@@ -1535,7 +1940,6 @@
     window.resumeGame = resumeGame;
     window.deleteGame = deleteGame;
     window.setScoringTeam = setScoringTeam;
-    window.toggleMatchbonusEntry = toggleMatchbonusEntry;
     window.deleteRound = deleteRound;
 
     function init() {
