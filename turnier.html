@@ -2553,7 +2553,8 @@
         ready: false,
         error: null,
         unsubscribe: null,
-        collectionName: 'turniere'
+        collectionName: 'turniere',
+        docPrefix: 'turnier_'
       },
       setup: {
         tournamentId: null,
@@ -3117,6 +3118,7 @@
           collection(db, state.firebase.collectionName),
           (snapshot) => {
             const remoteTournaments = snapshot.docs
+              .filter(docSnapshot => docSnapshot.id.startsWith(state.firebase.docPrefix))
               .map(docSnapshot => normalizeTournament({
                 id: docSnapshot.id,
                 ...docSnapshot.data()
