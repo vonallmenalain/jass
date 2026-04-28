@@ -1841,55 +1841,46 @@
     }
 
     .variable-counter-entry {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      display: flex;
       gap: 10px;
       align-items: start;
-    }
-
-    .variable-counter-sep {
-      color: var(--muted);
-      font-weight: 900;
-      padding-top: 36px;
-      text-align: center;
     }
 
     .variable-counter-team-block {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      flex: 1;
+    }
+
+    .variable-counter-team-block.team1-block {
+      align-items: flex-start;
+    }
+
+    .variable-counter-team-block.team2-block {
+      align-items: flex-end;
     }
 
     .variable-counter-team-name {
       font-size: 14px;
       font-weight: 700;
-      text-align: center;
       word-break: break-word;
       line-height: 1.2;
     }
 
-    .variable-counter-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .variable-counter-team-block.team2-block .variable-counter-team-name {
+      text-align: right;
     }
 
-    .variable-counter-label {
-      font-size: 12px;
-      color: var(--muted);
-      min-width: 44px;
+    .variable-counter-field {
+      width: 100%;
     }
 
-    .variable-counter-row .counter-point-input {
-      flex: 1;
-      min-width: 0;
+    .variable-counter-field .counter-point-input {
+      width: 100%;
     }
 
     .match-btn {
-      font-size: 11px;
-      padding: 4px 10px;
-      min-height: 28px;
-      height: 28px;
       width: 100%;
       justify-content: center;
     }
@@ -1983,11 +1974,13 @@
       }
 
       .variable-counter-entry {
-        grid-template-columns: 1fr;
+        flex-direction: column;
       }
 
-      .variable-counter-sep {
-        display: none;
+      .variable-counter-team-block.team1-block,
+      .variable-counter-team-block.team2-block {
+        align-items: flex-start;
+        width: 100%;
       }
     }
 
@@ -5204,33 +5197,28 @@
 
       return `
         <div class="variable-counter-entry">
-          <div class="variable-counter-team-block">
+          <div class="variable-counter-team-block team1-block">
             <div class="variable-counter-team-name">${escapeHtml(team1Names)}</div>
-            <div class="variable-counter-row">
-              <span class="variable-counter-label">Punkte</span>
-              <input id="counterEntryTeam1PointsInput" class="counter-point-input tap-input ${inputInvalid && !eitherMatch ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(String(t1DisplayPoints))}" data-counter-input data-variable-team="team1" ${t1PointsLocked ? '' : 'readonly'} ${t1PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam1PointsInput" class="counter-point-input tap-input ${inputInvalid && !eitherMatch ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t1PointsLocked && t1DisplayPoints !== '' ? String(t1DisplayPoints) : (t1DisplayPoints !== '' ? String(t1DisplayPoints) : ''))}" data-counter-input data-variable-team="team1" ${t1PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
             </div>
-            <div class="variable-counter-row">
+            <div class="variable-counter-field">
               <button class="mini-btn match-btn ${t1Match ? 'active match-active' : ''}" type="button" id="team1MatchBtn" data-variable-match="team1">Match${t1Match ? ' ✓' : ''}</button>
             </div>
-            <div class="variable-counter-row">
-              <span class="variable-counter-label">Weisen</span>
-              <input id="counterEntryTeam1Weisen1Input" class="counter-point-input tap-input ${t1WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="0" value="${escapeHtml(String(t1Weisen))}" ${t1WeisenLocked ? '' : 'data-counter-input data-variable-weisen="team1"'} readonly ${t1WeisenLocked ? 'tabindex="-1"' : ''} />
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam1Weisen1Input" class="counter-point-input tap-input ${t1WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="Weisen" value="${escapeHtml(t1Weisen > 0 ? String(t1Weisen) : '')}" ${t1WeisenLocked ? '' : 'data-counter-input data-variable-weisen="team1"'} readonly ${t1WeisenLocked ? 'tabindex="-1"' : ''} />
             </div>
           </div>
-          <div class="variable-counter-sep">:</div>
-          <div class="variable-counter-team-block">
+          <div class="variable-counter-team-block team2-block">
             <div class="variable-counter-team-name">${escapeHtml(team2Names)}</div>
-            <div class="variable-counter-row">
-              <span class="variable-counter-label">Punkte</span>
-              <input id="counterEntryTeam2PointsInput" class="counter-point-input tap-input ${inputInvalid && !eitherMatch ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(String(t2DisplayPoints))}" data-counter-input data-variable-team="team2" ${t2PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam2PointsInput" class="counter-point-input tap-input ${inputInvalid && !eitherMatch ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t2DisplayPoints !== '' ? String(t2DisplayPoints) : '')}" data-counter-input data-variable-team="team2" ${t2PointsLocked ? 'readonly tabindex="-1" style="opacity:0.55;"' : 'readonly'} />
             </div>
-            <div class="variable-counter-row">
+            <div class="variable-counter-field">
               <button class="mini-btn match-btn ${t2Match ? 'active match-active' : ''}" type="button" id="team2MatchBtn" data-variable-match="team2">Match${t2Match ? ' ✓' : ''}</button>
             </div>
-            <div class="variable-counter-row">
-              <span class="variable-counter-label">Weisen</span>
-              <input id="counterEntryTeam2Weisen1Input" class="counter-point-input tap-input ${t2WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="0" value="${escapeHtml(String(t2Weisen))}" ${t2WeisenLocked ? '' : 'data-counter-input data-variable-weisen="team2"'} readonly ${t2WeisenLocked ? 'tabindex="-1"' : ''} />
+            <div class="variable-counter-field">
+              <input id="counterEntryTeam2Weisen1Input" class="counter-point-input tap-input ${t2WeisenLocked ? 'weisen-input-disabled' : ''}" type="text" inputmode="none" placeholder="Weisen" value="${escapeHtml(t2Weisen > 0 ? String(t2Weisen) : '')}" ${t2WeisenLocked ? '' : 'data-counter-input data-variable-weisen="team2"'} readonly ${t2WeisenLocked ? 'tabindex="-1"' : ''} />
             </div>
           </div>
         </div>
