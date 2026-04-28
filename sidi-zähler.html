@@ -537,11 +537,91 @@
       gap: 10px;
     }
 
-    .bid-row {
-      display: grid;
-      grid-template-columns: 1fr 110px;
+    .variable-counter-entry {
+      display: flex;
       gap: 10px;
-      align-items: end;
+      align-items: start;
+    }
+
+    .variable-counter-team-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .variable-counter-team-block.team1-block {
+      align-items: flex-start;
+    }
+
+    .variable-counter-team-block.team2-block {
+      align-items: flex-end;
+    }
+
+    .variable-counter-team-name {
+      font-size: 14px;
+      font-weight: 700;
+      word-break: break-word;
+      line-height: 1.2;
+    }
+
+    .variable-counter-team-block.team2-block .variable-counter-team-name {
+      text-align: right;
+    }
+
+    .variable-counter-field {
+      width: 100%;
+    }
+
+    .variable-counter-field .counter-point-input {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 0 14px;
+      outline: none;
+      font-size: 16px;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .variable-counter-field .counter-point-input.invalid {
+      border-color: rgba(248, 113, 113, 0.65);
+    }
+
+    .match-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .match-btn.match-active {
+      background: rgba(34, 197, 94, 0.18);
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #22c55e;
+    }
+
+    .sidi-btn-active {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.88), rgba(239, 68, 68, 0.88)) !important;
+      color: white !important;
+      border-color: transparent !important;
+      box-shadow: 0 10px 24px rgba(239, 68, 68, 0.2);
+    }
+
+    .double-points-row {
+      width: 100%;
+    }
+
+    .double-points-row .btn-ghost {
+      min-height: 56px;
+    }
+
+    .double-points-row .btn-ghost.active {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.88), rgba(239, 68, 68, 0.88));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 10px 24px rgba(239, 68, 68, 0.2);
     }
 
     .mode-btn {
@@ -611,7 +691,15 @@
       h1 { font-size: 27px; }
       .score-value { font-size: 34px; }
       .preview-team span { font-size: 24px; }
-      .bid-row { grid-template-columns: 1fr; }
+      .variable-counter-entry {
+        flex-direction: column;
+      }
+
+      .variable-counter-team-block.team1-block,
+      .variable-counter-team-block.team2-block {
+        align-items: flex-start;
+        width: 100%;
+      }
     }
 
     .tap-input { caret-color: transparent; user-select: none; -webkit-user-select: none; cursor: pointer; }
@@ -622,6 +710,14 @@
     .keypad-head { display:flex; align-items:center; justify-content:space-between; }
     .keypad-title { font-size:13px; color:var(--muted); font-weight:700; }
     .keypad-display { min-height:66px; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; font-size:34px; font-weight:900; }
+    .keypad-quick-row { display: none; gap: 10px; }
+    .keypad-quick-row.show { display: grid; grid-template-columns: 1fr; }
+    .keypad-btn.keypad-quick {
+      min-height: 48px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
     .keypad-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
     .keypad-btn { min-height:56px; border-radius:14px; font-size:22px; font-weight:900; }
     .keypad-btn.action { font-size:16px; font-weight:800; }
@@ -749,12 +845,7 @@
           <div class="section-title">Neue Runde</div>
         </div>
 
-        <div class="team-pick" id="entryTeamPicker"></div>
-
-        <div class="point-input-wrap">
-          <label class="label" id="entryPointsLabel" for="entryPointsInput">Punkte eingeben</label>
-          <input id="entryPointsInput" class="point-input tap-input" type="text" inputmode="none" placeholder="0 bis 157" readonly />
-        </div>
+        <div id="entryFormRoot"></div>
 
         <div class="preview-box">
           <div class="preview-team">
@@ -764,33 +855,12 @@
           <div class="preview-sep">:</div>
           <div class="preview-team">
             <strong id="previewTeamBName">Team 2</strong>
-            <span id="previewTeamBPoints">157</span>
+            <span id="previewTeamBPoints">0</span>
           </div>
         </div>
 
-        <div class="extra-grid" id="bidBlock">
-          <div class="section-title" style="margin-bottom:0;">Geboten</div>
-
-          <div class="bid-row">
-            <div class="input-group">
-              <label for="bidTeam1Input" id="bidTeam1Label">Geboten Team 1</label>
-              <input id="bidTeam1Input" class="tap-input" type="text" inputmode="none" placeholder="0 bis 157" value="0" readonly />
-            </div>
-            <button class="mode-btn" id="toggleSidiTeam1">Sidi</button>
-          </div>
-
-          <div class="bid-row">
-            <div class="input-group">
-              <label for="bidTeam2Input" id="bidTeam2Label">Geboten Team 2</label>
-              <input id="bidTeam2Input" class="tap-input" type="text" inputmode="none" placeholder="0 bis 157" value="0" readonly />
-            </div>
-            <button class="mode-btn" id="toggleSidiTeam2">Sidi</button>
-          </div>
-        </div>
-
-        <div class="extra-grid">
-          <div class="section-title" style="margin-bottom:0;">Doppelte Punkte</div>
-          <button class="toggle-btn" id="toggleDoublePointsEntry">Ohne</button>
+        <div class="double-points-row">
+          <button class="btn-ghost" type="button" id="toggleDoublePointsEntry">Doppelte Punkte · Ohne</button>
         </div>
 
         <button class="btn" id="saveRoundBtn">Runde speichern</button>
@@ -819,6 +889,9 @@
         <button class="icon-btn" type="button" id="mobileKeypadCloseBtn">×</button>
       </div>
       <div class="keypad-display" id="mobileKeypadDisplay">0</div>
+      <div class="keypad-quick-row" id="keypadQuick157Row" aria-hidden="true">
+        <button class="btn-ghost keypad-btn keypad-quick" type="button" id="keypadQuick157Btn">157</button>
+      </div>
       <div class="keypad-grid">
         <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="1">1</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="2">2</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="3">3</button>
         <button class="btn-ghost keypad-btn" type="button" data-keypad-digit="4">4</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="5">5</button><button class="btn-ghost keypad-btn" type="button" data-keypad-digit="6">6</button>
@@ -836,6 +909,8 @@
     const STORAGE_KEY = 'jass-sidi-games-v1';
     const CURRENT_KEY = 'jass-sidi-current-game-v1';
 
+    const POINTS_PER_DEAL = 157;
+
     const state = {
       screen: 'home',
       games: [],
@@ -850,8 +925,8 @@
         withWriteLock: false
       },
       entry: {
-        scoringTeam: 'team1',
-        points: '',
+        team1Points: '',
+        team2Points: '',
         bidTeam1: 0,
         bidTeam2: 0,
         sidiTeam1: false,
@@ -862,17 +937,32 @@
 
     const $ = (id) => document.getElementById(id);
     let keypadSession = null;
+    function setKeypadQuick157Visible(visible) {
+      const quickRow = $('keypadQuick157Row');
+      if (!quickRow) return;
+      quickRow.classList.toggle('show', visible);
+      quickRow.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    }
+
     function closeMobileKeypad() {
       keypadSession = null;
+      setKeypadQuick157Visible(false);
       $('mobileKeypadBackdrop').classList.remove('show');
       $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'true');
     }
-    function openMobileKeypad(inputId, title, maxValue = null) {
+    function openMobileKeypad(inputId, title, maxValue = null, options = {}) {
       const input = $(inputId);
       if (!input || input.disabled) return;
-      keypadSession = { inputId, maxValue: Number.isFinite(maxValue) ? maxValue : null, value: String(input.value || '').replace(/[^\d]/g, '') };
+      const showQuick157 = Boolean(options.showQuick157);
+      keypadSession = {
+        inputId,
+        maxValue: Number.isFinite(maxValue) ? maxValue : null,
+        value: String(input.value || '').replace(/[^\d]/g, ''),
+        showQuick157
+      };
       $('mobileKeypadTitle').textContent = title || 'Punkte eingeben';
       $('mobileKeypadDisplay').textContent = keypadSession.value || '0';
+      setKeypadQuick157Visible(showQuick157);
       $('mobileKeypadBackdrop').classList.add('show');
       $('mobileKeypadBackdrop').setAttribute('aria-hidden', 'false');
     }
@@ -895,6 +985,11 @@
       }
       $('mobileKeypadDisplay').textContent = keypadSession.value || '0';
       syncKeypadValue(false);
+    }
+
+    function keyPadFillMaxPoints() {
+      if (!keypadSession || !keypadSession.showQuick157) return;
+      setKeypadValue(String(POINTS_PER_DEAL));
     }
 
     const screens = {
@@ -977,20 +1072,129 @@
       return parsed;
     }
 
-    function getRawRoundValues(entry) {
-      const points = clampInt(entry.points, 0, 157);
-      if (entry.scoringTeam === 'team1') {
-        return { baseTeam1: points, baseTeam2: 157 - points };
+    function parseCounterInputPoints(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.round(parsed);
+    }
+
+    function clampCounterPoints(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.max(0, Math.min(POINTS_PER_DEAL, Math.round(parsed)));
+    }
+
+    function isCounterInputValueInvalid(value) {
+      if (value === '' || value === null || value === undefined) return false;
+      const parsed = Number(value);
+      return !Number.isFinite(parsed) || parsed < 0 || parsed > POINTS_PER_DEAL;
+    }
+
+    function getRawRoundValuesFromEntry(entry) {
+      const t1Invalid = isCounterInputValueInvalid(entry.team1Points);
+      const t2Invalid = isCounterInputValueInvalid(entry.team2Points);
+      if (t1Invalid || t2Invalid) {
+        return { baseTeam1: NaN, baseTeam2: NaN };
       }
-      return { baseTeam1: 157 - points, baseTeam2: points };
+
+      const t1Raw = entry.team1Points !== '' && entry.team1Points != null ? parseCounterInputPoints(entry.team1Points) : null;
+      const t2Raw = entry.team2Points !== '' && entry.team2Points != null ? parseCounterInputPoints(entry.team2Points) : null;
+
+      if (t1Raw === null && t2Raw === null) {
+        return { baseTeam1: NaN, baseTeam2: NaN };
+      }
+
+      let baseTeam1;
+      let baseTeam2;
+      if (t1Raw !== null && t2Raw === null) {
+        const c1 = clampCounterPoints(t1Raw);
+        if (c1 === null) return { baseTeam1: NaN, baseTeam2: NaN };
+        baseTeam1 = c1;
+        baseTeam2 = POINTS_PER_DEAL - baseTeam1;
+      } else if (t2Raw !== null && t1Raw === null) {
+        const c2 = clampCounterPoints(t2Raw);
+        if (c2 === null) return { baseTeam1: NaN, baseTeam2: NaN };
+        baseTeam2 = c2;
+        baseTeam1 = POINTS_PER_DEAL - baseTeam2;
+      } else {
+        baseTeam1 = clampCounterPoints(t1Raw);
+        baseTeam2 = clampCounterPoints(t2Raw);
+        if (baseTeam1 === null || baseTeam2 === null || baseTeam1 + baseTeam2 !== POINTS_PER_DEAL) {
+          return { baseTeam1: NaN, baseTeam2: NaN };
+        }
+      }
+
+      return { baseTeam1, baseTeam2 };
+    }
+
+    function getRawRoundValues(payload) {
+      const pointsRaw = payload.points;
+      if (pointsRaw === '' || pointsRaw === null || pointsRaw === undefined) {
+        return { baseTeam1: NaN, baseTeam2: NaN };
+      }
+      const points = clampInt(pointsRaw, 0, POINTS_PER_DEAL);
+      return { baseTeam1: points, baseTeam2: POINTS_PER_DEAL - points };
+    }
+
+    function sidiPointsEntryLooksEmpty() {
+      const e = state.entry;
+      return String(e.team1Points ?? '').trim() === '' && String(e.team2Points ?? '').trim() === '';
+    }
+
+    function validateSidiPointsEntry() {
+      const e = state.entry;
+      const t1Invalid = isCounterInputValueInvalid(e.team1Points);
+      const t2Invalid = isCounterInputValueInvalid(e.team2Points);
+      if (t1Invalid || t2Invalid) {
+        return { ok: false, error: 'Bitte gültige Punktwerte zwischen 0 und 157 eingeben.' };
+      }
+
+      const t1Raw = e.team1Points !== '' && e.team1Points != null ? parseCounterInputPoints(e.team1Points) : null;
+      const t2Raw = e.team2Points !== '' && e.team2Points != null ? parseCounterInputPoints(e.team2Points) : null;
+
+      if (t1Raw === null && t2Raw === null) {
+        return { ok: false, error: 'Bitte Punkte für mindestens ein Team eingeben.' };
+      }
+
+      let baseTeam1;
+      let baseTeam2;
+      if (t1Raw !== null && t2Raw === null) {
+        const c1 = clampCounterPoints(t1Raw);
+        if (c1 === null) return { ok: false, error: 'Bitte gültige Punktwerte eingeben.' };
+        baseTeam1 = c1;
+        baseTeam2 = POINTS_PER_DEAL - baseTeam1;
+      } else if (t2Raw !== null && t1Raw === null) {
+        const c2 = clampCounterPoints(t2Raw);
+        if (c2 === null) return { ok: false, error: 'Bitte gültige Punktwerte eingeben.' };
+        baseTeam2 = c2;
+        baseTeam1 = POINTS_PER_DEAL - baseTeam2;
+      } else {
+        baseTeam1 = clampCounterPoints(t1Raw);
+        baseTeam2 = clampCounterPoints(t2Raw);
+        if (baseTeam1 === null || baseTeam2 === null || baseTeam1 + baseTeam2 !== POINTS_PER_DEAL) {
+          const sum = (baseTeam1 != null && baseTeam2 != null) ? baseTeam1 + baseTeam2 : null;
+          return {
+            ok: false,
+            error: sum != null
+              ? `Die Summe muss ${POINTS_PER_DEAL} ergeben (aktuell ${sum}).`
+              : `Die Summe muss ${POINTS_PER_DEAL} ergeben.`
+          };
+        }
+      }
+
+      return { ok: true, raw: { baseTeam1, baseTeam2 } };
     }
 
     function getEntryPayload() {
+      const raw = getRawRoundValuesFromEntry(state.entry);
+      const hasCardPoints = Number.isFinite(raw.baseTeam1) && Number.isFinite(raw.baseTeam2);
       return {
-        scoringTeam: state.entry.scoringTeam,
-        points: state.entry.points,
-        bidTeam1: state.entry.sidiTeam1 ? 257 : clampInt(state.entry.bidTeam1, 0, 157),
-        bidTeam2: state.entry.sidiTeam2 ? 257 : clampInt(state.entry.bidTeam2, 0, 157),
+        scoringTeam: 'team1',
+        points: hasCardPoints ? String(raw.baseTeam1) : '',
+        bidTeam1: state.entry.sidiTeam1 ? 257 : clampInt(state.entry.bidTeam1, 0, POINTS_PER_DEAL),
+        bidTeam2: state.entry.sidiTeam2 ? 257 : clampInt(state.entry.bidTeam2, 0, POINTS_PER_DEAL),
         sidiTeam1: Boolean(state.entry.sidiTeam1),
         sidiTeam2: Boolean(state.entry.sidiTeam2),
         doublePoints: Boolean(state.entry.doublePoints)
@@ -1009,6 +1213,25 @@
 
     function calculateRoundOutcome(payload, game, scoreBefore) {
       const raw = getRawRoundValues(payload);
+      if (!Number.isFinite(raw.baseTeam1) || !Number.isFinite(raw.baseTeam2)) {
+        const team1Bid = payload.sidiTeam1 ? 257 : clampInt(payload.bidTeam1, 0, POINTS_PER_DEAL);
+        const team2Bid = payload.sidiTeam2 ? 257 : clampInt(payload.bidTeam2, 0, POINTS_PER_DEAL);
+        return {
+          baseTeam1: raw.baseTeam1,
+          baseTeam2: raw.baseTeam2,
+          bidTeam1: team1Bid,
+          bidTeam2: team2Bid,
+          sidiTeam1: Boolean(payload.sidiTeam1),
+          sidiTeam2: Boolean(payload.sidiTeam2),
+          doublePoints: Boolean(payload.doublePoints),
+          totalTeam1: 0,
+          totalTeam2: 0,
+          writeLockBlockedTeam1: false,
+          writeLockBlockedTeam2: false,
+          extras: []
+        };
+      }
+
       let team1 = raw.baseTeam1;
       let team2 = raw.baseTeam2;
       const extras = [];
@@ -1017,8 +1240,8 @@
       const team2Bid = payload.sidiTeam2 ? 257 : clampInt(payload.bidTeam2, 0, 157);
       const doublePoints = Boolean(payload.doublePoints);
 
-      const team1Success = team1Bid > 0 && (payload.sidiTeam1 ? raw.baseTeam1 === 157 : raw.baseTeam1 >= team1Bid);
-      const team2Success = team2Bid > 0 && (payload.sidiTeam2 ? raw.baseTeam2 === 157 : raw.baseTeam2 >= team2Bid);
+      const team1Success = team1Bid > 0 && (payload.sidiTeam1 ? raw.baseTeam1 === POINTS_PER_DEAL : raw.baseTeam1 >= team1Bid);
+      const team2Success = team2Bid > 0 && (payload.sidiTeam2 ? raw.baseTeam2 === POINTS_PER_DEAL : raw.baseTeam2 >= team2Bid);
       const team1Failed = team1Bid > 0 && !team1Success;
       const team2Failed = team2Bid > 0 && !team2Success;
 
@@ -1039,7 +1262,7 @@
       if (team1Bid > 0) {
         const bonus = getSuccessBonus(team1Bid, doublePoints);
         if (team1Success) {
-          if (payload.sidiTeam1 && raw.baseTeam1 === 157) {
+          if (payload.sidiTeam1 && raw.baseTeam1 === POINTS_PER_DEAL) {
             team1 += 100;
           }
           team1 += bonus;
@@ -1051,7 +1274,7 @@
       if (team2Bid > 0) {
         const bonus = getSuccessBonus(team2Bid, doublePoints);
         if (team2Success) {
-          if (payload.sidiTeam2 && raw.baseTeam2 === 157) {
+          if (payload.sidiTeam2 && raw.baseTeam2 === POINTS_PER_DEAL) {
             team2 += 100;
           }
           team2 += bonus;
@@ -1127,8 +1350,8 @@
 
     function resetEntry() {
       state.entry = {
-        scoringTeam: 'team1',
-        points: '',
+        team1Points: '',
+        team2Points: '',
         bidTeam1: 0,
         bidTeam2: 0,
         sidiTeam1: false,
@@ -1247,6 +1470,112 @@
       return calculateRoundOutcome(payload, game, scoreBefore);
     }
 
+    function renderSidiEntryForm(game, finished) {
+      const e = state.entry;
+      const validated = validateSidiPointsEntry();
+      const empty = sidiPointsEntryLooksEmpty();
+      const invalidPreview = !empty && !validated.ok;
+
+      let t1Display = String(e.team1Points ?? '');
+      let t2Display = String(e.team2Points ?? '');
+      if (validated.ok && validated.raw) {
+        const r = validated.raw;
+        const t1Raw = e.team1Points !== '' && e.team1Points != null ? parseCounterInputPoints(e.team1Points) : null;
+        const t2Raw = e.team2Points !== '' && e.team2Points != null ? parseCounterInputPoints(e.team2Points) : null;
+        if (t1Raw !== null && t2Raw === null) {
+          t1Display = String(r.baseTeam1);
+          t2Display = String(r.baseTeam2);
+        } else if (t2Raw !== null && t1Raw === null) {
+          t2Display = String(r.baseTeam2);
+          t1Display = String(r.baseTeam1);
+        } else if (t1Raw !== null && t2Raw !== null) {
+          t1Display = String(r.baseTeam1);
+          t2Display = String(r.baseTeam2);
+        }
+      }
+
+      const bid1Shown = e.sidiTeam1 ? '257' : (e.bidTeam1 > 0 ? String(e.bidTeam1) : '');
+      const bid2Shown = e.sidiTeam2 ? '257' : (e.bidTeam2 > 0 ? String(e.bidTeam2) : '');
+
+      return `
+        <div class="variable-counter-entry">
+          <div class="variable-counter-team-block team1-block">
+            <div class="variable-counter-team-name">${escapeHtml(game.team1)}</div>
+            <div class="variable-counter-field">
+              <input id="entryTeam1PointsInput" class="counter-point-input tap-input ${invalidPreview ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t1Display)}" data-sidi-team-points="team1" readonly ${finished ? 'disabled' : ''} />
+            </div>
+            <div class="variable-counter-field">
+              <input id="bidTeam1Input" class="counter-point-input tap-input" type="text" inputmode="none" placeholder="Gebot" value="${escapeHtml(bid1Shown)}" data-sidi-bid="team1" readonly ${finished || e.sidiTeam1 ? 'disabled' : ''} />
+            </div>
+            <div class="variable-counter-field">
+              <button class="mini-btn match-btn ${e.sidiTeam1 ? 'sidi-btn-active' : ''}" type="button" id="toggleSidiTeam1" ${finished ? 'disabled' : ''}>Sidi${e.sidiTeam1 ? ' ✓' : ''}</button>
+            </div>
+          </div>
+          <div class="variable-counter-team-block team2-block">
+            <div class="variable-counter-team-name">${escapeHtml(game.team2)}</div>
+            <div class="variable-counter-field">
+              <input id="entryTeam2PointsInput" class="counter-point-input tap-input ${invalidPreview ? 'invalid' : ''}" type="text" inputmode="none" placeholder="Punkte" value="${escapeHtml(t2Display)}" data-sidi-team-points="team2" readonly ${finished ? 'disabled' : ''} />
+            </div>
+            <div class="variable-counter-field">
+              <input id="bidTeam2Input" class="counter-point-input tap-input" type="text" inputmode="none" placeholder="Gebot" value="${escapeHtml(bid2Shown)}" data-sidi-bid="team2" readonly ${finished || e.sidiTeam2 ? 'disabled' : ''} />
+            </div>
+            <div class="variable-counter-field">
+              <button class="mini-btn match-btn ${e.sidiTeam2 ? 'sidi-btn-active' : ''}" type="button" id="toggleSidiTeam2" ${finished ? 'disabled' : ''}>Sidi${e.sidiTeam2 ? ' ✓' : ''}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindSidiEntryEvents(game, finished) {
+      const root = $('entryFormRoot');
+      if (!root || finished) return;
+
+      root.querySelectorAll('[data-sidi-team-points]').forEach((input) => {
+        const teamKey = input.dataset.sidiTeamPoints;
+        input.addEventListener('click', () => {
+          if (input.disabled) return;
+          openMobileKeypad(input.id, `${teamKey === 'team1' ? game.team1 : game.team2} · Punkte`, POINTS_PER_DEAL, { showQuick157: true });
+        });
+        input.addEventListener('input', (event) => {
+          const val = event.target.value;
+          if (teamKey === 'team1') {
+            const parsed = parseCounterInputPoints(val);
+            const otherVal = parsed !== null ? String(POINTS_PER_DEAL - clampCounterPoints(parsed)) : '';
+            state.entry.team1Points = val;
+            state.entry.team2Points = otherVal;
+            const otherInput = $('entryTeam2PointsInput');
+            if (otherInput) otherInput.value = otherVal;
+          } else {
+            const parsed = parseCounterInputPoints(val);
+            const otherVal = parsed !== null ? String(POINTS_PER_DEAL - clampCounterPoints(parsed)) : '';
+            state.entry.team2Points = val;
+            state.entry.team1Points = otherVal;
+            const otherInput = $('entryTeam1PointsInput');
+            if (otherInput) otherInput.value = otherVal;
+          }
+          renderGame();
+        });
+      });
+
+      root.querySelectorAll('[data-sidi-bid]').forEach((input) => {
+        const teamKey = input.dataset.sidiBid;
+        input.addEventListener('click', () => {
+          if (input.disabled) return;
+          openMobileKeypad(input.id, `${teamKey === 'team1' ? game.team1 : game.team2} · Gebot`, POINTS_PER_DEAL);
+        });
+        input.addEventListener('input', (event) => {
+          const v = clampInt(event.target.value, 0, POINTS_PER_DEAL);
+          if (teamKey === 'team1') state.entry.bidTeam1 = v;
+          else state.entry.bidTeam2 = v;
+          renderGame();
+        });
+      });
+
+      $('toggleSidiTeam1')?.addEventListener('click', () => toggleSidi('team1'));
+      $('toggleSidiTeam2')?.addEventListener('click', () => toggleSidi('team2'));
+    }
+
     function renderGame() {
       const game = getCurrentGame();
       if (!game) {
@@ -1287,36 +1616,19 @@
         </div>
       `;
 
-      $('entryTeamPicker').innerHTML = `
-        <button class="mini-btn ${state.entry.scoringTeam === 'team1' ? 'active' : ''}" onclick="setScoringTeam('team1')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team1)}</button>
-        <button class="mini-btn ${state.entry.scoringTeam === 'team2' ? 'active' : ''}" onclick="setScoringTeam('team2')" ${finished ? 'disabled' : ''}>${escapeHtml(game.team2)}</button>
-      `;
-
-      $('entryPointsLabel').textContent = `Punkte für ${state.entry.scoringTeam === 'team1' ? game.team1 : game.team2}`;
-      $('entryPointsInput').value = state.entry.points;
-      $('entryPointsInput').disabled = finished;
+      $('entryFormRoot').innerHTML = renderSidiEntryForm(game, finished);
+      bindSidiEntryEvents(game, finished);
 
       $('previewTeamAName').textContent = game.team1;
       $('previewTeamBName').textContent = game.team2;
       $('previewTeamAPoints').textContent = preview.totalTeam1;
       $('previewTeamBPoints').textContent = preview.totalTeam2;
 
-      $('bidTeam1Label').textContent = `Geboten ${game.team1}`;
-      $('bidTeam2Label').textContent = `Geboten ${game.team2}`;
-      $('bidTeam1Input').value = state.entry.sidiTeam1 ? 257 : state.entry.bidTeam1;
-      $('bidTeam2Input').value = state.entry.sidiTeam2 ? 257 : state.entry.bidTeam2;
-      $('bidTeam1Input').disabled = finished || state.entry.sidiTeam1;
-      $('bidTeam2Input').disabled = finished || state.entry.sidiTeam2;
-      $('toggleSidiTeam1').disabled = finished;
-      $('toggleSidiTeam2').disabled = finished;
-      $('toggleSidiTeam1').classList.toggle('active', state.entry.sidiTeam1);
-      $('toggleSidiTeam2').classList.toggle('active', state.entry.sidiTeam2);
-      $('toggleSidiTeam1').textContent = 'Sidi';
-      $('toggleSidiTeam2').textContent = 'Sidi';
-
       $('toggleDoublePointsEntry').disabled = finished;
       $('toggleDoublePointsEntry').classList.toggle('active', state.entry.doublePoints);
-      $('toggleDoublePointsEntry').textContent = state.entry.doublePoints ? 'Mit' : 'Ohne';
+      $('toggleDoublePointsEntry').textContent = state.entry.doublePoints
+        ? 'Doppelte Punkte · Mit'
+        : 'Doppelte Punkte · Ohne';
 
       $('saveRoundBtn').disabled = finished;
       $('saveRoundBtn').textContent = finished ? 'Spiel beendet' : 'Runde speichern';
@@ -1370,11 +1682,6 @@
       }
       saveGames();
       renderHome();
-    }
-
-    function setScoringTeam(teamKey) {
-      state.entry.scoringTeam = teamKey;
-      renderGame();
     }
 
     function toggleSidi(teamKey) {
@@ -1450,10 +1757,16 @@
       const game = getCurrentGame();
       if (!game) return;
 
+      const validated = validateSidiPointsEntry();
+      if (!validated.ok) {
+        alert(validated.error || 'Bitte gültige Punkte eingeben.');
+        return;
+      }
+
       const payload = getEntryPayload();
       const raw = getRawRoundValues(payload);
-      if (raw.baseTeam1 < 0 || raw.baseTeam1 > 157 || raw.baseTeam2 < 0 || raw.baseTeam2 > 157) {
-        alert('Bitte einen Wert zwischen 0 und 157 eingeben.');
+      if (raw.baseTeam1 < 0 || raw.baseTeam1 > POINTS_PER_DEAL || raw.baseTeam2 < 0 || raw.baseTeam2 > POINTS_PER_DEAL) {
+        alert(`Bitte gültige Basis-Punkte zwischen 0 und ${POINTS_PER_DEAL} eingeben.`);
         return;
       }
 
@@ -1516,29 +1829,10 @@
         renderSetup();
       });
 
-      $('entryPointsInput').addEventListener('input', (e) => {
-        state.entry.points = e.target.value;
-        renderGame();
-      });
-
-      $('bidTeam1Input').addEventListener('input', (e) => {
-        state.entry.bidTeam1 = clampInt(e.target.value, 0, 157);
-        renderGame();
-      });
-
-      $('bidTeam2Input').addEventListener('input', (e) => {
-        state.entry.bidTeam2 = clampInt(e.target.value, 0, 157);
-        renderGame();
-      });
-
-      $('toggleSidiTeam1').addEventListener('click', () => toggleSidi('team1'));
-      $('toggleSidiTeam2').addEventListener('click', () => toggleSidi('team2'));
       $('toggleDoublePointsEntry').addEventListener('click', toggleDoublePointsEntry);
 
       $('customPointsInput').addEventListener('click', () => openMobileKeypad('customPointsInput', 'Punktziel'));
-      $('entryPointsInput').addEventListener('click', () => openMobileKeypad('entryPointsInput', 'Rundenpunkte', 157));
-      $('bidTeam1Input').addEventListener('click', () => openMobileKeypad('bidTeam1Input', 'Gebot Team 1', 157));
-      $('bidTeam2Input').addEventListener('click', () => openMobileKeypad('bidTeam2Input', 'Gebot Team 2', 157));
+      $('keypadQuick157Btn')?.addEventListener('click', keyPadFillMaxPoints);
       $('mobileKeypadBackdrop').addEventListener('click', (event) => {
         if (event.target === $('mobileKeypadBackdrop')) closeMobileKeypad();
       });
@@ -1555,7 +1849,6 @@
 
     window.resumeGame = resumeGame;
     window.deleteGame = deleteGame;
-    window.setScoringTeam = setScoringTeam;
     window.deleteRound = deleteRound;
 
     function init() {
