@@ -1,8 +1,9 @@
-const CACHE_NAME = 'jass-shell-v1';
+const CACHE_NAME = 'jass-shell-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './turnier.html',
+  './turnier-allgemein.html',
   './schieber-zähler.html',
   './sidi-zähler.html',
   './coiffeur-zähler.html',
