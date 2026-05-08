@@ -4502,7 +4502,7 @@
               </div>
               <div class="saved-actions">
                 <button class="btn-ghost" type="button" data-open-id="${tournament.id}">${openLabel}</button>
-                <button class="mini-btn danger" type="button" data-delete-id="${tournament.id}">Löschen</button>
+                ${tournament.status === 'finished' ? '' : `<button class="mini-btn danger" type="button" data-delete-id="${tournament.id}">Löschen</button>`}
               </div>
             </div>
           `;
