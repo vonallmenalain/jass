@@ -2554,7 +2554,8 @@
         error: null,
         unsubscribe: null,
         collectionName: 'turniere',
-        docPrefix: 'turnier_'
+        docPrefix: 'turnier_',
+        excludePrefixes: ['allgemein_']
       },
       setup: {
         tournamentId: null,
@@ -3117,8 +3118,11 @@
         state.firebase.unsubscribe = onSnapshot(
           collection(db, state.firebase.collectionName),
           (snapshot) => {
+            const excludePrefixes = Array.isArray(state.firebase.excludePrefixes)
+              ? state.firebase.excludePrefixes
+              : [];
             const remoteTournaments = snapshot.docs
-              .filter(docSnapshot => docSnapshot.id.startsWith(state.firebase.docPrefix))
+              .filter(docSnapshot => !excludePrefixes.some(prefix => docSnapshot.id.startsWith(prefix)))
               .map(docSnapshot => normalizeTournament({
                 id: docSnapshot.id,
                 ...docSnapshot.data()
@@ -4377,7 +4381,7 @@
               </div>
               <div class="saved-actions">
                 <button class="btn-ghost" type="button" data-open-id="${tournament.id}">${openLabel}</button>
-                <button class="mini-btn danger" type="button" data-delete-id="${tournament.id}">Löschen</button>
+                ${tournament.status === 'finished' ? '' : `<button class="mini-btn danger" type="button" data-delete-id="${tournament.id}">Löschen</button>`}
               </div>
             </div>
           `;
