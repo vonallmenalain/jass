@@ -1,0 +1,75 @@
+rules_version = '2';
+
+// Firestore Security Rules für den Jass-Turnierzähler.
+//
+// Quelle der Wahrheit für die im Firebase-Projekt `jassen-bc258`
+// hinterlegten Regeln; 1:1 in die Firebase-Console kopierbar.
+//
+// ACHTUNG – was diese Regeln NICHT leisten können:
+//
+// Die App hat keine Anmeldung. turnier.html und turnier-allgemein.html
+// sprechen Firestore ohne jedes Konto an. Damit gibt es in den Regeln
+// keinen Absender, an dem sich etwas festmachen liesse: Sie können nicht
+// unterscheiden, ob ein Zugriff aus der App oder aus einem fremden Skript
+// kommt, und den Schaden darum nur begrenzen, nicht verhindern.
+//
+// Wer das wirklich schliessen will, braucht eines von beidem:
+//
+//   a) Firebase App Check (reCAPTCHA Enterprise für Web). Beglaubigt, dass
+//      eine Anfrage aus der echten App kommt. Aufwand: ein Skript-Schnipsel
+//      im <head> und ein Schalter in der Console. Der richtige Weg für eine
+//      App ohne Login.
+//   b) Anonyme Anmeldung plus Eigentümer-Feld pro Turnier. Mehr Aufwand,
+//      bestehende Turniere müssten migriert werden.
+//
+// Bis dahin gilt: Wer die Adresse der Datenbank kennt – sie steht im
+// Quelltext –, kann Turniere lesen, ändern und löschen. Für Jass-Punkte ist
+// das vertretbar. Personendaten gehören nicht in diese Datenbank.
+//
+// Was die Regeln unten trotzdem bringen:
+//   – Nur `turniere` ist erreichbar, alles andere ist zu.
+//   – Ein Turnierdokument muss wie ein Turnier aussehen. Die Datenbank
+//     lässt sich nicht als Ablage für beliebige fremde Daten missbrauchen.
+//   – Obergrenzen bei Spielerzahl, Runden und Textlängen.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ein Turnier, wie es normalizeTournament() erzeugt. Bewusst nur die
+    // oberste Ebene und nur als Obergrenze: Die verschachtelten Runden und
+    // Tische entstehen mit Spread-Operatoren, ihre Feldnamen liegen nicht
+    // fest. Eine strengere Prüfung würde bei der nächsten Erweiterung der
+    // App stillschweigend alles blockieren.
+    function turnierFormOk() {
+      return request.resource.data.keys().size() <= 40
+          && (!('name' in request.resource.data)
+              || (request.resource.data.name is string
+                  && request.resource.data.name.size() <= 120))
+          && (!('players' in request.resource.data)
+              || (request.resource.data.players is list
+                  && request.resource.data.players.size() <= 64))
+          && (!('rounds' in request.resource.data)
+              || (request.resource.data.rounds is list
+                  && request.resource.data.rounds.size() <= 60));
+    }
+
+    // Die App abonniert die ganze Sammlung
+    // (onSnapshot(collection(db, 'turniere')), turnier.html Zeile 3118)
+    // und filtert erst im Browser. Das Auflisten zu sperren würde sie
+    // brechen – Lesen bleibt deshalb offen.
+    match /turniere/{turnierId} {
+      allow read: if true;
+
+      // create und update getrennt von delete: Beim Löschen ist
+      // `request.resource` leer, eine Formprüfung würde dort scheitern und
+      // das Löschen eines Turniers unmöglich machen (turnier.html
+      // Zeile 3097 ruft deleteDoc auf).
+      allow create, update: if turnierFormOk();
+      allow delete: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
