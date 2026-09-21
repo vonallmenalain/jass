@@ -28,29 +28,52 @@ rules_version = '2';
 //
 // Was die Regeln unten trotzdem bringen:
 //   – Nur `turniere` ist erreichbar, alles andere ist zu.
-//   – Ein Turnierdokument muss wie ein Turnier aussehen. Die Datenbank
-//     lässt sich nicht als Ablage für beliebige fremde Daten missbrauchen.
+//   – Ein Turnierdokument muss wie ein Turnier aussehen: Die tragenden
+//     Felder müssen da sein und stimmen. Die Datenbank lässt sich damit
+//     nicht als Ablage für beliebige fremde Daten missbrauchen.
 //   – Obergrenzen bei Spielerzahl, Runden und Textlängen.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Ein Turnier, wie es normalizeTournament() erzeugt. Bewusst nur die
-    // oberste Ebene und nur als Obergrenze: Die verschachtelten Runden und
-    // Tische entstehen mit Spread-Operatoren, ihre Feldnamen liegen nicht
-    // fest. Eine strengere Prüfung würde bei der nächsten Erweiterung der
-    // App stillschweigend alles blockieren.
+    // Ein Turnier, wie es buildSetupTournamentDraft() anlegt und
+    // normalizeTournament() weiterreicht – in turnier.html wie in
+    // turnier-allgemein.html identisch aufgebaut.
+    //
+    // `hasAll` statt bloss die Felder zu zählen: Eine reine Obergrenze auf
+    // die Anzahl Schlüssel hält gar nichts ab. Ein Dokument wie
+    // { payload: <fast 1 MiB Text> } hat genau einen Schlüssel und käme
+    // durch, und weil beide Apps die ganze Sammlung abonnieren, landet so
+    // ein Fremdkörper auch noch in der Turnierliste der Nutzer.
+    //
+    // Kein `hasOnly`: normalizeTournament() reicht das Turnier mit
+    // ...tournament weiter, ältere Dokumente können also Felder tragen,
+    // die es heute nicht mehr gibt. Eine Allowlist würde die beim nächsten
+    // Speichern stillschweigend blockieren.
+    //
+    // Die verschachtelten Runden und Tische bleiben ungeprüft: Sie
+    // entstehen ebenfalls mit Spread-Operatoren, ihre Feldnamen liegen
+    // nicht fest. Hier nur die oberste Ebene und Obergrenzen.
     function turnierFormOk() {
-      return request.resource.data.keys().size() <= 40
-          && (!('name' in request.resource.data)
-              || (request.resource.data.name is string
-                  && request.resource.data.name.size() <= 120))
-          && (!('players' in request.resource.data)
-              || (request.resource.data.players is list
-                  && request.resource.data.players.size() <= 64))
-          && (!('rounds' in request.resource.data)
-              || (request.resource.data.rounds is list
-                  && request.resource.data.rounds.size() <= 60));
+      return request.resource.data.keys().hasAll(
+                ['id', 'title', 'status', 'createdAt', 'players', 'rounds']
+             )
+          && request.resource.data.keys().size() <= 40
+          // Das angezeigte Turnier heisst `title`, nicht `name` – ohne
+          // diese Grenze könnte ein fremder Schreiber ein Dokument bis an
+          // die Firestore-Grenze von 1 MiB aufblähen.
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 120
+          && request.resource.data.id is string
+          && request.resource.data.id.size() <= 80
+          && request.resource.data.status is string
+          && request.resource.data.status.size() <= 20
+          && request.resource.data.createdAt is string
+          && request.resource.data.createdAt.size() <= 40
+          && request.resource.data.players is list
+          && request.resource.data.players.size() <= 64
+          && request.resource.data.rounds is list
+          && request.resource.data.rounds.size() <= 60;
     }
 
     // Die App abonniert die ganze Sammlung
