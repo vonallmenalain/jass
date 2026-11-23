@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v3';
+const CACHE_NAME = 'jass-shell-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,7 +9,11 @@ const APP_SHELL = [
   './coiffeur-zähler.html',
   './jass-spiel.html',
   './trumpf-trainer.html',
+  './jass-online.html',
   './jass-engine.js',
+  './jass-protokoll.js',
+  './jass-tisch.js',
+  './jass-online.js',
   './jass-bot.js',
   './jass-karten.js',
   './jass-einstellungen.js',

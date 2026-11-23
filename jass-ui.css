@@ -279,6 +279,190 @@ details.abschnitt .inhalt { padding-bottom: 12px; display: flex; flex-direction:
 .tabelle th { color: var(--muted-2); font-weight: 700; font-size: 12.5px; }
 .tabelle tfoot td { font-weight: 800; border-bottom: none; font-size: 15px; }
 
+/* ------------------------------------------------------------- Spieltisch
+ * jass-tisch.js baut ihn auf, Spiel und Online-Spiel benutzen ihn. */
+.team-a { color: #fcd34d; }
+.team-b { color: #93c5fd; }
+.tisch {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  padding: calc(8px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+  gap: 8px;
+  max-width: 980px; margin: 0 auto;
+}
+.kopf { display: flex; align-items: center; gap: 8px; }
+.kopf .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kopf .info strong { font-size: 15px; }
+.kopf .info span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trumpf-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  background: #fffdf8; color: #111827; font-weight: 800; font-size: 14px;
+  box-shadow: 0 6px 14px rgba(0,0,0,.3);
+  white-space: nowrap;
+}
+.trumpf-chip .farbzeichen { width: 18px; height: 18px; }
+.stand { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stand > div {
+  border-radius: 14px; padding: 6px 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0;
+}
+.stand .name { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stand .summe { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.stand .runde { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.feld {
+  position: relative; flex: 1; min-height: 220px;
+  border-radius: 28px;
+  background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 45%, var(--felt-2) 100%);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: inset 0 0 40px rgba(0,0,0,.35), var(--shadow);
+  overflow: hidden;
+  --tw: clamp(48px, min(15vw, 10.5vh), 86px);
+}
+.platz {
+  position: absolute;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 84px; text-align: center; z-index: 3;
+}
+.platz[data-pos="2"] { top: 8px; left: 50%; transform: translateX(-50%); flex-direction: row; width: auto; gap: 8px; text-align: left; }
+.platz[data-pos="2"] .ptext { align-items: flex-start; }
+.ptext { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.platz[data-pos="1"] { right: 4px; top: 50%; transform: translateY(-50%); }
+.platz[data-pos="3"] { left: 4px; top: 50%; transform: translateY(-50%); }
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 900; font-size: 16px; color: #111827;
+  border: 2px solid rgba(255,255,255,.8);
+  transition: box-shadow .2s ease;
+}
+.platz.team0 .avatar { background: #fcd34d; }
+.platz.team1 .avatar { background: #93c5fd; }
+.platz.dran .avatar { box-shadow: 0 0 0 4px rgba(255,255,255,.35), 0 0 18px rgba(253, 224, 71, .9); }
+.platz .pname { font-size: 12px; font-weight: 800; max-width: 84px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.platz .pinfo { font-size: 11px; color: #d1fae5; opacity: .85; }
+.mini-karten { display: flex; height: 18px; }
+.mini-karten i { width: 9px; height: 16px; border-radius: 2px; background: #991b1b; border: 1px solid #fffdf8; margin-left: -4px; }
+.mini-karten i:first-child { margin-left: 0; }
+.blase {
+  position: absolute; z-index: 6;
+  background: #fffdf8; color: #111827;
+  padding: 6px 10px; border-radius: 14px;
+  font-weight: 800; font-size: 13px; white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(0,0,0,.35);
+  animation: blase 2.6s ease forwards;
+  pointer-events: none;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.blase .farbzeichen { width: 15px; height: 15px; }
+@keyframes blase { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.9); } 8% { opacity: 1; transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.stich {
+  position: absolute; left: 50%; top: 55%;
+  width: 0; height: 0;
+  z-index: 2;
+  transition: transform .45s ease, opacity .45s ease;
+}
+.stich .karte {
+  position: absolute;
+  width: var(--tw);
+  margin-left: calc(var(--tw) / -2);
+  margin-top: calc(var(--tw) * -0.7);
+  transition: transform .2s ease;
+}
+.stich .karte[data-pos="0"] { transform: translate(0, calc(var(--tw) * 0.55)); z-index: 4; }
+.stich .karte[data-pos="1"] { transform: translate(calc(var(--tw) * 0.78), 0); }
+.stich .karte[data-pos="2"] { transform: translate(0, calc(var(--tw) * -0.55)); }
+.stich .karte[data-pos="3"] { transform: translate(calc(var(--tw) * -0.78), 0); }
+.stich .karte.neu { animation: rein .28s ease-out; }
+.stich .karte[data-pos="0"].neu { --vx: 0; --vy: 40vh; }
+.stich .karte[data-pos="1"].neu { --vx: 40vw; --vy: 0; }
+.stich .karte[data-pos="2"].neu { --vx: 0; --vy: -40vh; }
+.stich .karte[data-pos="3"].neu { --vx: -40vw; --vy: 0; }
+@keyframes rein { from { translate: var(--vx) var(--vy); opacity: .2; } to { translate: 0 0; opacity: 1; } }
+.stich .karte.sieger .karte-svg { filter: drop-shadow(0 0 10px rgba(253, 224, 71, .95)) drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+.stich.weg { opacity: 0; }
+.stich.weg[data-ziel="0"] { transform: translate(0, 40vh) scale(.6); }
+.stich.weg[data-ziel="1"] { transform: translate(40vw, 0) scale(.6); }
+.stich.weg[data-ziel="2"] { transform: translate(0, -40vh) scale(.6); }
+.stich.weg[data-ziel="3"] { transform: translate(-40vw, 0) scale(.6); }
+.platz.weg .avatar { background: #64748b !important; opacity: .7; }
+.hinweis-feld {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 7; max-width: 80%;
+  background: rgba(15, 23, 42, .9); border: 1px solid var(--border);
+  padding: 10px 14px; border-radius: 16px; text-align: center;
+  font-size: 14px; font-weight: 700; line-height: 1.4;
+}
+.stich-info {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  font-size: 12.5px; font-weight: 700; color: #d1fae5;
+  background: rgba(0,0,0,.25); padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  z-index: 3;
+}
+
+/* Ansage */
+.ansage {
+  position: absolute; inset: 0; z-index: 8;
+  display: flex; flex-direction: column;
+  overflow: auto; padding: 8px;
+  background: rgba(6, 30, 17, .35);
+}
+.ansage-box {
+  background: rgba(15, 23, 42, .92); border: 1px solid var(--border);
+  border-radius: 20px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow); max-width: 420px; width: 100%; margin: auto;
+}
+.ansage-box h2 { font-size: 16px; text-align: center; }
+.ansage-knoepfe { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+@media (max-height: 700px) { .ansage-knoepfe button { min-height: 36px; } .ansage-box { padding: 10px; gap: 6px; } }
+.ansage-knoepfe button {
+  min-height: 42px; border-radius: 12px; border: 1px solid var(--border);
+  background: #fffdf8; color: #111827; font-weight: 800; font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+}
+.ansage-knoepfe button .farbzeichen { width: 18px; height: 18px; }
+.ansage-knoepfe button.empfohlen { outline: 3px solid var(--accent); outline-offset: 1px; }
+.ansage-box .zeile { display: flex; gap: 6px; }
+.ansage-box .zeile > * { flex: 1; }
+.tipp-text { font-size: 13px; color: #fde68a; line-height: 1.4; }
+
+/* Hand */
+.hand-bereich { display: flex; flex-direction: column; gap: 6px; }
+.kommentar {
+  min-height: 20px; font-size: 13px; color: var(--muted); line-height: 1.35;
+  padding: 0 4px; text-align: center;
+}
+.kommentar b { color: var(--text); }
+.hand { position: relative; height: calc(var(--kw, 60px) * 1.4 + 16px); }
+.hand .karte { position: absolute; bottom: 0; transition: transform .15s ease, filter .15s ease, left .2s ease; }
+.hand .karte.gesperrt .karte-svg { filter: brightness(.55) saturate(.6) drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+.hand .karte.gewaehlt { transform: translateY(-14px); }
+.hand .karte.vorschlag { animation: puls 1s ease-in-out 3; }
+.hand.aktiv .karte:not(.gesperrt):hover { transform: translateY(-8px); }
+.hand.aktiv .karte.gewaehlt:hover { transform: translateY(-14px); }
+@keyframes puls { 50% { transform: translateY(-16px); } }
+.aktionen { display: flex; gap: 8px; justify-content: center; }
+.aktionen .btn-ghost { min-height: 36px; font-size: 14px; flex: 1; max-width: 200px; border-radius: 12px; }
+.mein-name { text-align: center; font-size: 12.5px; font-weight: 800; color: #fcd34d; }
+
+.ergebnis-titel { font-size: 26px; font-weight: 900; text-align: center; letter-spacing: -0.03em; }
+.letzter-stich { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.letzter-stich figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
+.letzter-stich .karte { --kw: 64px; }
+.letzter-stich figure.sieger figcaption { color: #fde68a; font-weight: 800; }
+
+@media (min-width: 700px) {
+  .feld { --tw: clamp(60px, min(11vw, 12vh), 96px); }
+  .platz { width: 110px; }
+}
+@media (max-height: 620px) {
+  .stand .summe { font-size: 17px; }
+  .avatar { width: 32px; height: 32px; font-size: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

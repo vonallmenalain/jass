@@ -1,0 +1,130 @@
+# Die Regeln der Realtime Database (database.rules.json) fahren automatisch
+# nach Firebase, ins Projekt jassen-bc258.
+#
+# Die Datei im Repository ist die Wahrheit; in der Firebase-Console wird an
+# den Regeln nichts von Hand geändert. Sonst laufen zwei Fassungen
+# auseinander, und welche gilt, sieht man erst, wenn etwas nicht mehr geht.
+#
+#   pruefen          läuft immer (Pull Request und main): spielt die Regeln
+#                    im Emulator durch (werkzeuge/test-regeln.mjs).
+#   veroeffentlichen läuft nur auf main, nach bestandener Prüfung. Ab hier
+#                    gelten die Regeln.
+#
+# Der Deploy-Schlüssel liegt NICHT als gewöhnliches Repository-Secret bereit,
+# sondern in der GitHub-Umgebung "produktion", die nur von main aus erreichbar
+# ist. Bei einem Pull Request aus demselben Repository läuft der Workflow in
+# der Fassung des Pull Requests – läge der Schlüssel offen bereit, könnte ein
+# umgeschriebener Workflow veröffentlichen, ohne je nach main zu kommen.
+#
+# Anders als ein Netlify-Deploy ist das hier NICHT durch ein gesperrtes
+# Publishing abgefedert: Ein Merge nach main wirkt sofort auf die Datenbank.
+#
+# Einzurichten ist das einmal – siehe FIREBASE.md.
+
+name: Firebase-Regeln
+
+on:
+  push:
+    branches: [main]
+    paths: &pfade
+      - "database.rules.json"
+      - "firebase.json"
+      - ".firebaserc"
+      - "werkzeuge/test-regeln.mjs"
+      - "werkzeuge/emulator.json"
+      - "werkzeuge/pruefe-dienstkonto.mjs"
+      - "werkzeuge/package.json"
+      - "werkzeuge/package-lock.json"
+      - ".github/workflows/firebase-regeln.yml"
+  pull_request:
+    paths: *pfade
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-regeln-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FIREBASE_PROJEKT: jassen-bc258
+
+jobs:
+  pruefen:
+    name: Regeln prüfen
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: werkzeuge/package-lock.json
+
+      # Der Emulator der Realtime Database ist ein Java-Programm.
+      - name: Java einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Werkzeuge installieren
+        run: npm ci --prefix werkzeuge --no-audit --no-fund
+
+      - name: Regeln im Emulator durchspielen
+        run: npm run --prefix werkzeuge test:regeln
+
+  veroeffentlichen:
+    name: Regeln veröffentlichen
+    needs: pruefen
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: produktion
+    steps:
+      - name: Repository holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: werkzeuge/package-lock.json
+
+      # Ein fehlender Schlüssel ist ein Fehler, kein Hinweis: Ein grüner Lauf
+      # ohne Deploy sähe aus wie ein erfolgreicher.
+      - name: Schlüssel prüfen
+        env:
+          DIENSTKONTO: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DIENSTKONTO:-}" ]; then
+            echo "::error::In der Umgebung 'produktion' fehlt das Secret FIREBASE_SERVICE_ACCOUNT. Die Regeln wurden NICHT veröffentlicht – siehe FIREBASE.md."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "${DIENSTKONTO}" | node werkzeuge/pruefe-dienstkonto.mjs
+          printf '%s' "${DIENSTKONTO}" > "${RUNNER_TEMP}/dienstkonto.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/dienstkonto.json" >> "$GITHUB_ENV"
+
+      - name: Werkzeuge installieren
+        run: npm ci --prefix werkzeuge --no-audit --no-fund
+
+      - name: Regeln der Realtime Database veröffentlichen
+        run: |
+          set -euo pipefail
+          werkzeuge/node_modules/.bin/firebase deploy --only database \
+            --project "${FIREBASE_PROJEKT}" \
+            --non-interactive \
+            --message "${GITHUB_SHA::7} aus ${GITHUB_REF_NAME}"
+          {
+            echo "### Regeln der Realtime Database veröffentlicht"
+            echo
+            echo "\`database.rules.json\` gilt ab jetzt in \`${FIREBASE_PROJEKT}\`."
+            echo
+            echo "Stand: \`${GITHUB_SHA::7}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

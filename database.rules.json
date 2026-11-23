@@ -1,0 +1,103 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "jass": {
+      "$code": {
+        ".validate": "$code.matches(/^[A-Z2-9]{6}$/)",
+        ".write": "auth != null && data.exists() && data.child('info/host').val() === auth.uid && !newData.exists()",
+
+        "info": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('host').val() === auth.uid) || data.child('host').val() === auth.uid || (newData.child('host').val() === auth.uid && data.parent().child('sitze').child(data.child('hostSitz').val()).child('online').val() === false && data.parent().child('sitze').child(newData.child('hostSitz').val()).child('uid').val() === auth.uid))",
+          ".validate": "newData.hasChildren(['name', 'host', 'hostSitz', 'erstellt', 'status', 'spielNr', 'regeln'])",
+          "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+          "host": { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "hostSitz": { ".validate": "newData.isString() && newData.val().matches(/^[0-3]$/)" },
+          "erstellt": { ".validate": "newData.isNumber()" },
+          "status": { ".validate": "newData.isString() && newData.val().matches(/^(lobby|spiel|fertig)$/)" },
+          "spielNr": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 100000" },
+          "tipps": { ".validate": "newData.isBoolean()" },
+          "regeln": {
+            "modi": {
+              "$m": { ".validate": "$m.matches(/^(T|OBE|UNE|SLO|SLU|MIS)$/) && newData.isBoolean()" }
+            },
+            "schieben": { ".validate": "newData.isBoolean()" },
+            "spielende": { ".validate": "newData.isString() && newData.val().matches(/^(runden|punkte)$/)" },
+            "runden": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10000" },
+            "zielPunkte": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000000" },
+            "letzterStich": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+            "weisen": { ".validate": "newData.isBoolean()" },
+            "stoeck": { ".validate": "newData.isBoolean()" },
+            "stoeckPunkte": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+            "matchBonus": { ".validate": "newData.isBoolean()" },
+            "matchPunkte": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "multiplikatoren": { ".validate": "newData.isBoolean()" },
+            "faktoren": {
+              "$f": { ".validate": "$f.matches(/^(T0|T1|T2|T3|OBE|UNE|SLO|SLU|MIS)$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 100" }
+            },
+            "untertrumpfen": { ".validate": "newData.isBoolean()" },
+            "puurFrei": { ".validate": "newData.isBoolean()" },
+            "ersterAnsager": { ".validate": "newData.isString() && newData.val().matches(/^(ecke7|zufall|sitz0)$/)" },
+            "ausspiel": { ".validate": "newData.isString() && newData.val().matches(/^(vorhand|ansager)$/)" },
+            "$anderes": { ".validate": false }
+          },
+          "$anderes": { ".validate": false }
+        },
+
+        "sitze": {
+          ".read": "auth != null",
+          "$s": {
+            ".write": "auth != null && (newData.parent().parent().child('info/host').val() === auth.uid || (data.child('typ').val() === 'mensch' && !data.child('uid').exists() && newData.child('uid').val() === auth.uid && newData.child('typ').val() === 'mensch') || (data.child('uid').val() === auth.uid && newData.child('typ').val() === data.child('typ').val() && (newData.child('uid').val() === auth.uid || !newData.child('uid').exists())))",
+            ".validate": "$s.matches(/^[0-3]$/) && newData.hasChildren(['typ', 'name'])",
+            "typ": { ".validate": "newData.isString() && newData.val().matches(/^(mensch|leicht|mittel|schwer)$/)" },
+            "uid": { ".validate": "newData.isString() && newData.val().length <= 128" },
+            "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+            "online": { ".validate": "newData.isBoolean()" },
+            "bereit": { ".validate": "newData.isNumber()" },
+            "$anderes": { ".validate": false }
+          }
+        },
+
+        "log": {
+          ".read": "auth != null",
+          ".write": "auth != null && !newData.exists() && newData.parent().child('info/host').val() === auth.uid",
+          "$n": {
+            ".write": "auth != null && !data.exists() && newData.exists() && (newData.parent().parent().child('info/host').val() === auth.uid || (newData.child('t').val() !== 'r' && newData.parent().parent().child('sitze').child('' + newData.child('s').val()).child('uid').val() === auth.uid))",
+            ".validate": "$n.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['t']) && (newData.child('t').val() === 'r' ? newData.hasChildren(['nr', 'a']) : newData.hasChildren(['s'])) && (newData.child('t').val() !== 'a' || newData.hasChildren(['c'])) && (newData.child('t').val() !== 'k' || newData.hasChildren(['k']))",
+            "t": { ".validate": "newData.isString() && newData.val().matches(/^[rpak]$/)" },
+            "s": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+            "nr": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 100000" },
+            "a": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+            "c": { ".validate": "newData.isString() && newData.val().matches(/^(T0|T1|T2|T3|OBE|UNE|SLO|SLU|MIS)$/)" },
+            "k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 35" },
+            "st": { ".validate": "newData.isNumber() && newData.val() === 1" },
+            "w": {
+              "$i": {
+                ".validate": "$i.matches(/^[0-8]$/)",
+                "$j": { ".validate": "$j.matches(/^[0-8]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 35" }
+              }
+            },
+            "$anderes": { ".validate": false }
+          }
+        },
+
+        "haende": {
+          ".write": "auth != null && newData.parent().child('info/host').val() === auth.uid",
+          "$s": {
+            ".read": "auth != null && (root.child('jass').child($code).child('info/host').val() === auth.uid || root.child('jass').child($code).child('sitze').child($s).child('uid').val() === auth.uid)",
+            ".validate": "$s.matches(/^[0-3]$/) && newData.hasChildren(['nr', 'karten'])",
+            "nr": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 100000" },
+            "karten": {
+              "$i": { ".validate": "$i.matches(/^[0-8]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 35" }
+            },
+            "$anderes": { ".validate": false }
+          }
+        },
+
+        "$anderes": { ".validate": false }
+      }
+    }
+  }
+}

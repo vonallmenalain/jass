@@ -1,0 +1,14 @@
+{
+  "name": "jass-werkzeuge",
+  "private": true,
+  "description": "Werkzeuge für die Regeln der Realtime Database und die Online-Tests. Nicht Teil der Website – darum nicht im Wurzelverzeichnis, wo Netlify es installieren würde.",
+  "scripts": {
+    "test:regeln": "firebase emulators:exec --config emulator.json --only database,auth --project demo-jass \"node --test test-regeln.mjs\"",
+    "test:online": "firebase emulators:exec --config emulator.json --only database,auth --project demo-jass \"node test-online.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^15.37.0"
+  }
+}
