@@ -50,6 +50,23 @@
     return n;
   }
 
+  // Anzeigen: Wer eine tiefe Karte einer Nebenfarbe anspielt, zeigt damit,
+  // dass er in dieser Farbe stark ist – er hält eine der zwei höchsten
+  // Karten, die noch im Spiel sind (oft den König, wenn das Ass noch fehlt).
+  // Gibt diese zwei Karten zurück, oder null, wenn es keine Anzeige ist.
+  const istTief = (k, eff) => STAERKE[eff][k] % 100 <= 3;
+  function anzeigeHoch(k, eff, gespieltVorher) {
+    const f = farbeVon(k);
+    if (f === trumpfVon(eff) || !istTief(k, eff)) return null;
+    const hoeher = [];
+    for (let w = 0; w < 9; w++) {
+      const x = f * 9 + w;
+      if (x !== k && !gespieltVorher[x] && STAERKE[eff][x] > STAERKE[eff][k]) hoeher.push(x);
+    }
+    if (!hoeher.length) return null;
+    return hoeher.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]).slice(0, 2);
+  }
+
   function trumpfKosten(k, eff) {
     return 10 + (STAERKE[eff][k] - 100) * 3 + PUNKTE[eff][k];
   }
@@ -140,12 +157,23 @@
     const kandidaten = legal.filter((k) => farbeVon(k) !== T);
     const pool = kandidaten.length ? kandidaten : legal;
     const p = partner(v.sitz);
+    // Hat der Partner diese Farbe angezeigt (und hat sie noch)?
+    const vomPartner = (f) => !!(v.angezeigt && (v.angezeigt[p] & bit(f)) && !(v.leer[p] & bit(f)));
+    // Halte ich eine der zwei höchsten Karten dieser Farbe, die noch im Spiel sind?
+    const starkIn = (f) => {
+      const offen = [];
+      for (let w = 0; w < 9; w++) { const x = f * 9 + w; if (!v.gespielt[x]) offen.push(x); }
+      offen.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]);
+      return offen.slice(0, 2).some((x) => v.hand.includes(x));
+    };
     const k = minNach(pool, (x) => {
       const f = farbeVon(x);
       let c = PUNKTE[eff][x] * 3 + (STAERKE[eff][x] % 100);
       const asDraussen = hoehereDraussen(x, eff, v.gespielt, v.hand);
       if (PUNKTE[eff][x] >= 10 && asDraussen > 0) c += 15; // eine Zehn nicht ohne Schutz anspielen
       if (T >= 0 && (v.leer[p] & bit(f)) && !(v.leer[p] & bit(T))) c -= 20; // Partner kann stechen
+      if (f !== T && vomPartner(f)) c -= 25; // die Farbe zurückspielen, die der Partner angezeigt hat
+      else if (f !== T && istTief(x, eff) && starkIn(f)) c -= 6; // selbst anzeigen
       c -= farbLaenge(v.hand, f) * 1.5;
       return c;
     });
@@ -153,6 +181,8 @@
     if (T >= 0 && (v.leer[p] & bit(f)) && !(v.leer[p] & bit(T))) {
       return { karte: k, grund: 'Dein Partner hat diese Farbe nicht mehr und kann stechen – spiel sie ihm zu.' };
     }
+    if (f !== T && vomPartner(f)) return { karte: k, grund: GRUND_ZURUECK };
+    if (f !== T && istTief(k, eff) && starkIn(f)) return { karte: k, grund: GRUND_ANZEIGEN };
     return { karte: k, grund: 'Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe an und schone deine hohen Karten.' };
   }
 
@@ -226,6 +256,8 @@
     return { karte: k, grund: farbeVon(k) === farbeVon(v.stich[0]) ? GRUND_ZUGEBEN : GRUND_VERWERFEN };
   }
 
+  const GRUND_ZURUECK = 'Dein Partner hat diese Farbe angezeigt: Er ist dort stark. Spiel sie ihm zurück.';
+  const GRUND_ANZEIGEN = 'Anzeigen: Spiel eine tiefe Karte der Farbe, in der du stark bist – so weiss dein Partner, was er dir zurückspielen soll.';
   const GRUND_ZUGEBEN = 'Du kannst den Stich nicht billig machen – gib die Karte, die am wenigsten wert ist.';
   const GRUND_VERWERFEN = 'Du hast die Farbe nicht und kannst den Stich nicht billig machen – verwirf eine Karte, die wenig wert ist.';
 
@@ -257,7 +289,7 @@
       code, regeln, haende, angesagtVon,
       stich: [], stichSitze: [], stichNr: 0, amZug: ausspieler,
       punkte: [0, 0], stichZahl: [0, 0],
-      gespielt: new Uint8Array(36), leer: [0, 0, 0, 0],
+      gespielt: new Uint8Array(36), leer: [0, 0, 0, 0], angezeigt: [0, 0, 0, 0],
     };
   }
 
@@ -267,7 +299,7 @@
       haende: s.haende.map((h) => h.slice()),
       stich: s.stich.slice(), stichSitze: s.stichSitze.slice(), stichNr: s.stichNr, amZug: s.amZug,
       punkte: s.punkte.slice(), stichZahl: s.stichZahl.slice(),
-      gespielt: s.gespielt.slice(), leer: s.leer.slice(),
+      gespielt: s.gespielt.slice(), leer: s.leer.slice(), angezeigt: s.angezeigt.slice(),
     };
   }
 
@@ -276,7 +308,11 @@
     const hand = s.haende[sitz];
     hand.splice(hand.indexOf(k), 1);
     const eff = effModus(s.code, s.stichNr);
-    if (s.stich.length) {
+    if (!s.stich.length) {
+      // tief angespielt = angezeigt (ausser man spielt dem Partner seine Farbe zurück)
+      const f = farbeVon(k);
+      if (f !== trumpfVon(eff) && istTief(k, eff) && !(s.angezeigt[partner(sitz)] & bit(f))) s.angezeigt[sitz] |= bit(f);
+    } else {
       const led = farbeVon(s.stich[0]);
       const f = farbeVon(k);
       const T = trumpfVon(eff);
@@ -305,7 +341,7 @@
     const sitz = s.amZug;
     return {
       sitz, hand: s.haende[sitz], stich: s.stich, stichSitze: s.stichSitze, stichNr: s.stichNr,
-      code: s.code, regeln: s.regeln, gespielt: s.gespielt, leer: s.leer, angesagtVon: s.angesagtVon,
+      code: s.code, regeln: s.regeln, gespielt: s.gespielt, leer: s.leer, angesagtVon: s.angesagtVon, angezeigt: s.angezeigt,
     };
   }
 
@@ -374,11 +410,13 @@
   // ------------------------------------------------------- Wissen & Welten
 
   // Was der Spieler auf `sitz` über die Runde weiss: gespielte Karten,
-  // wer welche Farbe nicht mehr hat, gezeigte Weise.
+  // wer welche Farbe nicht mehr hat, gezeigte Weise, angezeigte Farben.
   function wissen(spiel, sitz) {
     const runde = spiel.runde;
     const gespielt = new Uint8Array(36);
     const leer = [0, 0, 0, 0];
+    const angezeigt = [0, 0, 0, 0];
+    const anzeigen = [];   // { sitz, farbe, hoch: [zwei Karten] }
     const puurOffen = [false, false, false, false];
     const T0 = runde.code ? MODI[runde.code].trumpf : -1;
     const alle = runde.stiche.map((s) => ({ karten: s.karten, sitze: s.sitze, nr: runde.stiche.indexOf(s) }));
@@ -389,6 +427,14 @@
       const T = trumpfVon(eff);
       const led = farbeVon(st.karten[0]);
       st.karten.forEach((k, i) => {
+        if (i === 0) {
+          const s = st.sitze[0];
+          const hoch = anzeigeHoch(k, eff, gespielt);
+          if (hoch && !(angezeigt[partner(s)] & bit(farbeVon(k)))) {
+            angezeigt[s] |= bit(farbeVon(k));
+            anzeigen.push({ sitz: s, farbe: farbeVon(k), hoch });
+          }
+        }
         gespielt[k] = 1;
         if (i === 0) return;
         const f = farbeVon(k);
@@ -407,7 +453,7 @@
         for (const w of runde.weis.proSitz[s]) for (const k of w.karten) if (!gespielt[k] && !bekannt[s].includes(k)) bekannt[s].push(k);
       }
     }
-    return { gespielt, leer, puurOffen, bekannt, trumpf: T0 };
+    return { gespielt, leer, puurOffen, bekannt, trumpf: T0, angezeigt, anzeigen };
   }
 
   // Verteilt die unbekannten Karten passend zum Wissen auf die anderen.
@@ -466,6 +512,7 @@
     s.stichZahl = runde.stichZahl.slice();
     s.gespielt = w.gespielt.slice();
     s.leer = w.leer.slice();
+    s.angezeigt = w.angezeigt.slice();
     return s;
   }
 
@@ -504,36 +551,49 @@
     return handWerte(hand, regeln).bestPunkte < SCHIEBEN_SCHWELLE + SCHIEBEN_TOLERANZ;
   }
 
-  // Was der Spieler auf `sitz` aus Ansage und Schieben weiss – oder null,
-  // wenn es nichts zu beachten gibt (er hat selbst angesagt, niemand schob).
-  function ansageWissen(spiel, sitz) {
+  // Was der Spieler auf `sitz` aus Ansage, Schieben und Anzeigen weiss –
+  // oder null, wenn es nichts zu beachten gibt.
+  //   anzeigen: wer eine Farbe angezeigt hat und welche zwei Karten er
+  //             darum (wohl) hält – eine davon muss in seiner Hand sein,
+  //             solange sie noch nicht gespielt ist.
+  function ansageWissen(spiel, sitz, w) {
     const r = spiel.runde;
     if (!r.code) return null;
     const ansager = r.angesagtVon !== sitz ? r.angesagtVon : -1;
     const schieber = r.geschoben && r.ansager !== sitz ? r.ansager : -1;
-    if (ansager < 0 && schieber < 0) return null;
     const gespieltVon = [[], [], [], []];
     for (const st of r.stiche) st.karten.forEach((k, i) => gespieltVon[st.sitze[i]].push(k));
     r.stich.forEach((k, i) => gespieltVon[r.stichSitze[i]].push(k));
+    const anzeigen = [];
+    // Anzeigen sind für den Partner gedacht – nur seine werden gelesen.
+    for (const a of (w && w.anzeigen) || []) {
+      if (a.sitz !== partner(sitz)) continue;
+      if (a.hoch.some((k) => gespieltVon[a.sitz].includes(k))) continue;   // hat er schon gezeigt
+      const offen = a.hoch.filter((k) => !w.gespielt[k] && !r.haende[sitz].includes(k));
+      if (offen.length) anzeigen.push({ sitz: a.sitz, offen });
+    }
+    if (ansager < 0 && schieber < 0 && !anzeigen.length) return null;
     return {
-      ansager, schieber, code: r.code, gespieltVon,
+      ansager, schieber, code: r.code, gespieltVon, anzeigen,
       darfSchieben: ansager >= 0 && ansager === r.ansager && !!spiel.regeln.schieben,
     };
   }
 
-  function passtZumWissen(haende, regeln, info) {
+  function passtZumWissen(haende, regeln, info, ohneAnzeigen) {
     const ganz = (s) => haende[s].concat(info.gespieltVon[s]);
     if (info.ansager >= 0 && !passtZurAnsage(ganz(info.ansager), regeln, info.code, info.darfSchieben)) return false;
     if (info.schieber >= 0 && !passtZumSchieben(ganz(info.schieber), regeln)) return false;
+    if (!ohneAnzeigen) for (const a of info.anzeigen || []) if (!a.offen.some((k) => haende[a.sitz].includes(k))) return false;
     return true;
   }
 
-  // Eine Welt, die zu Ansage und Schieben passt. Findet sich nach vielen
-  // Versuchen keine (ungewöhnliche Ansage), dann eben irgendeine.
+  // Eine Welt, die zu Ansage, Schieben und Anzeigen passt. Findet sich
+  // keine, zuerst ohne die Anzeigen (vielleicht war es keine), dann
+  // irgendeine.
   function weltPassend(spiel, sitz, w, rng, info) {
-    for (let versuch = 0; versuch < 80; versuch++) {
+    for (let versuch = 0; versuch < 120; versuch++) {
       const haende = welt(spiel, sitz, w, rng);
-      if (passtZumWissen(haende, spiel.regeln, info)) return haende;
+      if (passtZumWissen(haende, spiel.regeln, info, versuch >= 70)) return haende;
     }
     return welt(spiel, sitz, w, rng);
   }
@@ -554,7 +614,7 @@
     const welten = restKarten <= exaktAb ? (o.weltenExakt || 30) : (o.welten || 120);
     const summe = new Map(legal.map((k) => [k, 0]));
     const meinTeam = team(sitz);
-    const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz);
+    const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz, o.anzeigenBeachten === false ? null : w);
     for (let i = 0; i < welten; i++) {
       const haende = info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng);
       for (const k of legal) {
@@ -572,6 +632,20 @@
     let wahl = werte[0];
     const m = werte.find((x) => x.karte === mittel.karte);
     if (m && wahl.wert - m.wert < 0.5) wahl = m;
+    // Zurückspielen: Hat der Partner eine Farbe angezeigt und sieht die
+    // Rechnung kaum einen Unterschied, spielt man ihm diese Farbe zurück –
+    // die tiefste Karte, damit seine hohe den Stich macht.
+    if (!runde.stich.length && o.anzeigenBeachten !== false) {
+      const effA = effModus(runde.code, runde.stichNr);
+      const p = partner(sitz);
+      const zurueck = legal.filter((k) => farbeVon(k) !== trumpfVon(effA) && (w.angezeigt[p] & bit(farbeVon(k))) && !(w.leer[p] & bit(farbeVon(k))));
+      if (zurueck.length) {
+        const kand = minNach(zurueck, (k) => STAERKE[effA][k]);
+        const x = werte.find((y) => y.karte === kand);
+        const schwelleZ = o.zurueckSchwelle != null ? o.zurueckSchwelle : ZURUECK_SCHWELLE;
+        if (x && werte[0].wert - x.wert <= schwelleZ) return { karte: kand, grund: GRUND_ZURUECK, werte };
+      }
+    }
     // Verwerfen: Sieht die Rechnung kaum einen Unterschied, kommt die Karte
     // aus der schwächsten Farbe – so kann der Partner daraus lesen, wo man
     // nichts hat. Gemessen kostet das nichts (werkzeuge/verwerfen.js).
@@ -594,6 +668,7 @@
   // Hälfte in eigenen Punkten) gelten zwei Karten beim Verwerfen als gleich
   // gut – kleiner als das, was das Durchspielen sicher unterscheiden kann.
   const VERWERF_SCHWELLE = 2;
+  const ZURUECK_SCHWELLE = 2;
   const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
 
   // Verwerfen heisst: Die ausgespielte Farbe fehlt, ein Gegner liegt vorne,
@@ -647,7 +722,7 @@
     const w = wissen(spiel, sitz);
     return {
       sitz, hand: runde.haende[sitz], stich: runde.stich, stichSitze: runde.stichSitze, stichNr: runde.stichNr,
-      code: runde.code, regeln: spiel.regeln, gespielt: w.gespielt, leer: w.leer, angesagtVon: runde.angesagtVon,
+      code: runde.code, regeln: spiel.regeln, gespielt: w.gespielt, leer: w.leer, angesagtVon: runde.angesagtVon, angezeigt: w.angezeigt,
     };
   }
 
@@ -985,6 +1060,8 @@
     'Im Stich liegen viele Punkte – versuch ihn zu übernehmen.',
     GRUND_ZUGEBEN,
     GRUND_VERWERFEN,
+    GRUND_ZURUECK,
+    GRUND_ANZEIGEN,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',
