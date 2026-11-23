@@ -315,8 +315,15 @@ details.abschnitt .inhalt { padding-bottom: 12px; display: flex; flex-direction:
 .stand .summe { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .stand .runde { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
+/* Der Teppich ist quadratisch: so gross, wie der Platz in der kleineren
+   Richtung erlaubt, mittig im Rahmen. */
+.feld-rahmen {
+  flex: 1; min-height: 220px; min-width: 0;
+  display: grid; place-items: center;
+  container-type: size;
+}
 .feld {
-  position: relative; flex: 1; min-height: 220px;
+  position: relative; width: 100cqmin; height: 100cqmin;
   border-radius: 28px;
   background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 45%, var(--felt-2) 100%);
   border: 1px solid rgba(255,255,255,0.12);
@@ -328,8 +335,35 @@ details.abschnitt .inhalt { padding-bottom: 12px; display: flex; flex-direction:
   --fw: calc(var(--tw) * 0.62);
 }
 @supports not (container-type: size) {
-  .feld { --tw: clamp(48px, min(15vw, 10.5vh), 86px); }
+  .feld-rahmen { display: block; }
+  .feld { width: 100%; height: 100%; --tw: clamp(48px, min(15vw, 10.5vh), 86px); }
 }
+/* Jassteppiche (jass-tisch.js TEPPICHE) */
+.feld.teppich-trumpf { background: radial-gradient(ellipse at center, #166036 0%, #11502b 50%, #0a361e 100%); }
+.feld.teppich-alae { background: radial-gradient(ellipse at center, #252832 0%, #15171d 55%, #08090c 100%); border-color: rgba(254, 121, 113, .3); }
+.feld.teppich-kreuz { background: radial-gradient(ellipse at center, #b4232a 0%, #8c1a1f 50%, #5c0f13 100%); }
+.teppich-deko { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.deko-mitte { position: absolute; left: 50%; top: 50%; width: 44%; transform: translate(-50%, -50%); }
+.deko-trumpf { opacity: .13; filter: brightness(0) invert(1); }
+.deko-trumpf .farbzeichen, .dialog .deko-trumpf .farbzeichen { width: 100%; height: auto; display: block; background: none; padding: 0; border-radius: 0; }
+.deko-text { width: auto; color: #fff; font-size: 34cqmin; line-height: 1; font-weight: 900; }
+.deko-alae { opacity: .3; }
+.deko-kreuz { width: 30%; opacity: .16; }
+.deko-ecke { position: absolute; left: 4%; bottom: 4%; width: 15%; display: grid; grid-template-columns: 1fr 1fr; gap: 6%; opacity: .2; filter: brightness(0) invert(1); }
+.deko-ecke .farbzeichen, .dialog .deko-ecke .farbzeichen { width: 100%; height: auto; display: block; background: none; padding: 0; border-radius: 0; }
+.teppich-probe .deko-ecke { width: 26%; }
+.teppich-stift {
+  position: absolute; left: 8px; top: 8px; z-index: 5;
+  width: 30px; height: 30px; border-radius: 50%; padding: 0;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25);
+  font-size: 14px; line-height: 28px; cursor: pointer; opacity: .65;
+}
+.teppich-stift:hover, .teppich-stift:focus-visible { opacity: 1; }
+.ton-btn { font-size: 17px; }
+.teppich-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.teppich-probe { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; border-radius: 16px; background: none; border: 2px solid transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.teppich-probe.aktiv { border-color: var(--accent); }
+.teppich-probe .feld { position: relative; width: 100%; height: auto; aspect-ratio: 1; border-radius: 16px; container-type: size; box-shadow: inset 0 0 20px rgba(0,0,0,.35); }
 .platz {
   position: absolute;
   display: flex; flex-direction: row; align-items: center; gap: 6px;
@@ -539,7 +573,10 @@ details.abschnitt .inhalt { padding-bottom: 12px; display: flex; flex-direction:
   .tisch .trumpf-chip { padding: 4px 9px; font-size: 13px; }
   .tisch .stand { grid-area: stand; grid-template-columns: 1fr; gap: 4px; }
   .tisch .stand .summe { font-size: 16px; }
-  .tisch .feld { grid-area: feld; min-height: 180px; border-radius: 22px; }
+  .tisch .feld-rahmen { grid-area: feld; min-height: 180px; }
+  /* Im Querformat auf dem Handy ist die Höhe knapp: dort darf der Teppich
+     breiter sein (höchstens 1,6-mal so breit wie hoch). */
+  .tisch .feld { border-radius: 22px; width: min(100cqw, 160cqh); height: 100cqh; }
   .tisch .kommentar { grid-area: kommentar; text-align: left; overflow-y: auto; min-height: 0; font-size: 12.5px; }
   .tisch .aktionen { grid-area: aktionen; flex-direction: column; }
   .tisch .aktionen .btn-ghost { max-width: none; min-height: 32px; font-size: 13px; }

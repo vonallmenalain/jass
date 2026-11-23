@@ -22,7 +22,18 @@
     kartenbild: 'foto',   // foto (unsere Karten) | eigen | klassisch (SVG-cards) – karten/README.md
     stichWarten: true,    // gegen den Computer: der volle Stich bleibt liegen, bis man tippt
     austeilen: true,      // das Austeilen zeigen (Karten fliegen zu den Plätzen)
+    teppich: 'gruen',     // Jassteppich: gruen | ecken | trumpf | alae | kreuz (jass-tisch.js TEPPICHE)
+    ruecken: 'alae',      // Kartenrücken: alae (schwarz mit Logo) | rot
+    klang: 'papier',      // Töne am Tisch: aus | papier | holz | weich (jass-toene.js)
+    lautstaerke: 45,      // 0..100
   };
+
+  // Kartenbild, Rücken und Töne gleich anwenden.
+  function wende(a) {
+    if (root.JassKarten && root.JassKarten.setzeBild) root.JassKarten.setzeBild(a.kartenbild);
+    if (root.JassKarten && root.JassKarten.setzeRuecken) root.JassKarten.setzeRuecken(a.ruecken);
+    if (root.JassToene) root.JassToene.setze({ klang: a.klang, lautstaerke: a.lautstaerke });
+  }
 
   const VORLAGEN = [
     { id: 'standard', name: 'Standard', text: 'Trumpf, Obenabe, Undenufe · ohne Weisen, Match und Multiplikatoren · 8 Runden', regeln: {} },
@@ -50,7 +61,7 @@
   function speichereRegeln(r) { schreibe(KEY_REGELN, r); }
   function ladeAnzeige() {
     const a = Object.assign({}, STANDARD_ANZEIGE, lese(KEY_ANZEIGE) || {});
-    if (root.JassKarten && root.JassKarten.setzeBild) root.JassKarten.setzeBild(a.kartenbild);
+    wende(a);
     return a;
   }
   function speichereAnzeige(a) { schreibe(KEY_ANZEIGE, a); }
@@ -222,6 +233,12 @@
         ${o.tempo !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Tempo der Computer</span>${segmente('tempo', [['langsam', 'Langsam'], ['normal', 'Normal'], ['schnell', 'Schnell']], a.tempo)}</div>` : ''}
         ${o.rechnen !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Rechentiefe</span>${segmente('rechnen', [['schnell', 'Schnell'], ['normal', 'Normal'], ['gruendlich', 'Gründlich'], ['maximal', 'Maximal']], a.rechnen)}<small class="muted klein">Wie viele mögliche Kartenverteilungen die Computer und der Tipp vor jedem Zug durchspielen: 120, 300 (Standard), 600 oder 1000. Mehr rechnet länger (auf dem Handy bis zu ein paar Sekunden), wird aber nur wenig stärker.</small></div>` : ''}
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenbild</span>${segmente('kartenbild', [['foto', 'Unsere Karten'], ['eigen', 'Jass-App'], ['klassisch', 'Klassisch']], a.kartenbild)}<small class="muted klein">Unsere Karten: der Kartensatz, mit dem wir spielen, fotografiert. Klassisch: französische Karten von SVG-cards (David Bellot, frei unter LGPL). Die Kartenfarben unten gelten nur für «Jass-App».</small></div>
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenrücken</span>${segmente('ruecken', [['alae', 'alae.app (schwarz)'], ['rot', 'Rot']], a.ruecken)}</div>
+        ${o.spiel !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Jassteppich</span>${segmente('teppich', [['gruen', 'Grün'], ['ecken', 'Vier Farben'], ['trumpf', 'Trumpf'], ['alae', 'alae.app'], ['kreuz', 'Schweiz']], a.teppich)}<small class="muted klein">Auch am Tisch mit dem ✏️ in der Ecke des Teppichs.</small></div>
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Töne am Tisch</span>${segmente('klang', (root.JassToene ? root.JassToene.KLAENGE : [['aus', 'Aus']]), a.klang)}
+          <div class="reihe" style="gap:10px;align-items:center"><span class="muted klein">Leise</span><input type="range" min="0" max="100" step="5" value="${Number(a.lautstaerke) || 0}" data-r="lautstaerke" aria-label="Lautstärke" style="flex:1"><span class="muted klein">Laut</span>
+          <button class="btn-ghost btn-klein" type="button" data-probe>▶ Probe</button></div>
+          <small class="muted klein">Ein leises Geräusch beim Austeilen, bei jeder gespielten Karte (von der Seite des Spielers) und beim Abräumen des Stichs. Schnell aus: 🔊 oben am Tisch.</small></div>` : ''}
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}<small class="muted klein">Vier Farben: Kreuz grün, Ecke blau – leichter zu unterscheiden.</small></div>
         ${o.spiel !== false ? `
         ${schalter('hilfen', 'Erlaubte Karten hervorheben', 'Karten, die du nicht spielen darfst, werden abgedunkelt', a.hilfen)}
@@ -233,16 +250,22 @@
     }
     container.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-r]');
-      if (!b) return;
+      if (!b) {
+        if (e.target.closest('[data-probe]') && root.JassToene) { wende(anzeige); root.JassToene.probe(anzeige.klang === 'aus' ? 'papier' : anzeige.klang); }
+        return;
+      }
       anzeige[b.dataset.r] = b.dataset.wert;
-      if (b.dataset.r === 'kartenbild' && root.JassKarten) root.JassKarten.setzeBild(b.dataset.wert);
+      wende(anzeige);
+      if (b.dataset.r === 'klang' && root.JassToene && b.dataset.wert !== 'aus') root.JassToene.probe(b.dataset.wert);
       zeichne();
       beiAenderung(anzeige);
     });
     container.addEventListener('change', (e) => {
       const el = e.target;
-      if (el.type !== 'checkbox' || !el.dataset.r) return;
-      anzeige[el.dataset.r] = el.checked;
+      if (!el.dataset.r) return;
+      if (el.type === 'checkbox') anzeige[el.dataset.r] = el.checked;
+      else if (el.type === 'range') { anzeige[el.dataset.r] = Number(el.value); wende(anzeige); if (root.JassToene) root.JassToene.karte(0); }
+      else return;
       beiAenderung(anzeige);
     });
     zeichne();
@@ -250,6 +273,6 @@
 
   root.JassEinstellungen = {
     ladeRegeln, speichereRegeln, ladeAnzeige, speichereAnzeige, vorlage, VORLAGEN, STANDARD_ANZEIGE,
-    regelFormular, anzeigeFormular, zusammenfassung, lese, schreibe,
+    regelFormular, anzeigeFormular, zusammenfassung, lese, schreibe, wende,
   };
 })(typeof self !== 'undefined' ? self : this);
