@@ -10,6 +10,7 @@
   <style>
     .modus-chip { display: inline-flex; align-items: center; gap: 8px; align-self: center; padding: 8px 14px; border-radius: 999px; background: #fffdf8; color: #111827; font-weight: 800; }
     .modus-chip .farbzeichen { width: 20px; height: 20px; }
+    .aufgabe-zeile { display: flex; align-items: center; justify-content: center; gap: 8px; }
     .stich-feld {
       background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
       border-radius: 22px; padding: 14px; border: 1px solid rgba(255,255,255,0.12);
@@ -49,16 +50,16 @@
 
     <div class="uebung-grid">
       <div class="stack">
-        <span class="modus-chip" id="modus"></span>
+        <div class="aufgabe-zeile" id="aufgabeText" data-vorlesen><span class="modus-chip" id="modus"></span></div>
         <div class="stich-feld" id="stich"></div>
-        <p class="muted klein" id="letzterHinweis" style="text-align:center" hidden>Das ist der letzte Stich: Er zählt 5 Punkte extra.</p>
+        <p class="muted klein" id="letzterHinweis" style="text-align:center" hidden data-vorlesen>Das ist der letzte Stich: Er zählt 5 Punkte extra.</p>
       </div>
       <div class="stack">
         <div class="antwort" id="antwort">?</div>
-        <div class="rechnung" id="rechnung" hidden></div>
+        <div class="rechnung" id="rechnung" hidden data-vorlesen></div>
         <div class="tasten" id="tasten"></div>
         <button class="btn btn-voll" type="button" id="weiterBtn" hidden>Weiter</button>
-        <details class="abschnitt"><summary>Wie viel ist welche Karte?</summary><div class="inhalt" id="tabelle"></div></details>
+        <details class="abschnitt"><summary>Wie viel ist welche Karte?</summary><div class="inhalt" id="tabelle" data-vorlesen></div></details>
       </div>
     </div>
   </div>
@@ -68,12 +69,18 @@
   <script src="jass-engine.js"></script>
   <script src="jass-karten.js"></script>
   <script src="jass-einstellungen.js"></script>
+  <script src="jass-bot.js"></script>
+  <script src="jass-sprechtexte.js"></script>
+  <script src="jass-stimme-dateien.js"></script>
+  <script src="jass-stimme.js"></script>
+  <script src="jass-vorlesen.js"></script>
   <script>
   (function () {
     'use strict';
     const J = window.JassEngine;
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
+    const S = window.JassSprechtexte;
     const $ = (id) => document.getElementById(id);
     K.setzeFarben(E.ladeAnzeige().farben);
 
@@ -122,6 +129,7 @@
       $('aufgabeNr').textContent = 'Aufgabe ' + (serie.nr + 1) + ' von ' + serie.laenge;
       $('sterne').textContent = '⭐ ' + serie.richtig;
       $('modus').innerHTML = m.trumpf >= 0 ? K.zeichen(m.trumpf) + '<span>' + m.name + ' ist Trumpf</span>' : '<span>' + m.symbol + ' ' + m.name + '</span>';
+      $('aufgabeText').dataset.sprechen = JSON.stringify(S.zaehlenAufgabe(a.code, a.karten, a.letzter));
       $('stich').style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
       $('stich').innerHTML = a.karten.map((k, i) => `<div><div class="karte">${K.svg(k, { trumpf: m.trumpf === J.farbeVon(k), code: a.code })}</div><span class="wert">${a.beantwortet ? a.werte[i] : ''}</span></div>`).join('');
       $('letzterHinweis').hidden = !a.letzter;
@@ -137,6 +145,7 @@
         const teile = a.karten.map((k, i) => `${J.kurzName(k)} <b>${a.werte[i]}</b>`);
         if (a.letzter) teile.push('letzter Stich <b>5</b>');
         r.innerHTML = (a.richtig ? 'Richtig! ' : 'Es sind <b>' + a.summe + '</b>: ') + teile.join(' + ') + ' = <b>' + a.summe + '</b>';
+        r.dataset.sprechen = JSON.stringify(S.zaehlenLoesung(a.code, a.karten, a.werte, a.letzter, a.summe, a.richtig));
       }
       zeichneTabelle();
     }
@@ -154,6 +163,7 @@
       } else {
         zeilen.push(['Ass', 11], ['Zehn', 10], ['Acht', 8], ['König', 4], ['Dame', 3], ['Bauer', 2], ['Neun, Sieben, Sechs', 0]);
       }
+      $('tabelle').dataset.sprechen = JSON.stringify(S.werteTabelle(code));
       $('tabelle').innerHTML = `<table class="werte-tabelle">${zeilen.map(([n, w]) => `<tr><td>${n}</td><td>${w}</td></tr>`).join('')}</table>
         <p class="muted klein" style="margin-top:6px">${m.trumpf >= 0 ? 'Im Trumpf zählen Bauer und Neun mehr; die Acht zählt nichts.' : 'Ohne Trumpf zählt die Acht 8 Punkte.'} Ein ganzes Spiel hat 157 Punkte (mit dem letzten Stich).</p>`;
     }
@@ -191,10 +201,11 @@
     function zeigeErgebnis() {
       const neu = !einst.rekord || serie.richtig / serie.laenge > einst.rekord.richtig / einst.rekord.laenge;
       if (neu) { einst.rekord = { richtig: serie.richtig, laenge: serie.laenge }; speichere(); }
-      $('dialogInhalt').innerHTML = `<div class="ergebnis-titel">${serie.richtig === serie.laenge ? '🏆' : '⭐'} ${serie.richtig} von ${serie.laenge} richtig</div>
+      $('dialogInhalt').innerHTML = `<div class="ergebnis-titel" data-vorlesen>${serie.richtig === serie.laenge ? '🏆' : '⭐'} ${serie.richtig} von ${serie.laenge} richtig</div>
         ${neu ? '<p style="text-align:center;color:#fde68a;font-weight:800">Neuer Rekord!</p>' : ''}
         <button class="btn btn-voll" type="button" id="nochmal">Nochmals</button>
         <a class="btn-ghost btn-voll" href="training.html">Andere Übung</a>`;
+      $('dialogInhalt').querySelector('.ergebnis-titel').dataset.sprechen = JSON.stringify(S.zaehlenErgebnis(serie.richtig, serie.laenge, neu));
       $('dialog').classList.add('offen');
       $('nochmal').addEventListener('click', () => { $('dialog').classList.remove('offen'); neueSerie(); });
     }

@@ -61,6 +61,7 @@
           <button class="btn-ghost btn-klein" type="button" id="leeren">Leeren</button>
         </div>
       </div>
+      <p class="muted klein" data-vorlesen>Tippe unten deine 9 Karten an – oder nimm «Zufall». Dann zeige ich dir, was du ansagen solltest.</p>
       <div class="meine-hand" id="hand"></div>
       <div class="segmente" id="lage">
         <button type="button" data-lage="vorhand" class="aktiv">Ich sage an (darf schieben)</button>
@@ -70,7 +71,7 @@
 
     <div class="panel stack" id="fotoPanel" hidden>
       <img class="foto" id="foto" alt="Foto deiner Karten">
-      <p class="muted klein">Die automatische Erkennung der Karten ist vorbereitet, aber noch nicht eingeschaltet. Tippe die Karten unten an – das Foto hilft beim Abschreiben.</p>
+      <p class="muted klein" data-vorlesen>Die automatische Erkennung der Karten ist vorbereitet, aber noch nicht eingeschaltet. Tippe die Karten unten an – das Foto hilft beim Abschreiben.</p>
     </div>
 
     <div class="panel stack" id="ergebnis" hidden></div>
@@ -87,6 +88,10 @@
   <script src="jass-bot.js"></script>
   <script src="jass-karten.js"></script>
   <script src="jass-einstellungen.js"></script>
+  <script src="jass-sprechtexte.js"></script>
+  <script src="jass-stimme-dateien.js"></script>
+  <script src="jass-stimme.js"></script>
+  <script src="jass-vorlesen.js"></script>
   <script>
   (function () {
     'use strict';
@@ -94,6 +99,7 @@
     const B = window.JassBot;
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
+    const S = window.JassSprechtexte;
     const $ = (id) => document.getElementById(id);
     let anzeige = E.ladeAnzeige();
     K.setzeFarben(anzeige.farben);
@@ -225,7 +231,8 @@
         else satz = 'Ziemlich genau im Schnitt.';
       }
       const wie = ichSchob ? 'Du hast geschoben, angesagt wurde <b>' + name(e.code) + '</b>' : 'Angesagt: <b>' + name(e.code) + '</b>';
-      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}">
+      const sprechen = S.vergleich({ punkte: e.punkte, code: e.code, ichSchob }, erwartet, null);
+      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" data-vorlesen data-sprechen="${esc(JSON.stringify(sprechen))}">
         <h3>Ausgespielt</h3>
         <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
         <p class="muted">${wie}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
@@ -243,16 +250,18 @@
       $('ergebnis').hidden = false;
       $('ergebnis').innerHTML = `
         ${vergleichHtml(liste)}
-        <span class="muted klein" style="text-align:center">Mein Vorschlag</span>
-        <div class="empfehlung">${modusHtml(beste.code)}</div>
-        <p class="muted" style="text-align:center">${esc(B.faustregel(hand, beste.code))}</p>
+        <div class="stack" style="gap:6px;align-items:center" data-vorlesen data-sprechen="${esc(JSON.stringify(S.helferVorschlag(hand, liste, !!regeln.multiplikatoren, heuristik.code)))}">
+          <span class="muted klein" style="text-align:center">Mein Vorschlag</span>
+          <div class="empfehlung">${modusHtml(beste.code)}</div>
+          <p class="muted" style="text-align:center">${esc(B.faustregel(hand, beste.code))}</p>
+        </div>
         <div class="ergebnis-liste">${liste.map((x) => `<div class="ergebnis-zeile ${x === beste ? 'beste' : ''}">
           <span class="name">${modusHtml(x.code)}</span>
           <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
           <span class="wert">${Math.round(x.punkte)}</span></div>`).join('')}</div>
         <p class="muted klein">Ø Punkte für euer Team${regeln.multiplikatoren ? ' (mit Multiplikator)' : ''}, aus ${liste[0].n} durchgespielten Verteilungen. ${heuristik.code !== beste.code ? 'Die schnelle Faustregel hätte ' + esc(name(heuristik.code)) + ' gesagt – knapp, beides ist vertretbar.' : ''}</p>
         <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&amp;geschoben=1' : ''}&amp;trainer=1&amp;zurueck=helfer">${ausgespielt ? 'Nochmals eine Runde' : 'Mit diesen Karten eine Runde'} gegen den Computer spielen</a>
-        <p class="muted klein">Gespielt wird genau eine Runde – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert.</p>`;
+        <p class="muted klein" data-vorlesen data-sprechen="${esc(JSON.stringify(S.HELFER_RUNDE))}">Gespielt wird genau eine Runde – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert.</p>`;
     }
 
     // Foto: vorbereitet für die Erkennung. Bis sie eingeschaltet ist, dient
