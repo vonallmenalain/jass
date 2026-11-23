@@ -687,10 +687,10 @@ function computerZug(n, stufe, stand) {
   const jetzt = P.naechster(spiel);
   if (jetzt.art !== n.art || jetzt.sitz !== n.sitz) return;
   if (n.art === 'ansage') {
-    const w = B.waehleAnsage(spiel, n.sitz, stufe);
+    const w = B.waehleAnsage(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
     schreibe(w.code === 'SCHIEBEN' ? { t: 'p', s: n.sitz } : { t: 'a', s: n.sitz, c: w.code });
   } else {
-    const z = B.waehleKarte(spiel, n.sitz, stufe);
+    const z = B.waehleKarte(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
     schreibe(P.kartenEreignis(spiel, n.sitz, z.karte));
   }
 }

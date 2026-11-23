@@ -8,6 +8,10 @@
  *   JassKarten.rueckseite()             die Rückseite
  *   JassKarten.zeichen(farbe, gross)    nur das Farbzeichen (für Knöpfe)
  *   JassKarten.setzeFarben('klassisch' | 'vier')
+ *   JassKarten.setzeBild('eigen' | 'klassisch')
+ *
+ * «Klassisch» zeigt den freien Kartensatz SVG-cards (David Bellot, LGPL,
+ * karten/README.md) – echte französische Karten mit Bildfiguren.
  */
 (function (root) {
   'use strict';
@@ -31,6 +35,16 @@
     vier: ['#1f2937', '#d62839', '#15803d', '#1d4ed8'],
   };
   let farben = FARBSCHEMA.klassisch;
+  let bild = 'eigen';
+  const KLASSISCH_DATEI = 'karten/svg-cards.svg';
+  const KLASSISCH_FARBE = ['spade', 'heart', 'club', 'diamond'];
+  const KLASSISCH_WERT = ['6', '7', '8', '9', '10', 'jack', 'queen', 'king', '1'];
+  // Gemessen (getBBox): Die Karten von SVG-cards liegen bei x 1.25, y −5.01
+  // und sind 166.58 × 253.67 gross; eingepasst in unser Feld 100 × 140.
+  const KLASSISCH_MASS = 140 / 253.67;
+  const KLASSISCH_LAGE = `translate(${((100 - 166.58 * KLASSISCH_MASS) / 2).toFixed(2)} 0) scale(${KLASSISCH_MASS.toFixed(5)}) translate(-1.25 5.01)`;
+
+  function setzeBild(name) { bild = name === 'klassisch' ? 'klassisch' : 'eigen'; }
 
   function setzeFarben(name) {
     farben = FARBSCHEMA[name] || FARBSCHEMA.klassisch;
@@ -62,8 +76,18 @@
   const KRONE = 'M10 70L18 30L34 52L50 22L66 52L82 30L90 70Z';
   const HUT = 'M14 66C14 50 30 40 50 40C70 40 86 50 86 66ZM6 66H94V74H6Z';
 
+  function svgKlassisch(k, o) {
+    const id = KLASSISCH_FARBE[J.farbeVon(k)] + '_' + KLASSISCH_WERT[J.wertVon(k)];
+    const titel = J.kartenName(k, o.code);
+    const trumpf = o.trumpf
+      ? `<rect x="2" y="1.5" width="96" height="137" rx="7" fill="none" stroke="#f59e0b" stroke-width="3.5"/><g transform="translate(78 6)"><circle cx="8" cy="8" r="8" fill="#f59e0b"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`
+      : '';
+    return `<svg class="karte-svg" viewBox="0 0 100 140" role="img" aria-label="${titel}"><title>${titel}</title><use href="${KLASSISCH_DATEI}#${id}" transform="${KLASSISCH_LAGE}"/>${trumpf}</svg>`;
+  }
+
   function svg(k, opt) {
     const o = opt || {};
+    if (bild === 'klassisch') return svgKlassisch(k, o);
     const f = J.farbeVon(k);
     const w = J.wertVon(k);
     const farbe = farben[f];
@@ -97,6 +121,9 @@
   }
 
   function rueckseite() {
+    if (bild === 'klassisch') {
+      return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true"><use href="${KLASSISCH_DATEI}#back" transform="${KLASSISCH_LAGE}" fill="#991b1b"/></svg>`;
+    }
     return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true">
       <defs><pattern id="jr" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#7f1d1d"/><rect width="5" height="10" fill="#991b1b"/></pattern></defs>
       <rect x="1.5" y="1.5" width="97" height="137" rx="9" fill="#fffdf8" stroke="#d6d3d1" stroke-width="1.5"/>
@@ -106,5 +133,5 @@
     </svg>`;
   }
 
-  root.JassKarten = { svg, rueckseite, zeichen, setzeFarben, farbeHex, FARBSCHEMA };
+  root.JassKarten = { svg, rueckseite, zeichen, setzeFarben, setzeBild, farbeHex, FARBSCHEMA };
 })(typeof self !== 'undefined' ? self : this);

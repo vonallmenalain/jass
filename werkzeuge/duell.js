@@ -14,13 +14,13 @@ for (let i = 0; i < N; i++) {
     const rng = J.zufall(i * 7 + (tausch ? 1 : 0));
     while (r.phase === 'ansage') {
       const s = J.ansageAmZug(r);
-      const w = B.waehleAnsage(spiel, s, stufe(s), { rng });
+      const w = B.waehleAnsage(spiel, s, stufe(s), Object.assign({ rng }, B.rechentiefe(process.env.TIEFE)));
       if (w.code === 'SCHIEBEN') J.schieben(spiel); else J.ansagen(spiel, w.code);
     }
     while (r.phase === 'spiel') {
       const s = r.amZug;
       const t0 = Date.now();
-      const z = B.waehleKarte(spiel, s, stufe(s), { rng, exaktAb: process.env.EXAKT ? Number(process.env.EXAKT) : undefined });
+      const z = B.waehleKarte(spiel, s, stufe(s), Object.assign({ rng }, B.rechentiefe(process.env.TIEFE)));
       const dt = Date.now() - t0;
       if (stufe(s) === 'schwer') { zeit += dt; zuege++; langsamste = Math.max(langsamste, dt); }
       J.spiele(spiel, s, z.karte);

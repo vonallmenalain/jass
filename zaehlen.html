@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <title>Stiche zählen</title>
+  <link rel="stylesheet" href="jass-ui.css" />
+  <style>
+    .modus-chip { display: inline-flex; align-items: center; gap: 8px; align-self: center; padding: 8px 14px; border-radius: 999px; background: #fffdf8; color: #111827; font-weight: 800; }
+    .modus-chip .farbzeichen { width: 20px; height: 20px; }
+    .stich-feld {
+      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
+      border-radius: 22px; padding: 14px; border: 1px solid rgba(255,255,255,0.12);
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: 520px; width: 100%; margin: 0 auto;
+    }
+    .stich-feld .karte { width: 100%; }
+    .stich-feld .wert {
+      display: block; text-align: center; font-weight: 900; font-size: 15px; margin-top: 4px; color: #fde68a; min-height: 20px;
+    }
+    .antwort { font-size: 44px; font-weight: 900; text-align: center; letter-spacing: .04em; min-height: 56px; font-variant-numeric: tabular-nums; }
+    .antwort.richtig { color: #4ade80; }
+    .antwort.falsch { color: #f87171; }
+    .tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 360px; margin: 0 auto; width: 100%; }
+    .tasten button { min-height: 58px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,0.08); font-size: 24px; font-weight: 900; }
+    .tasten button.ok { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #fff; }
+    .rechnung { text-align: center; line-height: 1.6; font-size: 15px; }
+    .rechnung b { color: #fde68a; }
+    .werte-tabelle { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .werte-tabelle td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .werte-tabelle td:last-child { text-align: right; font-weight: 800; }
+    @media (orientation: landscape) and (max-height: 600px) {
+      .uebung-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+      .tasten button { min-height: 46px; }
+      .antwort { font-size: 36px; min-height: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" style="--max: 820px">
+    <div class="topbar">
+      <a class="icon-btn" href="training.html" aria-label="Zurück">←</a>
+      <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Stiche zählen</h1></div>
+      <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
+    </div>
+
+    <div class="panel" style="padding:10px 16px"><div class="reihe" style="justify-content:space-between;font-weight:800"><span id="aufgabeNr"></span><span id="sterne"></span></div></div>
+
+    <div class="uebung-grid">
+      <div class="stack">
+        <span class="modus-chip" id="modus"></span>
+        <div class="stich-feld" id="stich"></div>
+        <p class="muted klein" id="letzterHinweis" style="text-align:center" hidden>Das ist der letzte Stich: Er zählt 5 Punkte extra.</p>
+      </div>
+      <div class="stack">
+        <div class="antwort" id="antwort">?</div>
+        <div class="rechnung" id="rechnung" hidden></div>
+        <div class="tasten" id="tasten"></div>
+        <button class="btn btn-voll" type="button" id="weiterBtn" hidden>Weiter</button>
+        <details class="abschnitt"><summary>Wie viel ist welche Karte?</summary><div class="inhalt" id="tabelle"></div></details>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-hinten" id="dialog"><div class="dialog" id="dialogInhalt" role="dialog" aria-modal="true"></div></div>
+
+  <script src="jass-engine.js"></script>
+  <script src="jass-karten.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const J = window.JassEngine;
+    const K = window.JassKarten;
+    const E = window.JassEinstellungen;
+    const $ = (id) => document.getElementById(id);
+    K.setzeFarben(E.ladeAnzeige().farben);
+
+    const KEY = 'jass-lernen-zaehlen-v1';
+    const STANDARD = { modi: { T: true, OBE: true, UNE: true }, karten: 4, serie: 10, letzter: true, rekord: null };
+    let einst = Object.assign({}, STANDARD, E.lese(KEY) || {});
+    einst.modi = Object.assign({}, STANDARD.modi, einst.modi || {});
+    const speichere = () => E.schreibe(KEY, einst);
+
+    let serie = null;
+    let aufgabe = null;
+    let eingabe = '';
+
+    $('tasten').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK'].map((t) => `<button type="button" data-taste="${t}" class="${t === 'OK' ? 'ok' : ''}">${t}</button>`).join('');
+
+    function neueSerie() {
+      serie = { nr: 0, richtig: 0, laenge: einst.serie };
+      neueAufgabe();
+    }
+
+    function zufallsModus(rng) {
+      const moeglich = [];
+      if (einst.modi.T) moeglich.push('T0', 'T1', 'T2', 'T3');
+      if (einst.modi.OBE) moeglich.push('OBE', 'OBE');
+      if (einst.modi.UNE) moeglich.push('UNE', 'UNE');
+      if (!moeglich.length) moeglich.push('T1');
+      return moeglich[Math.floor(rng() * moeglich.length)];
+    }
+
+    function neueAufgabe() {
+      const rng = J.zufall(J.neuerSeed());
+      const code = zufallsModus(rng);
+      const karten = J.mische(Array.from({ length: 36 }, (_, k) => k), rng).slice(0, einst.karten);
+      const letzter = einst.letzter && einst.karten === 4 && rng() < 0.15;
+      const eff = J.effModus(code, 0);
+      const werte = karten.map((k) => J.PUNKTE[eff][k]);
+      const summe = werte.reduce((a, b) => a + b, 0) + (letzter ? 5 : 0);
+      aufgabe = { code, karten, werte, summe, letzter, beantwortet: false };
+      eingabe = '';
+      zeichne();
+    }
+
+    function zeichne() {
+      const a = aufgabe;
+      const m = J.MODI[a.code];
+      $('aufgabeNr').textContent = 'Aufgabe ' + (serie.nr + 1) + ' von ' + serie.laenge;
+      $('sterne').textContent = '⭐ ' + serie.richtig;
+      $('modus').innerHTML = m.trumpf >= 0 ? K.zeichen(m.trumpf) + '<span>' + m.name + ' ist Trumpf</span>' : '<span>' + m.symbol + ' ' + m.name + '</span>';
+      $('stich').style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
+      $('stich').innerHTML = a.karten.map((k, i) => `<div><div class="karte">${K.svg(k, { trumpf: m.trumpf === J.farbeVon(k), code: a.code })}</div><span class="wert">${a.beantwortet ? a.werte[i] : ''}</span></div>`).join('');
+      $('letzterHinweis').hidden = !a.letzter;
+      const ant = $('antwort');
+      ant.className = 'antwort' + (a.beantwortet ? (a.richtig ? ' richtig' : ' falsch') : '');
+      ant.textContent = a.beantwortet ? (a.richtig ? '✓ ' + a.summe : '✗ ' + (eingabe || '0')) : (eingabe || '?');
+      $('tasten').hidden = a.beantwortet;
+      $('weiterBtn').hidden = !a.beantwortet;
+      $('weiterBtn').textContent = serie.nr + 1 >= serie.laenge ? 'Zum Ergebnis' : 'Weiter';
+      const r = $('rechnung');
+      r.hidden = !a.beantwortet;
+      if (a.beantwortet) {
+        const teile = a.karten.map((k, i) => `${J.kurzName(k)} <b>${a.werte[i]}</b>`);
+        if (a.letzter) teile.push('letzter Stich <b>5</b>');
+        r.innerHTML = (a.richtig ? 'Richtig! ' : 'Es sind <b>' + a.summe + '</b>: ') + teile.join(' + ') + ' = <b>' + a.summe + '</b>';
+      }
+      zeichneTabelle();
+    }
+
+    function zeichneTabelle() {
+      const code = aufgabe.code;
+      const m = J.MODI[code];
+      const eff = J.effModus(code, 0);
+      const zeilen = [];
+      if (m.trumpf >= 0) {
+        zeilen.push(['Trumpf-Bauer (Puur)', 20], ['Trumpf-Neun (Nell)', 14]);
+        zeilen.push(['Ass', 11], ['Zehn', 10], ['König', 4], ['Dame', 3], ['Bauer (nicht Trumpf)', 2], ['Neun, Acht, Sieben, Sechs', 0]);
+      } else if (eff === J.EFF_UNE) {
+        zeilen.push(['Sechs', 11], ['Zehn', 10], ['Acht', 8], ['König', 4], ['Dame', 3], ['Bauer', 2], ['Ass, Neun, Sieben', 0]);
+      } else {
+        zeilen.push(['Ass', 11], ['Zehn', 10], ['Acht', 8], ['König', 4], ['Dame', 3], ['Bauer', 2], ['Neun, Sieben, Sechs', 0]);
+      }
+      $('tabelle').innerHTML = `<table class="werte-tabelle">${zeilen.map(([n, w]) => `<tr><td>${n}</td><td>${w}</td></tr>`).join('')}</table>
+        <p class="muted klein" style="margin-top:6px">${m.trumpf >= 0 ? 'Im Trumpf zählen Bauer und Neun mehr; die Acht zählt nichts.' : 'Ohne Trumpf zählt die Acht 8 Punkte.'} Ein ganzes Spiel hat 157 Punkte (mit dem letzten Stich).</p>`;
+    }
+
+    $('tasten').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-taste]');
+      if (!b || aufgabe.beantwortet) return;
+      const t = b.dataset.taste;
+      if (t === '⌫') eingabe = eingabe.slice(0, -1);
+      else if (t === 'OK') { if (eingabe) pruefe(); return; }
+      else if (eingabe.length < 3) eingabe = (eingabe === '0' ? '' : eingabe) + t;
+      zeichne();
+    });
+    document.addEventListener('keydown', (e) => {
+      if ($('dialog').classList.contains('offen') || !aufgabe) return;
+      if (aufgabe.beantwortet) { if (e.key === 'Enter') $('weiterBtn').click(); return; }
+      if (/^[0-9]$/.test(e.key) && eingabe.length < 3) { eingabe = (eingabe === '0' ? '' : eingabe) + e.key; zeichne(); }
+      else if (e.key === 'Backspace') { eingabe = eingabe.slice(0, -1); zeichne(); }
+      else if (e.key === 'Enter' && eingabe) pruefe();
+    });
+
+    function pruefe() {
+      aufgabe.beantwortet = true;
+      aufgabe.richtig = Number(eingabe) === aufgabe.summe;
+      if (aufgabe.richtig) serie.richtig++;
+      zeichne();
+    }
+
+    $('weiterBtn').addEventListener('click', () => {
+      if (serie.nr + 1 >= serie.laenge) { zeigeErgebnis(); return; }
+      serie.nr++;
+      neueAufgabe();
+    });
+
+    function zeigeErgebnis() {
+      const neu = !einst.rekord || serie.richtig / serie.laenge > einst.rekord.richtig / einst.rekord.laenge;
+      if (neu) { einst.rekord = { richtig: serie.richtig, laenge: serie.laenge }; speichere(); }
+      $('dialogInhalt').innerHTML = `<div class="ergebnis-titel">${serie.richtig === serie.laenge ? '🏆' : '⭐'} ${serie.richtig} von ${serie.laenge} richtig</div>
+        ${neu ? '<p style="text-align:center;color:#fde68a;font-weight:800">Neuer Rekord!</p>' : ''}
+        <button class="btn btn-voll" type="button" id="nochmal">Nochmals</button>
+        <a class="btn-ghost btn-voll" href="training.html">Andere Übung</a>`;
+      $('dialog').classList.add('offen');
+      $('nochmal').addEventListener('click', () => { $('dialog').classList.remove('offen'); neueSerie(); });
+    }
+
+    $('einstellungenBtn').addEventListener('click', () => {
+      const s = (pfad, titel, an) => `<label class="schalter"><span class="text"><span>${titel}</span></span><input type="checkbox" data-e="${pfad}" ${an ? 'checked' : ''}></label>`;
+      $('dialogInhalt').innerHTML = `<h2>Einstellungen</h2>
+        <div><h3>Was üben?</h3>${s('modi.T', 'Trumpf', einst.modi.T)}${s('modi.OBE', 'Obenabe', einst.modi.OBE)}${s('modi.UNE', 'Undenufe', einst.modi.UNE)}${s('letzter', 'Manchmal den letzten Stich (+5)', einst.letzter)}</div>
+        <div class="stack" style="gap:8px"><span>Karten pro Aufgabe</span><div class="segmente" data-seg="karten">${[[4, 'Ein Stich (4)'], [8, 'Zwei Stiche (8)']].map(([w, t]) => `<button type="button" data-w="${w}" class="${einst.karten === w ? 'aktiv' : ''}">${t}</button>`).join('')}</div></div>
+        <div class="stack" style="gap:8px"><span>Aufgaben pro Serie</span><div class="segmente" data-seg="serie">${[5, 10, 20].map((w) => `<button type="button" data-w="${w}" class="${einst.serie === w ? 'aktiv' : ''}">${w}</button>`).join('')}</div></div>
+        <button class="btn btn-voll" type="button" id="fertig">Fertig – neue Serie</button>`;
+      $('dialog').classList.add('offen');
+      $('dialogInhalt').querySelectorAll('[data-e]').forEach((el) => el.addEventListener('change', () => {
+        const [a, b] = el.dataset.e.split('.');
+        if (b) einst[a][b] = el.checked; else einst[a] = el.checked;
+        if (!einst.modi.T && !einst.modi.OBE && !einst.modi.UNE) { einst.modi.T = true; }
+        speichere();
+      }));
+      $('dialogInhalt').querySelectorAll('[data-seg]').forEach((seg) => seg.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-w]');
+        if (!b) return;
+        einst[seg.dataset.seg] = Number(b.dataset.w);
+        seg.querySelectorAll('button').forEach((x) => x.classList.toggle('aktiv', x === b));
+        speichere();
+      }));
+      $('fertig').addEventListener('click', () => { $('dialog').classList.remove('offen'); neueSerie(); });
+    });
+
+    neueSerie();
+  })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(function () {});
+  </script>
+</body>
+</html>

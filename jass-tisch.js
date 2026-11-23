@@ -206,7 +206,11 @@
       const handEl = el('hand');
       const breite = handEl.clientWidth || 320;
       const n = hand.length;
-      const kw = Math.min(92, Math.max(46, breite / (1 + Math.max(n - 1, 1) * 0.6)));
+      // Die Karten richten sich nach der Breite – und nach der Höhe, damit
+      // im Querformat das Feld nicht verschwindet.
+      const quer = window.innerWidth > window.innerHeight && window.innerHeight < 600;
+      const nachHoehe = (window.innerHeight * (quer ? 0.26 : 0.19)) / 1.4;
+      const kw = Math.min(92, nachHoehe, Math.max(46, breite / (1 + Math.max(n - 1, 1) * 0.6)));
       const schritt = n > 1 ? Math.min(kw * 1.06, (breite - kw) / (n - 1)) : 0;
       const start = (breite - (kw + schritt * (n - 1))) / 2;
       handEl.style.setProperty('--kw', kw + 'px');
@@ -298,7 +302,7 @@
       if (!box) return;
       box.textContent = 'Ich spiele deine Karten durch …';
       const b = B.bewertung(hand, z.spiel.regeln, { geschoben: r.geschoben || !J.darfSchieben(r, z.spiel.regeln) });
-      const ziel = 160;
+      const ziel = B.rechentiefe(anzeige().rechnen).ansage * 2;
       const schritt = () => {
         if (z.eingabe !== 'ansage') return;
         b.schritt(20);
@@ -314,7 +318,7 @@
     el('tipp').addEventListener('click', () => {
       if (z.eingabe === 'ansage') { tippAnsage(); return; }
       if (!meinKartenZug()) return;
-      const t = o.tippKarte ? o.tippKarte() : B.schwerZug(z.spiel, z.ansichtSitz);
+      const t = o.tippKarte ? o.tippKarte() : B.schwerZug(z.spiel, z.ansichtSitz, B.rechentiefe(anzeige().rechnen));
       if (!t) return;
       gewaehlt = anzeige().einTipp ? null : t.karte;
       zeichneHand();

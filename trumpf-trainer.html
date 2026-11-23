@@ -86,7 +86,7 @@
 <body>
   <div class="app" style="--max: 720px">
     <div class="topbar">
-      <a class="icon-btn" href="index.html" aria-label="Zurück zur Startseite">←</a>
+      <a class="icon-btn" href="training.html" aria-label="Zurück">←</a>
       <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Trumpf-Trainer</h1></div>
       <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
     </div>
@@ -377,7 +377,7 @@
         <button class="btn btn-voll" type="button" id="dialogOk">Fertig</button>`;
       $('dialog').classList.add('offen');
       E.regelFormular($('setRegeln'), regeln, (r) => { E.speichereRegeln(r); }, { laenge: false, offen: ['modi'] });
-      E.anzeigeFormular($('setAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { spiel: false, tempo: false });
+      E.anzeigeFormular($('setAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { spiel: false, tempo: false, rechnen: false });
       $('setGeschoben').addEventListener('click', (e) => {
         const b = e.target.closest('[data-w]'); if (!b) return;
         einst.geschoben = b.dataset.w; speichereEinst();

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <title>Trumpf-Helfer</title>
+  <link rel="stylesheet" href="jass-ui.css" />
+  <style>
+    .auswahl { display: flex; flex-direction: column; gap: 8px; }
+    .farb-reihe { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
+    .farb-reihe button { padding: 0; border: none; background: none; border-radius: 7px; transition: transform .1s ease, opacity .15s ease; }
+    .farb-reihe button .karte-svg { width: 100%; display: block; }
+    .farb-reihe button.gewaehlt { transform: translateY(-4px); }
+    .farb-reihe button.gewaehlt .karte-svg { filter: drop-shadow(0 0 6px rgba(253, 224, 71, .95)); }
+    .farb-reihe button:disabled { opacity: .35; }
+    .meine-hand {
+      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
+      border-radius: 20px; padding: 10px; border: 1px solid rgba(255,255,255,0.12);
+      display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; min-height: 80px;
+    }
+    .meine-hand .leer { border: 2px dashed rgba(255,255,255,.25); border-radius: 8px; aspect-ratio: 100 / 140; }
+    .meine-hand button { padding: 0; border: none; background: none; }
+    .meine-hand .karte-svg { width: 100%; display: block; }
+    .foto { width: 100%; max-height: 320px; object-fit: contain; border-radius: 14px; background: #000; }
+    .ergebnis-liste { display: flex; flex-direction: column; gap: 6px; }
+    .ergebnis-zeile { display: grid; grid-template-columns: 128px 1fr 48px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; font-size: 14px; }
+    .ergebnis-zeile.beste { background: rgba(74, 222, 128, .1); }
+    .ergebnis-zeile .name { font-weight: 800; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+    .ergebnis-zeile .name .farbzeichen { background: #fffdf8; border-radius: 6px; padding: 2px; width: 22px; height: 22px; flex-shrink: 0; }
+    .ergebnis-zeile .name .ohne { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #fffdf8; color: #111827; font-size: 13px; flex-shrink: 0; }
+    .ergebnis-zeile .bar { height: 12px; border-radius: 6px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .ergebnis-zeile .bar span { display: block; height: 100%; border-radius: 6px; background: #64748b; }
+    .ergebnis-zeile.beste .bar span { background: #4ade80; }
+    .ergebnis-zeile .wert { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .empfehlung { font-size: 22px; font-weight: 900; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .empfehlung .farbzeichen { width: 26px; height: 26px; background: #fffdf8; border-radius: 8px; padding: 3px; }
+    .balken-leer { width: 100%; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; }
+    .balken-voll { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  </style>
+</head>
+<body>
+  <div class="app" style="--max: 720px">
+    <div class="topbar">
+      <a class="icon-btn" href="training.html" aria-label="Zurück">←</a>
+      <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Trumpf-Helfer</h1></div>
+      <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
+    </div>
+
+    <div class="panel stack">
+      <div class="reihe" style="justify-content:space-between">
+        <h2 id="zaehler">Deine Karten: 0 von 9</h2>
+        <div class="reihe">
+          <label class="btn-ghost btn-klein" style="cursor:pointer">📷 Foto<input type="file" accept="image/*" capture="environment" id="kamera" hidden></label>
+          <button class="btn-ghost btn-klein" type="button" id="leeren">Leeren</button>
+        </div>
+      </div>
+      <div class="meine-hand" id="hand"></div>
+      <div class="segmente" id="lage">
+        <button type="button" data-lage="vorhand" class="aktiv">Ich sage an (darf schieben)</button>
+        <button type="button" data-lage="geschoben">Partner hat geschoben</button>
+      </div>
+    </div>
+
+    <div class="panel stack" id="fotoPanel" hidden>
+      <img class="foto" id="foto" alt="Foto deiner Karten">
+      <p class="muted klein">Die automatische Erkennung der Karten ist vorbereitet, aber noch nicht eingeschaltet. Tippe die Karten unten an – das Foto hilft beim Abschreiben.</p>
+    </div>
+
+    <div class="panel stack" id="ergebnis" hidden></div>
+
+    <div class="panel stack">
+      <h3>Karten antippen</h3>
+      <div class="auswahl" id="auswahl"></div>
+    </div>
+  </div>
+
+  <div class="dialog-hinten" id="dialog"><div class="dialog" id="dialogInhalt" role="dialog" aria-modal="true"></div></div>
+
+  <script src="jass-engine.js"></script>
+  <script src="jass-bot.js"></script>
+  <script src="jass-karten.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const J = window.JassEngine;
+    const B = window.JassBot;
+    const K = window.JassKarten;
+    const E = window.JassEinstellungen;
+    const $ = (id) => document.getElementById(id);
+    let anzeige = E.ladeAnzeige();
+    K.setzeFarben(anzeige.farben);
+    let regeln = E.ladeRegeln();
+
+    const KEY = 'jass-lernen-helfer-v1';
+    const gemerkt = E.lese(KEY) || {};
+    let hand = Array.isArray(gemerkt.hand) ? gemerkt.hand.filter((k) => k >= 0 && k < 36).slice(0, 9) : [];
+    let lage = gemerkt.lage === 'geschoben' ? 'geschoben' : 'vorhand';
+    let rechnung = 0;
+    const merke = () => E.schreibe(KEY, { hand, lage });
+
+    // Reihen der Auswahl: Farben abwechselnd schwarz/rot, Ass links.
+    function zeichneAuswahl() {
+      const voll = hand.length >= 9;
+      $('auswahl').innerHTML = [0, 1, 2, 3].map((f) => `<div class="farb-reihe">${[8, 7, 6, 5, 4, 3, 2, 1, 0].map((w) => {
+        const k = J.karte(f, w);
+        const drin = hand.includes(k);
+        return `<button type="button" data-karte="${k}" class="${drin ? 'gewaehlt' : ''}" ${voll && !drin ? 'disabled' : ''} aria-pressed="${drin}" aria-label="${J.kartenName(k)}">${K.svg(k)}</button>`;
+      }).join('')}</div>`).join('');
+    }
+
+    function zeichneHand() {
+      const sortiert = J.sortiereHand(hand, null);
+      $('hand').innerHTML = sortiert.map((k) => `<button type="button" data-weg="${k}" aria-label="${J.kartenName(k)} entfernen">${K.svg(k)}</button>`).join('') + '<div class="leer"></div>'.repeat(9 - hand.length);
+      $('zaehler').textContent = 'Deine Karten: ' + hand.length + ' von 9';
+      $('lage').querySelectorAll('button').forEach((b) => b.classList.toggle('aktiv', b.dataset.lage === lage));
+      $('lage').hidden = !regeln.schieben;
+    }
+
+    function alles() {
+      zeichneHand();
+      zeichneAuswahl();
+      merke();
+      if (hand.length === 9) rechne(); else { rechnung++; $('ergebnis').hidden = true; }
+    }
+
+    $('auswahl').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-karte]');
+      if (!b || b.disabled) return;
+      const k = Number(b.dataset.karte);
+      hand = hand.includes(k) ? hand.filter((x) => x !== k) : hand.concat(k);
+      alles();
+    });
+    $('hand').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-weg]');
+      if (!b) return;
+      hand = hand.filter((x) => x !== Number(b.dataset.weg));
+      alles();
+    });
+    $('leeren').addEventListener('click', () => { hand = []; alles(); });
+    $('lage').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-lage]');
+      if (!b) return;
+      lage = b.dataset.lage;
+      alles();
+    });
+
+    function modusHtml(code) {
+      if (code === 'SCHIEBEN') return '<span class="ohne">↔</span><span>Schieben</span>';
+      const m = J.MODI[code];
+      return (m.trumpf >= 0 ? K.zeichen(m.trumpf) : `<span class="ohne">${m.symbol}</span>`) + `<span>${m.name}</span>`;
+    }
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Spielt die Hand mit vielen Verteilungen der anderen Karten durch.
+    function rechne() {
+      const id = ++rechnung;
+      const geschoben = lage === 'geschoben' || !regeln.schieben;
+      const b = B.bewertung(hand, regeln, { geschoben });
+      const ziel = Math.max(200, B.rechentiefe(anzeige.rechnen).ansage * 4);
+      const box = $('ergebnis');
+      box.hidden = false;
+      box.innerHTML = '<p class="muted">Ich spiele deine Karten durch …</p><div class="balken-leer"><div class="balken-voll" id="balken"></div></div>';
+      const schritt = () => {
+        if (id !== rechnung) return;
+        const t0 = performance.now();
+        while (b.gemacht < ziel && performance.now() - t0 < 30) b.schritt(5);
+        const balken = $('balken');
+        if (balken) balken.style.width = Math.round((100 * b.gemacht) / ziel) + '%';
+        if (b.gemacht < ziel) { setTimeout(schritt, 0); return; }
+        zeigeErgebnis(b.ergebnis());
+      };
+      setTimeout(schritt, 20);
+    }
+
+    function zeigeErgebnis(liste) {
+      const beste = liste[0];
+      const max = Math.max(...liste.map((x) => x.punkte));
+      const min = Math.min(0, ...liste.map((x) => x.punkte));
+      const name = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
+      const heuristik = B.heuristikAnsage(hand, regeln, lage !== 'geschoben' && regeln.schieben);
+      $('ergebnis').innerHTML = `
+        <span class="muted klein" style="text-align:center">Mein Vorschlag</span>
+        <div class="empfehlung">${modusHtml(beste.code)}</div>
+        <p class="muted" style="text-align:center">${esc(B.faustregel(hand, beste.code))}</p>
+        <div class="ergebnis-liste">${liste.map((x) => `<div class="ergebnis-zeile ${x === beste ? 'beste' : ''}">
+          <span class="name">${modusHtml(x.code)}</span>
+          <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
+          <span class="wert">${Math.round(x.punkte)}</span></div>`).join('')}</div>
+        <p class="muted klein">Ø Punkte für euer Team${regeln.multiplikatoren ? ' (mit Multiplikator)' : ''}, aus ${liste[0].n} durchgespielten Verteilungen. ${heuristik.code !== beste.code ? 'Die schnelle Faustregel hätte ' + esc(name(heuristik.code)) + ' gesagt – knapp, beides ist vertretbar.' : ''}</p>
+        <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&geschoben=1' : ''}">Mit diesen Karten gegen den Computer spielen</a>`;
+    }
+
+    // Foto: vorbereitet für die Erkennung. Bis sie eingeschaltet ist, dient
+    // das Bild als Vorlage zum Antippen.
+    $('kamera').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const url = URL.createObjectURL(f);
+      $('foto').src = url;
+      $('fotoPanel').hidden = false;
+      $('fotoPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    $('einstellungenBtn').addEventListener('click', () => {
+      $('dialogInhalt').innerHTML = `<h2>Einstellungen</h2><div class="stack" id="setRegeln" style="gap:10px"></div><div id="setAnzeige"></div>
+        <button class="btn btn-voll" type="button" id="dialogOk">Fertig</button>`;
+      $('dialog').classList.add('offen');
+      E.regelFormular($('setRegeln'), regeln, (r) => E.speichereRegeln(r), { laenge: false, offen: ['modi'] });
+      E.anzeigeFormular($('setAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { spiel: false, tempo: false });
+      $('dialogOk').addEventListener('click', () => { $('dialog').classList.remove('offen'); alles(); });
+    });
+    $('dialog').addEventListener('click', (e) => { if (e.target === $('dialog')) $('dialogOk').click(); });
+
+    alles();
+  })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(function () {});
+  </script>
+</body>
+</html>

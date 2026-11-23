@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <title>Gespielte Partien</title>
+  <link rel="stylesheet" href="jass-ui.css" />
+  <style>
+    .partie-zeile { display: flex; flex-direction: column; gap: 4px; text-align: left; width: 100%; padding: 12px 14px; }
+    .partie-zeile .oben { display: flex; justify-content: space-between; gap: 8px; width: 100%; font-weight: 800; }
+    .partie-zeile .unten { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .runden-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+    .runden-tabs button { flex-shrink: 0; }
+    .mini { display: inline-block; width: 38px; vertical-align: middle; }
+    .mini .karte-svg { width: 100%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+    .hand-zeile { display: grid; grid-template-columns: 92px 1fr; gap: 8px; align-items: center; }
+    .hand-zeile .wer { font-weight: 800; font-size: 13px; line-height: 1.2; }
+    .hand-zeile .wer small { display: block; color: var(--muted-2); font-weight: 600; }
+    .hand-karten { display: flex; flex-wrap: wrap; gap: 3px; }
+    .stich-zeile {
+      border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 8px 10px;
+      background: rgba(255,255,255,.03); display: flex; flex-direction: column; gap: 6px;
+    }
+    .stich-zeile.markiert { border-color: rgba(248, 113, 113, .7); }
+    .stich-kopf { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; }
+    .stich-kopf b { font-size: 14px; }
+    .stich-karten { display: flex; gap: 8px; flex-wrap: wrap; }
+    .stich-karten figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--muted); }
+    .stich-karten figure.sieger figcaption { color: #fde68a; font-weight: 800; }
+    .stich-karten .mini { width: 46px; }
+    .gruende { display: none; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.4; }
+    .stich-zeile.offen .gruende { display: flex; }
+    .grund { background: rgba(0,0,0,.2); border-radius: 10px; padding: 6px 8px; }
+    .grund .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .notiz { background: rgba(239, 68, 68, .12); border: 1px solid rgba(239, 68, 68, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
+    .ansage-liste { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+  </style>
+</head>
+<body>
+  <div class="app" style="--max: 760px">
+    <div class="topbar">
+      <a class="icon-btn" href="jass-spiel.html" aria-label="Zurück">←</a>
+      <div class="topbar-titel"><span class="eyebrow">Gegen Computer</span><h1 id="titel">Gespielte Partien</h1></div>
+    </div>
+    <section class="stack" id="liste"></section>
+    <section class="stack" id="ansicht" hidden></section>
+  </div>
+
+  <div class="dialog-hinten" id="dialog"><div class="dialog" id="dialogInhalt" role="dialog" aria-modal="true"></div></div>
+
+  <script src="jass-engine.js"></script>
+  <script src="jass-karten.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script src="jass-verlauf.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const J = window.JassEngine;
+    const K = window.JassKarten;
+    const E = window.JassEinstellungen;
+    const V = window.JassVerlauf;
+    const $ = (id) => document.getElementById(id);
+    K.setzeFarben(E.ladeAnzeige().farben);
+
+    const STUFE = { mensch: '👤', leicht: '🤖 Leicht', mittel: '🤖 Mittel', schwer: '🤖 Schwer' };
+    let partie = null;
+    let gespeichert = true;   // false: aus einer Datei geöffnet, nicht in der Liste
+    let rundeIndex = 0;
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    const mini = (k, code) => `<span class="mini">${K.svg(k, { code, trumpf: code && J.MODI[code] && J.MODI[code].trumpf === J.farbeVon(k) })}</span>`;
+    const teamName = (p, t) => p.spieler[t].name + ' & ' + p.spieler[t + 2].name;
+    const datum = (ms) => new Date(ms).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const modusName = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c] ? J.MODI[c].lang : c);
+
+    // ----------------------------------------------------------- Liste
+
+    function zeigeListe() {
+      partie = null;
+      $('titel').textContent = 'Gespielte Partien';
+      $('ansicht').hidden = true;
+      $('liste').hidden = false;
+      const alle = V.alle();
+      $('liste').innerHTML = `
+        <div class="panel stack">
+          <p class="muted klein">Jede Partie gegen den Computer wird hier gespeichert – mit allen Karten, Ansagen und Zügen, bei den Computern mit Begründung. Siehst du etwas Komisches, markiere die Stelle und exportiere die Partie als Datei.</p>
+          <label class="btn-ghost btn-klein" style="cursor:pointer;align-self:flex-start">📂 Datei öffnen<input type="file" accept=".json,application/json" id="dateiOeffnen" hidden></label>
+        </div>
+        ${alle.length ? alle.map((p) => {
+          const n = p.notizen ? p.notizen.length : 0;
+          const stand = p.ende ? `${p.summe[0]} : ${p.summe[1]}` : 'läuft';
+          return `<button class="btn-ghost partie-zeile" type="button" data-id="${esc(p.id)}">
+            <span class="oben"><span>${esc(datum(p.start))}</span><span>${esc(stand)}</span></span>
+            <span class="unten">${esc(teamName(p, 0))} gegen ${esc(teamName(p, 1))} · ${p.runden.length} ${p.runden.length === 1 ? 'Runde' : 'Runden'}${n ? ' · 🚩 ' + n : ''}</span>
+          </button>`;
+        }).join('') : '<div class="panel"><p class="muted">Noch keine Partie gespielt.</p></div>'}`;
+      $('liste').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', () => oeffne(V.lade(b.dataset.id), true)));
+      $('dateiOeffnen').addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        f.text().then((t) => {
+          const p = JSON.parse(t);
+          if (!V.istPartie(p)) throw new Error('keine Partie');
+          oeffne(p, false);
+        }).catch(() => alert('Diese Datei ist keine Jass-Partie.'));
+      });
+    }
+
+    // ---------------------------------------------------------- Ansicht
+
+    function oeffne(p, ausListe) {
+      if (!p) { zeigeListe(); return; }
+      partie = p;
+      gespeichert = ausListe;
+      rundeIndex = 0;
+      $('liste').hidden = true;
+      $('ansicht').hidden = false;
+      $('titel').textContent = datum(p.start);
+      zeichneAnsicht();
+      window.scrollTo(0, 0);
+    }
+
+    function zeichneAnsicht() {
+      const p = partie;
+      const r = p.runden[rundeIndex];
+      const kopf = `<div class="panel stack">
+        <div class="reihe" style="justify-content:space-between">
+          <span><b>${esc(teamName(p, 0))}</b> ${p.ende ? p.summe[0] + ' : ' + p.summe[1] : '(läuft)'} <b>${esc(teamName(p, 1))}</b></span>
+        </div>
+        <p class="muted klein">${esc(E.zusammenfassung(J.regelnMitStandard(p.regeln)))} · Rechentiefe ${esc(p.rechnen || 'normal')} · ${p.spieler.map((x) => esc(x.name) + ' ' + (STUFE[x.typ] || '')).join(', ')}</p>
+        <div class="reihe">
+          <button class="btn btn-klein" type="button" id="herunterladen">⬇︎ Als Datei</button>
+          ${navigator.share ? '<button class="btn-ghost btn-klein" type="button" id="teilen">Teilen</button>' : ''}
+          <button class="btn-ghost btn-klein" type="button" id="kopieren">Kopieren</button>
+          ${gespeichert ? '<button class="btn-ghost btn-klein" type="button" id="loeschen">Löschen</button>' : ''}
+          <button class="btn-ghost btn-klein" type="button" id="zurListe">Alle Partien</button>
+        </div>
+        ${p.notizen && p.notizen.length ? `<div class="stack" style="gap:6px">${p.notizen.map((n) => `<div class="notiz">🚩 Runde ${n.runde + 1}${n.stich != null ? ', Stich ' + (n.stich + 1) : ', Ansage'}: ${esc(n.text)}</div>`).join('')}</div>` : ''}
+        <div class="runden-tabs segmente">${p.runden.map((x, i) => `<button type="button" data-runde="${i}" class="${i === rundeIndex ? 'aktiv' : ''}">Runde ${x.nr + 1}</button>`).join('')}</div>
+      </div>`;
+      $('ansicht').innerHTML = kopf + (r ? rundeHtml(p, r) : '<div class="panel"><p class="muted">Noch keine Runde.</p></div>');
+      verbinde();
+    }
+
+    function rundeHtml(p, r) {
+      const code = r.code || (r.ansagen.find((a) => a.wahl !== 'SCHIEBEN') || {}).wahl || null;
+      const name = (s) => esc(p.spieler[s].name);
+      const ansagen = r.ansagen.map((a) => {
+        const werte = a.werte ? `<div class="werte">Durchgerechnet: ${a.werte.map((w) => esc(modusName(w.c)) + ' ' + w.p).join(' · ')}</div>` : '';
+        return `<div class="grund"><b>${name(a.s)}</b> ${STUFE[a.stufe] || ''}: ${esc(modusName(a.wahl))}${a.grund && a.stufe !== 'mensch' ? ' – ' + esc(a.grund) : ''}${werte}</div>`;
+      }).join('');
+      const haende = [0, 2, 1, 3].map((s) => `<div class="hand-zeile"><div class="wer">${name(s)}<small>${s % 2 === 0 ? 'Team A' : 'Team B'}${s === r.ansager ? ' · Vorhand' : ''}</small></div>
+        <div class="hand-karten">${J.sortiereHand(r.haende[s], code).map((k) => mini(k, code)).join('')}</div></div>`).join('');
+      // Die Züge in Stiche teilen und die Stiche mit der Engine nachrechnen.
+      const stiche = [];
+      for (const z of r.zuege) {
+        if (!stiche[z.stich]) stiche[z.stich] = [];
+        stiche[z.stich].push(z);
+      }
+      const notizen = (p.notizen || []).filter((n) => n.runde === r.nr);
+      const sticheHtml = stiche.map((zuege, i) => {
+        if (!zuege) return '';
+        const eff = code ? J.effModus(code, i) : J.EFF_OBE;
+        const karten = zuege.map((z) => z.k);
+        const fertig = karten.length === 4;
+        const gi = fertig ? J.gewinnerIndex(karten, eff) : -1;
+        let punkte = fertig ? J.stichPunkte(karten, eff) : 0;
+        if (fertig && i === 8) punkte += J.regelnMitStandard(p.regeln).letzterStich;
+        const markiert = notizen.filter((n) => n.stich === i);
+        const gruende = zuege.map((z) => {
+          let werte = '';
+          if (z.werte && z.werte.length > 1) werte = `<div class="werte">Durchgerechnet (Ø Punkte Vorsprung): ${z.werte.map((w) => esc(J.kurzName(w.k)) + ' ' + w.w).join(' · ')}</div>`;
+          const tipp = z.tipp != null ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : '';
+          return `<div class="grund"><b>${name(z.s)}</b> ${STUFE[z.stufe] || ''} spielt ${esc(J.kartenName(z.k, code))}${tipp}${z.grund ? '<br>' + esc(z.grund) : ''}${werte}</div>`;
+        }).join('');
+        return `<div class="stich-zeile ${markiert.length ? 'markiert offen' : ''}" data-stich="${i}">
+          <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${fertig ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : 'nicht fertig'}</span></div>
+          <div class="stich-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}">${mini(z.k, code)}<figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
+          ${markiert.map((n) => `<div class="notiz">🚩 ${esc(n.text)}</div>`).join('')}
+          <div class="gruende">${gruende}
+            <button class="btn-ghost btn-klein" type="button" data-markieren="${i}" style="align-self:flex-start">🚩 Markieren</button></div>
+        </div>`;
+      }).join('');
+      const ab = r.abrechnung;
+      const titel = code ? J.MODI[code].lang : 'keine Ansage';
+      return `<div class="panel stack">
+          <h2>Runde ${r.nr + 1} · ${esc(titel)}</h2>
+          ${ab ? `<p class="muted">Ergebnis: ${esc(teamName(p, 0))} ${ab.total[0]} · ${esc(teamName(p, 1))} ${ab.total[1]}</p>` : ''}
+          <h3>Ansage</h3><div class="ansage-liste">${ansagen || '<span class="muted">–</span>'}</div>
+          ${notizen.filter((n) => n.stich == null).map((n) => `<div class="notiz">🚩 ${esc(n.text)}</div>`).join('')}
+        </div>
+        <div class="panel stack"><h3>Karten zu Beginn</h3>${haende}</div>
+        <div class="panel stack"><h3>Stiche</h3><p class="muted klein">Antippen zeigt, warum jeder so gespielt hat.</p>${sticheHtml || '<span class="muted">–</span>'}</div>`;
+    }
+
+    function verbinde() {
+      const a = $('ansicht');
+      a.querySelectorAll('[data-runde]').forEach((b) => b.addEventListener('click', () => { rundeIndex = Number(b.dataset.runde); zeichneAnsicht(); }));
+      a.querySelectorAll('.stich-zeile').forEach((z) => z.addEventListener('click', (e) => {
+        if (e.target.closest('[data-markieren]')) return;
+        z.classList.toggle('offen');
+      }));
+      a.querySelectorAll('[data-markieren]').forEach((b) => b.addEventListener('click', () => markiere(Number(b.dataset.markieren))));
+      $('zurListe').addEventListener('click', zeigeListe);
+      $('herunterladen').addEventListener('click', herunterladen);
+      if ($('teilen')) $('teilen').addEventListener('click', teilen);
+      $('kopieren').addEventListener('click', () => {
+        navigator.clipboard.writeText(JSON.stringify(partie)).then(() => toast('In die Zwischenablage kopiert'), () => toast('Kopieren ging nicht'));
+      });
+      if ($('loeschen')) $('loeschen').addEventListener('click', () => {
+        if (!confirm('Diese Partie löschen?')) return;
+        V.loesche(partie.id);
+        zeigeListe();
+      });
+    }
+
+    function markiere(stich) {
+      const r = partie.runden[rundeIndex];
+      $('dialogInhalt').innerHTML = `<h2>🚩 Runde ${r.nr + 1}, Stich ${stich + 1}</h2>
+        <p class="muted">Was war komisch?</p>
+        <textarea class="text-feld" id="notizText" rows="4" style="min-height:96px;padding:10px" maxlength="600"></textarea>
+        <button class="btn btn-voll" type="button" id="notizOk">Speichern</button>
+        <button class="btn-ghost btn-voll" type="button" id="notizAbbrechen">Abbrechen</button>`;
+      $('dialog').classList.add('offen');
+      const feld = $('notizText');
+      setTimeout(() => feld.focus(), 50);
+      $('notizAbbrechen').addEventListener('click', () => $('dialog').classList.remove('offen'));
+      $('notizOk').addEventListener('click', () => {
+        const text = feld.value.trim();
+        if (!text) return;
+        V.notiz(partie, { runde: r.nr, stich, text });
+        if (gespeichert) V.speichere(partie);
+        $('dialog').classList.remove('offen');
+        zeichneAnsicht();
+      });
+    }
+
+    function datei() {
+      return new File([JSON.stringify(partie, null, 1)], V.dateiname(partie), { type: 'application/json' });
+    }
+    function herunterladen() {
+      const f = datei();
+      const url = URL.createObjectURL(f);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = f.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+    function teilen() {
+      const f = datei();
+      const daten = navigator.canShare && navigator.canShare({ files: [f] }) ? { files: [f], title: f.name } : { title: f.name, text: JSON.stringify(partie) };
+      navigator.share(daten).catch(() => {});
+    }
+
+    function toast(text) {
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.textContent = text;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2400);
+    }
+    $('dialog').addEventListener('click', (e) => { if (e.target === $('dialog')) $('dialog').classList.remove('offen'); });
+
+    const id = new URLSearchParams(location.search).get('p');
+    if (id && V.lade(id)) oeffne(V.lade(id), true);
+    else zeigeListe();
+  })();
+  </script>
+</body>
+</html>

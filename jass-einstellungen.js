@@ -18,6 +18,8 @@
     erklaeren: true,      // Computer sagen, warum sie so spielen
     farben: 'klassisch',  // klassisch | vier
     einTipp: false,       // Karte mit einem Tipp spielen (sonst: antippen, dann nochmals)
+    rechnen: 'normal',    // Rechentiefe von «Schwer» und den Tipps (JassBot.RECHENTIEFE)
+    kartenbild: 'eigen',  // eigen | klassisch (SVG-cards, karten/README.md)
   };
 
   const VORLAGEN = [
@@ -44,7 +46,11 @@
 
   function ladeRegeln() { return J.regelnMitStandard(lese(KEY_REGELN) || {}); }
   function speichereRegeln(r) { schreibe(KEY_REGELN, r); }
-  function ladeAnzeige() { return Object.assign({}, STANDARD_ANZEIGE, lese(KEY_ANZEIGE) || {}); }
+  function ladeAnzeige() {
+    const a = Object.assign({}, STANDARD_ANZEIGE, lese(KEY_ANZEIGE) || {});
+    if (root.JassKarten && root.JassKarten.setzeBild) root.JassKarten.setzeBild(a.kartenbild);
+    return a;
+  }
   function speichereAnzeige(a) { schreibe(KEY_ANZEIGE, a); }
 
   function vorlage(id) {
@@ -63,7 +69,7 @@
 
   function zusammenfassung(r) {
     const teile = [];
-    teile.push(r.spielende === 'punkte' ? 'bis ' + r.zielPunkte : r.runden + ' Runden');
+    teile.push(r.spielende === 'punkte' ? 'bis ' + r.zielPunkte : r.runden + (r.runden === 1 ? ' Runde' : ' Runden'));
     const modi = MODUS_TEXTE.filter(([g]) => r.modi[g]).map(([, n]) => n.replace(/ \(.*\)/, ''));
     teile.push([...new Set(modi)].join(', '));
     const extra = [];
@@ -212,6 +218,8 @@
       const a = anzeige;
       container.innerHTML = `
         ${o.tempo !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Tempo der Computer</span>${segmente('tempo', [['langsam', 'Langsam'], ['normal', 'Normal'], ['schnell', 'Schnell']], a.tempo)}</div>` : ''}
+        ${o.rechnen !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Rechentiefe</span>${segmente('rechnen', [['schnell', 'Schnell'], ['normal', 'Normal'], ['gruendlich', 'Gründlich'], ['maximal', 'Maximal']], a.rechnen)}<small class="muted klein">Wie viele mögliche Kartenverteilungen der Computer «Schwer» und der Tipp durchspielen: 40, 120, 300 oder 600 pro Zug. Mehr rechnet länger (auf dem Handy bis zu ein paar Sekunden), wird aber nur wenig stärker.</small></div>` : ''}
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenbild</span>${segmente('kartenbild', [['eigen', 'Jass-App'], ['klassisch', 'Klassisch']], a.kartenbild)}<small class="muted klein">Klassisch: echte französische Karten mit Bildfiguren (SVG-cards von David Bellot, frei unter LGPL). Die Kartenfarben unten gelten nur für «Jass-App».</small></div>
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}<small class="muted klein">Vier Farben: Kreuz grün, Ecke blau – leichter zu unterscheiden.</small></div>
         ${o.spiel !== false ? `
         ${schalter('hilfen', 'Erlaubte Karten hervorheben', 'Karten, die du nicht spielen darfst, werden abgedunkelt', a.hilfen)}
@@ -223,6 +231,7 @@
       const b = e.target.closest('button[data-r]');
       if (!b) return;
       anzeige[b.dataset.r] = b.dataset.wert;
+      if (b.dataset.r === 'kartenbild' && root.JassKarten) root.JassKarten.setzeBild(b.dataset.wert);
       zeichne();
       beiAenderung(anzeige);
     });
