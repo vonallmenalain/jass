@@ -263,6 +263,15 @@
       const bossImStich = hoehereDraussen(vorneKarte, eff, v.gespielt, v.hand) === 0;
       const sicher = letzter || (bossImStich && (fV === T || !gegnerKannStechen(v, eff)));
       const pool = verlierer.length ? verlierer : legal;
+      // Jede erlaubte Karte schlägt die des Partners: Ich muss übernehmen und
+      // mache den Stich selbst – das ist kein Schmieren. Die tiefste Karte,
+      // die reicht; liegen darüber gleichwertige Karten (im Undenufe nach der
+      // Sechs die Sieben und die Acht), die höchste davon zuerst.
+      if (sicher && !verlierer.length) {
+        const tiefste = minNach(legal, (x) => STAERKE[eff][x]);
+        const k = hoechsteGleichwertige(tiefste, v.hand, eff, v.gespielt);
+        return { karte: k, grund: k === tiefste ? GRUND_UEBERNEHMEN : GRUND_UEBERNEHMEN_GLEICH };
+      }
       if (sicher) {
         const zeichen = (x) => farbeVon(x) !== T && farbeVon(x) !== farbeVon(v.stich[0]) && hoehereDraussen(x, eff, v.gespielt, v.hand) === 0;
         const k = maxNach(pool, (x) => {
@@ -719,12 +728,16 @@
     // im Undenufe die Sechs vor der Sieben). Für die Punkte ist es gleich –
     // die Unterschiede in der Rechnung sind Zufall –, aber so weiss der
     // Partner sofort, dass der Stich sicher ist, und kann schmieren.
-    if (!runde.stich.length) {
+    // Ebenso beim Zugeben, wenn meine Karte den Stich nimmt: Ob die Sieben
+    // oder die Acht den Stich macht, ist gleich – die höchste zuerst.
+    {
       const effG = effModus(runde.code, runde.stichNr);
-      const hoch = hoechsteGleichwertige(wahl.karte, runde.haende[sitz], effG, w.gespielt);
+      const nimmt = !runde.stich.length || schlaegt(wahl.karte, runde.stich[gewinnerIndex(runde.stich, effG)], effG);
+      const hoch = nimmt ? hoechsteGleichwertige(wahl.karte, runde.haende[sitz], effG, w.gespielt) : wahl.karte;
       const x = hoch !== wahl.karte ? werte.find((y) => y.karte === hoch) : null;
       if (x && wahl.wert - x.wert <= GLEICH_SCHWELLE) {
-        return { karte: hoch, grund: hoch === mittel.karte ? mittel.grund : GRUND_GLEICHWERTIG, werte };
+        const grund = hoch === mittel.karte ? mittel.grund : runde.stich.length ? GRUND_GLEICHWERTIG_STICH : GRUND_GLEICHWERTIG;
+        return { karte: hoch, grund, werte };
       }
     }
     // Ass schmieren als Zeichen: Liegt der Partner vorne und halte ich in
@@ -766,6 +779,9 @@
   const GLEICH_SCHWELLE = 4;
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
+  const GRUND_GLEICHWERTIG_STICH = 'Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.';
+  const GRUND_UEBERNEHMEN = 'Du musst deinen Partner übernehmen und machst den Stich selbst – nimm die tiefste Karte, die reicht, und behalte die hohen für später.';
+  const GRUND_UEBERNEHMEN_GLEICH = 'Du musst deinen Partner übernehmen und machst den Stich selbst. Deine Karten sind gleichwertig – spiel die höchste zuerst.';
   const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
 
   // Verwerfen heisst: Die ausgespielte Farbe fehlt, ein Gegner liegt vorne,
@@ -1161,6 +1177,9 @@
     GRUND_ANZEIGEN,
     GRUND_ASS_SCHMIEREN,
     GRUND_GLEICHWERTIG,
+    GRUND_GLEICHWERTIG_STICH,
+    GRUND_UEBERNEHMEN,
+    GRUND_UEBERNEHMEN_GLEICH,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',

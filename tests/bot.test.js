@@ -275,3 +275,32 @@ test('Ass schmieren als Zeichen: mit Ass, König, Dame geschmiert – der Partne
   assert.equal(r.karte, 9);
   assert.match(r.grund, /angezeigt/);
 });
+
+test('Übernehmen müssen ist kein Schmieren: im Undenufe mit 7, 8, 9 (6 draussen) die 7 zuerst', () => {
+  // Aus einer Partie (Runde 3, Stich 7): Du spielst Kreuz Dame an, Ben hat
+  // nur noch Kreuz 7, 8, 9 – jede schlägt die Dame, er macht den Stich selbst.
+  const regeln = J.regelnMitStandard({ modi: { T: true, OBE: true, UNE: true, SLO: false, SLU: false, MIS: false }, weisen: false, stoeck: false, matchBonus: false, multiplikatoren: false });
+  const haende = [[0, 1, 8, 7, 24, 2, 29, 15, 18], [27, 13, 16, 25, 22, 14, 9, 28, 12], [19, 4, 33, 26, 21, 20, 30, 17, 6], [23, 11, 32, 31, 35, 10, 34, 3, 5]];
+  const zuege = [[2, 26], [3, 23], [0, 18], [1, 25], [0, 0], [1, 12], [2, 4], [3, 3], [0, 1], [1, 22], [2, 6], [3, 5], [0, 2], [1, 14], [2, 17], [3, 35],
+    [0, 7], [1, 28], [2, 30], [3, 32], [0, 8], [1, 16], [2, 33], [3, 34], [0, 24], [1, 13]];
+  const spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: 2 });
+  J.schieben(spiel); J.ansagen(spiel, 'UNE');
+  for (const [s, k] of zuege) J.spiele(spiel, s, k);
+  assert.deepEqual(spiel.runde.haende[2].slice().sort((a, b) => a - b), [19, 20, 21]);
+  const m = B.mittelZug(B.ansichtAus(spiel, 2));
+  assert.equal(m.karte, 19, 'Kreuz 7');
+  assert.doesNotMatch(m.grund, /Schmieren/);
+  assert.match(m.grund, /übernehmen/);
+  const z = B.schwerZug(spiel, 2, Object.assign({ rng: J.zufall(5) }, B.rechentiefe('schnell')));
+  assert.equal(z.karte, 19, 'Kreuz 7');
+  // Muss man übernehmen, liegen aber keine gleichwertigen Karten darüber,
+  // kommt die tiefste, die reicht: Undenufe, Partner liegt mit der Kreuz Dame
+  // vorne, ich bin Letzter mit Kreuz 7 und 9 – die 8 ist noch draussen.
+  const h2 = [[26, 20, 18, 22, 23, 25, 0, 1, 2], [24, 9, 10, 11, 12, 13, 14, 15, 16], [27, 28, 29, 30, 31, 32, 33, 34, 35], [19, 21, 3, 4, 5, 6, 7, 8, 17]];
+  const sp2 = J.neuesSpiel(J.regelnMitStandard(), { haende: h2, ersterAnsager: 0 });
+  J.ansagen(sp2, 'UNE');
+  J.spiele(sp2, 0, 26); J.spiele(sp2, 1, 24); J.spiele(sp2, 2, 27);
+  const m2 = B.mittelZug(B.ansichtAus(sp2, 3));
+  assert.equal(m2.karte, 21, 'Kreuz 9 – die 7 bleibt für später');
+  assert.match(m2.grund, /tiefste Karte, die reicht/);
+});
