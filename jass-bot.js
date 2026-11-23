@@ -706,6 +706,21 @@
     }
     const werte = legal.map((k) => ({ karte: k, wert: summe.get(k) / welten }));
     werte.sort((a, b) => b.wert - a.wert);
+    // Trumpf ziehen nach dem Schieben: Hat der Partner nach meinem Schieben
+    // eine Farbe angesagt und spiele ich den ersten Stich aus, kommt Trumpf –
+    // der Buur, wenn ich ihn habe, sonst der kleinste. Die Rechnung mit den
+    // Verteilungen unterschätzt das; gemessen bringt es dem Team im Schnitt
+    // 2,6 ± 0,8 Punkte mehr (werkzeuge/trumpf-ziehen.js, 1200 Verteilungen).
+    if (o.trumpfZiehen !== false && runde.stichNr === 0 && !runde.stich.length && runde.geschoben && runde.angesagtVon === partner(sitz)) {
+      const effT = effModus(runde.code, 0);
+      const T = trumpfVon(effT);
+      const trumpf = T >= 0 ? legal.filter((k) => farbeVon(k) === T) : [];
+      if (trumpf.length) {
+        const buur = trumpf.find((k) => wertVon(k) === WB);
+        const k = buur != null ? buur : minNach(trumpf, (x) => STAERKE[effT][x]);
+        return { karte: k, grund: GRUND_TRUMPF_NACH_SCHIEBEN, werte };
+      }
+    }
     // Bei (fast) gleichem Wert die Wahl der Faustregel nehmen.
     let wahl = werte[0];
     const m = werte.find((x) => x.karte === mittel.karte);
@@ -780,6 +795,7 @@
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
   const GRUND_GLEICHWERTIG_STICH = 'Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.';
+  const GRUND_TRUMPF_NACH_SCHIEBEN = 'Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – im ersten Stich spielst du ihm Trumpf an, damit die Gegner ihre Trümpfe hergeben müssen.';
   const GRUND_UEBERNEHMEN = 'Du musst deinen Partner übernehmen und machst den Stich selbst – nimm die tiefste Karte, die reicht, und behalte die hohen für später.';
   const GRUND_UEBERNEHMEN_GLEICH = 'Du musst deinen Partner übernehmen und machst den Stich selbst. Deine Karten sind gleichwertig – spiel die höchste zuerst.';
   const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
@@ -1180,6 +1196,7 @@
     GRUND_GLEICHWERTIG_STICH,
     GRUND_UEBERNEHMEN,
     GRUND_UEBERNEHMEN_GLEICH,
+    GRUND_TRUMPF_NACH_SCHIEBEN,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',

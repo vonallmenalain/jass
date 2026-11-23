@@ -1438,6 +1438,7 @@ window.JassStimmeDateien = {
   "Tippe unten deine 9 Karten an, nimm «Zufall» – oder fotografiere deine Hand.": "stimme/bffe0d47befe.mp3",
   "Trumpf mit dem Puur (Bauer) und mindestens drei Trümpfen – noch besser mit Nell (Neun) dazu.": "stimme/6a08dea25ee7.mp3",
   "Trumpf wählen": "stimme/a02359783333.mp3",
+  "Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – im ersten Stich spielst du ihm Trumpf an, damit die Gegner ihre Trümpfe hergeben müssen.": "stimme/c04eae8a99c2.mp3",
   "Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.": "stimme/7d6025ec0113.mp3",
   "Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.": "stimme/c65321429934.mp3",
   "Trumpf-Bauer, der Puur: 20.": "stimme/300a78c95327.mp3",

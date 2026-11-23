@@ -304,3 +304,24 @@ test('Übernehmen müssen ist kein Schmieren: im Undenufe mit 7, 8, 9 (6 drausse
   assert.equal(m2.karte, 21, 'Kreuz 9 – die 7 bleibt für später');
   assert.match(m2.grund, /tiefste Karte, die reicht/);
 });
+
+test('Trumpf ziehen nach dem Schieben: der Schieber spielt im ersten Stich Trumpf an (gemessen +2,6 Punkte)', () => {
+  // Aus einer Partie: Ben schiebt, du sagst Ecke an. Ben hat Ecke Ass, König,
+  // Acht, Sieben (ohne Buur) – er spielt den kleinsten Trumpf an.
+  const regeln = J.regelnMitStandard({ modi: { T: true, OBE: true, UNE: true, SLO: false, SLU: false, MIS: false }, weisen: false, stoeck: false, matchBonus: false, multiplikatoren: false });
+  const haende = [[21, 7, 32, 16, 3, 33, 22, 30, 10], [14, 13, 2, 12, 31, 25, 19, 8, 23], [15, 4, 18, 28, 0, 24, 29, 35, 34], [27, 17, 26, 6, 20, 9, 11, 5, 1]];
+  const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 2 });
+  J.schieben(spiel); J.ansagen(spiel, 'T3');
+  assert.equal(spiel.runde.amZug, 2);
+  const z = B.schwerZug(spiel, 2, Object.assign({ rng: J.zufall(2) }, B.rechentiefe('schnell')));
+  assert.equal(z.karte, 28, 'Ecke Sieben');
+  assert.match(z.grund, /Trumpf ziehen/);
+  assert.notEqual(B.schwerZug(spiel, 2, Object.assign({ rng: J.zufall(2), trumpfZiehen: false }, B.rechentiefe('schnell'))).grund, z.grund);
+  // Hat der Schieber den Buur, kommt der Buur.
+  const h2 = haende.map((h) => h.slice());
+  const i = h2[0].indexOf(32); const j = h2[2].indexOf(35);   // Ecke Bauer ↔ Ecke Ass tauschen
+  h2[0][i] = 35; h2[2][j] = 32;
+  const sp2 = J.neuesSpiel(regeln, { haende: h2, ersterAnsager: 2 });
+  J.schieben(sp2); J.ansagen(sp2, 'T3');
+  assert.equal(B.schwerZug(sp2, 2, Object.assign({ rng: J.zufall(2) }, B.rechentiefe('schnell'))).karte, 32, 'Ecke Bauer');
+});
