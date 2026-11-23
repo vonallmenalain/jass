@@ -36,7 +36,7 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 [hidden] { display: none !important; }
@@ -185,6 +185,9 @@ p { margin: 0; line-height: 1.45; }
   min-width: 0;
 }
 select.text-feld { appearance: auto; }
+textarea.text-feld { color: var(--text); background: rgba(0, 0, 0, 0.35); font-size: 16px; line-height: 1.45; padding: 10px 12px; resize: vertical; caret-color: var(--accent); }
+.text-feld::placeholder { color: var(--muted-2); }
+.text-feld:focus { outline: none; border-color: var(--accent); }
 select.text-feld option { color: #111; }
 
 details.abschnitt {

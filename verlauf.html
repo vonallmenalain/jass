@@ -37,7 +37,7 @@
     .stich-zeile.offen .gruende { display: flex; }
     .grund { background: rgba(0,0,0,.2); border-radius: 10px; padding: 6px 8px; }
     .grund .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
-    .notiz { background: rgba(0, 0, 0, .12); border: 1px solid rgba(0, 0, 0, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
+    .notiz { background: rgba(254, 121, 113, .1); border: 1px solid rgba(254, 121, 113, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
     .ansage-liste { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
     .marke { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(250, 204, 21, .16); color: #ff9d96; margin-right: 4px; }
     .trainer-werte { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
@@ -104,7 +104,15 @@
       $('liste').hidden = false;
       const alle = V.alle().filter((p) => filter === 'alle' || V.quelleVon(p) === filter);
       const knopf = (w, t) => `<button type="button" data-filter="${w}" class="${filter === w ? 'aktiv' : ''}">${t}</button>`;
+      const offen = V.markierungenOffen();
       $('liste').innerHTML = `
+        ${offen ? `<div class="panel stack markierungen">
+          <div class="reihe" style="justify-content:space-between"><b>🚩 ${offen} ${offen === 1 ? 'Markierung' : 'Markierungen'} zur Analyse</b></div>
+          <div class="reihe">
+            <button class="btn btn-klein" type="button" id="markierungenLaden">⬇︎ Herunterladen</button>
+            ${navigator.share ? '<button class="btn-ghost btn-klein" type="button" id="markierungenTeilen">Teilen</button>' : ''}
+          </div>
+        </div>` : ''}
         <div class="panel stack">
           <div class="segmente" id="filter">${knopf('alle', 'Alle')}${knopf('spiel', 'Gegen Computer')}${knopf('trainer', '🎯 Training')}</div>
           <label class="btn-ghost btn-klein" style="cursor:pointer;align-self:flex-start">📂 Datei öffnen<input type="file" accept=".json,application/json" id="dateiOeffnen" hidden></label>
@@ -123,6 +131,27 @@
           </button>`;
         }).join('') : `<div class="panel"><p class="muted">${filter === 'trainer' ? 'Noch keine Hand im Trumpf-Trainer oder Trumpf-Helfer ausgespielt.' : 'Noch keine Partie gespielt.'}</p></div>`}`;
       $('liste').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', () => oeffne(V.lade(b.dataset.id), true)));
+      // Alle offenen Markierungen in eine Datei – danach abgehakt, die
+      // nächste Datei beginnt neu.
+      const markierungsFile = () => {
+        const d = V.markierungsDatei();
+        return { d, f: new File([JSON.stringify(d, null, 1)], V.markierungsDateiname(), { type: 'application/json' }) };
+      };
+      const fertig = (d) => {
+        V.markiereHeruntergeladen(d);
+        toast(d.anzahl + (d.anzahl === 1 ? ' Markierung' : ' Markierungen') + ' heruntergeladen');
+        zeigeListe();
+      };
+      if ($('markierungenLaden')) $('markierungenLaden').addEventListener('click', () => {
+        const { d, f } = markierungsFile();
+        speichereDatei(f);
+        fertig(d);
+      });
+      if ($('markierungenTeilen')) $('markierungenTeilen').addEventListener('click', () => {
+        const { d, f } = markierungsFile();
+        const daten = navigator.canShare && navigator.canShare({ files: [f] }) ? { files: [f], title: f.name } : { title: f.name, text: JSON.stringify(d) };
+        navigator.share(daten).then(() => fertig(d), () => {});
+      });
       $('filter').addEventListener('click', (e) => {
         const b = e.target.closest('[data-filter]');
         if (!b) return;
@@ -238,7 +267,7 @@
         return `<div class="stich-zeile ${markiert.length ? 'markiert offen' : ''}" data-stich="${i}">
           <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${fertig ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : 'nicht fertig'}</span></div>
           <div class="stich-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}">${mini(z.k, code)}<figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
-          ${markiert.map((n) => `<div class="notiz">🚩 ${esc(n.text)}</div>`).join('')}
+          ${markiert.map((n) => `<div class="notiz">🚩 ${esc(n.text)}${n.exportiert ? ' <span class="muted klein">· heruntergeladen</span>' : ''}</div>`).join('')}
           <div class="gruende">${gruende}
             <button class="btn-ghost btn-klein" type="button" data-markieren="${i}" style="align-self:flex-start">🚩 Markieren</button></div>
         </div>`;
@@ -300,8 +329,8 @@
     function datei() {
       return new File([JSON.stringify(partie, null, 1)], V.dateiname(partie), { type: 'application/json' });
     }
-    function herunterladen() {
-      const f = datei();
+    function herunterladen() { speichereDatei(datei()); }
+    function speichereDatei(f) {
       const url = URL.createObjectURL(f);
       const a = document.createElement('a');
       a.href = url;
