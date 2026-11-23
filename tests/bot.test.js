@@ -222,8 +222,8 @@ test('Anzeigen: tief angespielt heisst stark in der Farbe – der Partner spielt
   // Ben weiss: Du hält Schaufel Ass oder König
   const info = B.ansageWissen(spiel, 2, w);
   assert.deepEqual(info.anzeigen, [{ sitz: 0, offen: [8, 7] }]);
-  // Anna hat das Ass selbst – für sie bleibt nur der König
-  assert.deepEqual(B.ansageWissen(spiel, 1, B.wissen(spiel, 1)).anzeigen, [{ sitz: 0, offen: [7] }]);
+  // Anzeigen gelten dem Partner: Anna (Gegnerin) liest sie nicht
+  assert.deepEqual(B.ansageWissen(spiel, 1, B.wissen(spiel, 1)).anzeigen, []);
   // Später am Anspielen spielt Ben die angezeigte Farbe zurück
   const v = Object.assign(B.ansichtAus(spiel, 2), { stich: [], stichSitze: [], hand: [6, 9, 33] });
   const z = B.mittelZug(v);

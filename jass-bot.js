@@ -565,8 +565,9 @@
     for (const st of r.stiche) st.karten.forEach((k, i) => gespieltVon[st.sitze[i]].push(k));
     r.stich.forEach((k, i) => gespieltVon[r.stichSitze[i]].push(k));
     const anzeigen = [];
+    // Anzeigen sind für den Partner gedacht – nur seine werden gelesen.
     for (const a of (w && w.anzeigen) || []) {
-      if (a.sitz === sitz) continue;
+      if (a.sitz !== partner(sitz)) continue;
       if (a.hoch.some((k) => gespieltVon[a.sitz].includes(k))) continue;   // hat er schon gezeigt
       const offen = a.hoch.filter((k) => !w.gespielt[k] && !r.haende[sitz].includes(k));
       if (offen.length) anzeigen.push({ sitz: a.sitz, offen });
@@ -641,7 +642,8 @@
       if (zurueck.length) {
         const kand = minNach(zurueck, (k) => STAERKE[effA][k]);
         const x = werte.find((y) => y.karte === kand);
-        if (x && werte[0].wert - x.wert <= ZURUECK_SCHWELLE) return { karte: kand, grund: GRUND_ZURUECK, werte };
+        const schwelleZ = o.zurueckSchwelle != null ? o.zurueckSchwelle : ZURUECK_SCHWELLE;
+        if (x && werte[0].wert - x.wert <= schwelleZ) return { karte: kand, grund: GRUND_ZURUECK, werte };
       }
     }
     // Verwerfen: Sieht die Rechnung kaum einen Unterschied, kommt die Karte
