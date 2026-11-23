@@ -67,6 +67,40 @@
     return hoeher.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]).slice(0, 2);
   }
 
+  // Ass schmieren als Zeichen: Wer die höchste Karte einer Nebenfarbe in
+  // den Stich seines Partners gibt, zeigt, dass er dort sehr stark ist – er
+  // hält auch die nächsten Karten (z. B. König und Dame). Gibt die zwei
+  // höchsten Karten dieser Farbe zurück, die danach noch im Spiel sind, oder
+  // null, wenn es kein solches Schmieren ist.
+  function geschmierterBock(k, eff, gespieltVorher, stich, stichSitze, sitz) {
+    if (!stich.length) return null;
+    const f = farbeVon(k);
+    if (f === farbeVon(stich[0]) || f === trumpfVon(eff) || !PUNKTE[eff][k]) return null;
+    if (team(stichSitze[gewinnerIndex(stich, eff)]) !== team(sitz)) return null;
+    const rest = [];
+    for (let w = 0; w < 9; w++) {
+      const x = f * 9 + w;
+      if (x === k || gespieltVorher[x]) continue;
+      if (STAERKE[eff][x] > STAERKE[eff][k]) return null;   // nicht die höchste
+      rest.push(x);
+    }
+    if (!rest.length) return null;
+    return rest.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]).slice(0, 2);
+  }
+  // Halte ich nach der Karte k auch die nächsten (bis zu zwei) Karten
+  // ihrer Farbe, die noch im Spiel sind? Dann bin ich dort «sehr stark».
+  function sehrStarkNach(k, hand, eff, gespielt) {
+    const f = farbeVon(k);
+    const rest = [];
+    for (let w = 0; w < 9; w++) {
+      const x = f * 9 + w;
+      if (x !== k && !gespielt[x] && STAERKE[eff][x] < STAERKE[eff][k]) rest.push(x);
+    }
+    rest.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]);
+    const naechste = rest.slice(0, 2);
+    return naechste.length > 0 && naechste.every((x) => hand.includes(x));
+  }
+
   // Die stärkste Karte einer Liste (oder null).
   const hoechste = (liste, eff) => (liste.length ? maxNach(liste, (k) => STAERKE[eff][k]) : null);
 
@@ -230,12 +264,14 @@
       const sicher = letzter || (bossImStich && (fV === T || !gegnerKannStechen(v, eff)));
       const pool = verlierer.length ? verlierer : legal;
       if (sicher) {
+        const zeichen = (x) => farbeVon(x) !== T && farbeVon(x) !== farbeVon(v.stich[0]) && hoehereDraussen(x, eff, v.gespielt, v.hand) === 0;
         const k = maxNach(pool, (x) => {
           let s = PUNKTE[eff][x];
           if (farbeVon(x) === T) s -= 12 + (STAERKE[eff][x] - 100);
-          else if (hoehereDraussen(x, eff, v.gespielt, v.hand) === 0 && farbeVon(x) !== farbeVon(v.stich[0])) s -= 6;
+          else if (zeichen(x)) s += sehrStarkNach(x, v.hand, eff, v.gespielt) ? 2 : -6; // mit Ass, König und Dame: das Ass als Zeichen
           return s;
         });
+        if (PUNKTE[eff][k] > 0 && zeichen(k) && sehrStarkNach(k, v.hand, eff, v.gespielt)) return { karte: k, grund: GRUND_ASS_SCHMIEREN };
         if (PUNKTE[eff][k] > 0) return { karte: k, grund: 'Schmieren: Dein Partner macht diesen Stich sicher – gib ihm Punkte mit.' };
         return { karte: k, grund: 'Dein Partner macht den Stich – du hast keine Punkte zum Schmieren, also gibst du eine tiefe Karte.' };
       }
@@ -276,6 +312,7 @@
     return { karte: k, grund: farbeVon(k) === farbeVon(v.stich[0]) ? GRUND_ZUGEBEN : GRUND_VERWERFEN };
   }
 
+  const GRUND_ASS_SCHMIEREN = 'Schmieren mit Zeichen: Gib die höchste Karte dieser Farbe – so weiss dein Partner, dass du dort sehr stark bist, und spielt sie dir später zurück.';
   const GRUND_ZURUECK = 'Dein Partner hat diese Farbe angezeigt: Er ist dort stark. Spiel sie ihm zurück.';
   const GRUND_ANZEIGEN = 'Anzeigen: Spiel eine tiefe Karte der Farbe, in der du stark bist – so weiss dein Partner, was er dir zurückspielen soll.';
   const GRUND_ZUGEBEN = 'Du kannst den Stich nicht billig machen – gib die Karte, die am wenigsten wert ist.';
@@ -336,6 +373,11 @@
       const led = farbeVon(s.stich[0]);
       const f = farbeVon(k);
       const T = trumpfVon(eff);
+      if (f !== led && f !== T && PUNKTE[eff][k] && team(s.stichSitze[gewinnerIndex(s.stich, eff)]) === team(sitz)) {
+        let hoechste = true;
+        for (let w = 0; w < 9 && hoechste; w++) { const x = f * 9 + w; if (x !== k && !s.gespielt[x] && STAERKE[eff][x] > STAERKE[eff][k]) hoechste = false; }
+        if (hoechste) s.angezeigt[sitz] |= bit(f);
+      }
       if (f !== led) {
         if (led === T) s.leer[sitz] |= bit(T);
         else if (f !== T) s.leer[sitz] |= bit(led);
@@ -453,6 +495,13 @@
           if (hoch && !(angezeigt[partner(s)] & bit(farbeVon(k)))) {
             angezeigt[s] |= bit(farbeVon(k));
             anzeigen.push({ sitz: s, farbe: farbeVon(k), hoch });
+          }
+        } else {
+          const s = st.sitze[i];
+          const hoch = geschmierterBock(k, eff, gespielt, st.karten.slice(0, i), st.sitze.slice(0, i), s);
+          if (hoch) {
+            angezeigt[s] |= bit(farbeVon(k));
+            anzeigen.push({ sitz: s, farbe: farbeVon(k), hoch, geschmiert: true });
           }
         }
         gespielt[k] = 1;
@@ -678,6 +727,19 @@
         return { karte: hoch, grund: hoch === mittel.karte ? mittel.grund : GRUND_GLEICHWERTIG, werte };
       }
     }
+    // Ass schmieren als Zeichen: Liegt der Partner vorne und halte ich in
+    // einer anderen Farbe die höchste Karte samt den nächsten (Ass, König,
+    // Dame), gebe ich bei Gleichstand das Ass – der Partner liest daraus,
+    // dass er mir diese Farbe zurückspielen kann.
+    if (runde.stich.length) {
+      const effS = effModus(runde.code, runde.stichNr);
+      const kand = legal.filter((k) => geschmierterBock(k, effS, w.gespielt, runde.stich, runde.stichSitze, sitz) && sehrStarkNach(k, runde.haende[sitz], effS, w.gespielt));
+      if (kand.length) {
+        const k = maxNach(kand, (x) => PUNKTE[effS][x]);
+        const x = werte.find((y) => y.karte === k);
+        if (x && werte[0].wert - x.wert <= SCHMIER_SCHWELLE) return { karte: k, grund: GRUND_ASS_SCHMIEREN, werte };
+      }
+    }
     // Verwerfen: Sieht die Rechnung kaum einen Unterschied, kommt die Karte
     // aus der schwächsten Farbe – so kann der Partner daraus lesen, wo man
     // nichts hat. Gemessen kostet das nichts (werkzeuge/verwerfen.js).
@@ -702,6 +764,7 @@
   const VERWERF_SCHWELLE = 2;
   const ZURUECK_SCHWELLE = 2;
   const GLEICH_SCHWELLE = 4;
+  const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
   const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
 
@@ -1096,6 +1159,7 @@
     GRUND_VERWERFEN,
     GRUND_ZURUECK,
     GRUND_ANZEIGEN,
+    GRUND_ASS_SCHMIEREN,
     GRUND_GLEICHWERTIG,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
