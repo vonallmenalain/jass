@@ -200,3 +200,33 @@ test('Ansage-Wissen: Welten passen zu Ansage und Schieben', () => {
   assert.equal(B.passtZurAnsage(stark, regeln, 'T2', true), true);
   assert.equal(B.passtZurAnsage(schwach, regeln, 'T2', true), false);
 });
+
+test('Anzeigen: tief angespielt heisst stark in der Farbe – der Partner spielt sie zurück', () => {
+  const regeln = J.regelnMitStandard();
+  const haende = [
+    [23, 17, 3, 24, 4, 0, 31, 13, 16],
+    [14, 27, 8, 28, 20, 29, 2, 26, 1],
+    [18, 25, 34, 15, 6, 33, 22, 21, 9],
+    [10, 35, 32, 19, 5, 12, 30, 7, 11],
+  ];
+  const spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: 2 });
+  J.schieben(spiel);
+  J.ansagen(spiel, 'T2');
+  // Stich 1: Ben Kreuz Sechs, Clara Kreuz Sieben, Du Buur, Anna Kreuz Acht
+  for (const [s, k] of [[2, 18], [3, 19], [0, 23], [1, 20]]) J.spiele(spiel, s, k);
+  // Du spielt die Schaufel Sechs an: Anzeige in Schaufel
+  J.spiele(spiel, 0, 0);
+  const w = B.wissen(spiel, 2);
+  assert.ok(w.angezeigt[0] & 1, 'Schaufel ist angezeigt');
+  assert.deepEqual(w.anzeigen, [{ sitz: 0, farbe: 0, hoch: [8, 7] }], 'Ass oder König');
+  // Ben weiss: Du hält Schaufel Ass oder König
+  const info = B.ansageWissen(spiel, 2, w);
+  assert.deepEqual(info.anzeigen, [{ sitz: 0, offen: [8, 7] }]);
+  // Anna hat das Ass selbst – für sie bleibt nur der König
+  assert.deepEqual(B.ansageWissen(spiel, 1, B.wissen(spiel, 1)).anzeigen, [{ sitz: 0, offen: [7] }]);
+  // Später am Anspielen spielt Ben die angezeigte Farbe zurück
+  const v = Object.assign(B.ansichtAus(spiel, 2), { stich: [], stichSitze: [], hand: [6, 9, 33] });
+  const z = B.mittelZug(v);
+  assert.equal(z.karte, 6);
+  assert.match(z.grund, /angezeigt/);
+});
