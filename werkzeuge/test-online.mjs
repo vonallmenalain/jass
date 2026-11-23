@@ -111,9 +111,10 @@ while (Date.now() - start < 240000) {
       const erlaubt = s.locator('[data-rolle="hand"] .karte:not(.gesperrt)');
       const n = await erlaubt.count();
       if (n) {
-        await erlaubt.nth(Math.floor(Math.random() * n)).click({ force: true }).catch(() => {});
+        // Auf den sichtbaren Rand tippen: Die Karten überlappen sich.
+        await erlaubt.nth(Math.floor(Math.random() * n)).click({ force: true, position: { x: 8, y: 30 } }).catch(() => {});
         const gew = s.locator('[data-rolle="hand"] .karte.gewaehlt');
-        if (await gew.count()) await gew.click({ force: true }).catch(() => {});
+        if (await gew.count()) await gew.click({ force: true, position: { x: 8, y: 30 } }).catch(() => {});
         karten++;
         etwas = true;
         if (g === mia && bilder === 0 && karten > 6) { await s.waitForTimeout(200); await s.screenshot({ path: path.join(BILDER, '2-tisch-mia.png') }); bilder++; }

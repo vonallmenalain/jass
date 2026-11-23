@@ -393,7 +393,7 @@
         else if (f !== T) leer[s] |= bit(led);
       });
     }
-    // Wurde der Puur inzwischen gespielt, ist die Ausnahme hinfällig.
+    // Wurde der Buur inzwischen gespielt, ist die Ausnahme hinfällig.
     if (T0 >= 0 && gespielt[J.karte(T0, WB)]) for (let s = 0; s < 4; s++) puurOffen[s] = false;
     const bekannt = [[], [], [], []];
     if (runde.weis && runde.weis.siegerTeam >= 0 && runde.stichNr >= 1) {
@@ -473,6 +473,10 @@
     const ansicht = ansichtAus(spiel, sitz);
     const mittel = mittelZug(ansicht);
     if (legal.length === 1) return { karte: legal[0], grund: mittel.grund, werte: null };
+    if (o.puurZuerst !== false) {
+      const puur = puurZiehen(spiel, sitz, legal);
+      if (puur != null) return { karte: puur, grund: 'Trumpf ziehen: Mit dem Buur zuerst – er macht den Stich sicher, und wer das Nell allein hat, muss es hergeben.', werte: null };
+    }
     const w = wissen(spiel, sitz);
     const rng = o.rng || J.zufall(J.neuerSeed());
     const restKarten = runde.haende.reduce((n, h) => n + h.length, 0);
@@ -517,6 +521,23 @@
       simSpiele(s, k);
       return { karte: k, wert: exakt(s, team(sitz), -Infinity, Infinity) };
     }).sort((a, b) => b.wert - a.wert);
+  }
+
+  // «Buur zuerst»: Wer selbst (oder dessen Partner) Trumpf gemacht hat, den
+  // Buur hält und ausspielt, zieht mit ihm an, solange die Gegner noch
+  // Trümpfe haben könnten.
+  function puurZiehen(spiel, sitz, legal) {
+    const runde = spiel.runde;
+    if (runde.stich.length || runde.angesagtVon < 0 || team(runde.angesagtVon) !== team(sitz)) return null;
+    const T = trumpfVon(effModus(runde.code, runde.stichNr));
+    if (T < 0) return null;
+    const puur = J.karte(T, WB);
+    if (!legal.includes(puur)) return null;
+    const w = wissen(spiel, sitz);
+    let draussen = 0;
+    for (let x = T * 9; x < T * 9 + 9; x++) if (!w.gespielt[x] && !runde.haende[sitz].includes(x)) draussen++;
+    const gegnerKoennen = [1, 3].some((i) => !(w.leer[(sitz + i) % 4] & bit(T)));
+    return draussen > 0 && gegnerKoennen ? puur : null;
   }
 
   function ansichtAus(spiel, sitz) {
@@ -723,12 +744,12 @@
   const ZAHL_KLEIN_SECHSER = ['keiner', 'einer', 'zwei', 'drei', 'vier']; // der Sechser
   const TRUMPF_URTEIL = {
     sehrStark: 'Das ist ein sehr starker Trumpf.',
-    stark: 'Puur und viele Trümpfe – stark.',
-    gut: 'Mit dem Puur und drei Trümpfen kann man gut ansagen.',
-    viele: 'Viele Trümpfe – auch ohne Puur ordentlich.',
+    stark: 'Buur und viele Trümpfe – stark.',
+    gut: 'Mit dem Buur und drei Trümpfen kann man gut ansagen.',
+    viele: 'Viele Trümpfe – auch ohne Buur ordentlich.',
     wenige: 'Zu wenige Trümpfe.',
-    gefaehrlich: 'Ohne Puur und Nell ist ein Trumpf gefährlich – die Gegner stechen dich.',
-    nell: 'Ohne den Puur kann dir der Gegner das Nell wegstechen.',
+    gefaehrlich: 'Ohne Buur und Nell ist ein Trumpf gefährlich – die Gegner stechen dich.',
+    nell: 'Ohne den Buur kann dir der Gegner das Nell wegstechen.',
   };
   const SATZ_SCHIEBEN = 'Schieben lohnt sich, wenn keine Ansage richtig stark ist – dann wählt dein Partner mit seinen Karten.';
   const SATZ_MISERE = 'Für Misère braucht man viele tiefe Karten und wenige Asse.';
@@ -737,7 +758,7 @@
   function trumpfSatz(n, puur, nell, ass) {
     let satz = n === 0 ? 'Kein Trumpf' : n === 1 ? 'Ein Trumpf' : ZAHL[n] + ' Trümpfe';
     const mit = [];
-    if (puur) mit.push('Puur');
+    if (puur) mit.push('Buur');
     if (nell) mit.push('Nell');
     if (ass) mit.push('Trumpf-Ass');
     if (mit.length) satz += ' mit ' + (mit.length === 1 ? mit[0] : mit.slice(0, -1).join(', ') + ' und ' + mit[mit.length - 1]);
@@ -814,11 +835,15 @@
     if (f === T && w === W9) return 'Spiel das Nell.';
     return 'Spiel ' + ARTIKEL[w] + ' ' + J.FARBEN[f].name + ' ' + J.WERT_NAMEN[w] + '.';
   }
+  // Geschrieben heisst er «Buur», die Stimme sagt «Puur» – so sind die
+  // Aufnahmen gemacht, und so klingt es richtig.
+  const sprechform = (satz) => satz.replace(/\bBuur\b/g, 'Puur');
+
   function sprechGrund(grund) {
     if (/^Du bist der Letzte: Mit einem Trumpf holst du dir \d+ Punkte\.$/.test(grund)) return 'Du bist der Letzte: Mit einem Trumpf holst du dir die Punkte im Stich.';
     if (/^Im Stich liegen \d+ Punkte – das lohnt sich zu stechen\.$/.test(grund)) return 'Im Stich liegen genug Punkte – das lohnt sich zu stechen.';
     if (/^Ich habe \d+ mögliche Kartenverteilungen durchgespielt:/.test(grund)) return 'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
-    return grund;
+    return sprechform(grund);
   }
   const MODUS_TIPP = {
     T0: 'Mein Tipp: Schaufel Trumpf.', T1: 'Mein Tipp: Herz Trumpf.', T2: 'Mein Tipp: Kreuz Trumpf.', T3: 'Mein Tipp: Ecke Trumpf.',
@@ -832,7 +857,7 @@
     return 'Im Schnitt etwa ' + n + ' Punkte für euch.';
   }
   function sprechAnsage(hand, code, punkte, mitMultiplikator) {
-    return [MODUS_TIPP[code], sprechSchnitt(punkte, mitMultiplikator)].concat(faustregelTeile(hand, code));
+    return [MODUS_TIPP[code], sprechSchnitt(punkte, mitMultiplikator)].concat(faustregelTeile(hand, code).map(sprechform));
   }
 
   // Alle Sätze, die die Stimme je sagen kann – zum Vertonen
@@ -862,9 +887,12 @@
     'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.',
     'Misère: Du musst überstechen – mit der kleinstmöglichen Karte.',
     'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.',
+    'Trumpf ziehen: Mit dem Buur zuerst – er macht den Stich sicher, und wer das Nell allein hat, muss es hergeben.',
   ];
   function alleSprechTeile() {
-    const s = new Set(GRUENDE);
+    const s = new Set(GRUENDE.map(sprechform));
+    const add = s.add.bind(s);
+    s.add = (x) => add(sprechform(x));
     for (let k = 0; k < 36; k++) {
       s.add(sprechKarte(k, null));
       s.add(sprechKarte(k, 'T' + farbeVon(k)));
@@ -939,7 +967,7 @@
   const api = {
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
-    sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile,
+    sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
     simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

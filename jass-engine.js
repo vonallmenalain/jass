@@ -73,7 +73,7 @@
     faktoren: { T0: 2, T1: 1, T2: 2, T3: 1, OBE: 3, UNE: 3, SLO: 4, SLU: 4, MIS: 1 },
     // false: Untertrumpfen verboten (ausser man hat nur noch Trumpf).
     untertrumpfen: false,
-    // true: Den Trumpf-Bauer (Puur) muss man nie angeben.
+    // true: Den Trumpf-Bauer (Buur) muss man nie angeben.
     puurFrei: true,
     // Wer in der ersten Runde ansagt: 'ecke7' (wer die Ecken-7 hat),
     // 'zufall' oder 'sitz0' (immer der Spieler unten).
@@ -549,7 +549,7 @@
     const f = farbeVon(k);
     const w = wertVon(k);
     const T = code && MODI[code] ? MODI[code].trumpf : -1;
-    if (T === f && w === WB) return 'Puur (' + FARBEN[f].name + ' Bauer)';
+    if (T === f && w === WB) return 'Buur (' + FARBEN[f].name + ' Bauer)';
     if (T === f && w === W9) return 'Nell (' + FARBEN[f].name + ' Neun)';
     return FARBEN[f].name + ' ' + WERT_NAMEN[w];
   }

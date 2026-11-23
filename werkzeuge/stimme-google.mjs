@@ -51,7 +51,7 @@ const GRENZE_MONAT = 100000;
 
 // Schreibweisen nur für die Stimme – was Google sonst falsch betont.
 const AUSSPRACHE = [
-  [/\bPuur\b/g, 'Puur'],
+  [/\bBuur\b/g, 'Puur'], // geschrieben Buur, gesprochen Puur
 ];
 
 const [befehl, ...rest] = process.argv.slice(2);
