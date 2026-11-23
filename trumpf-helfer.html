@@ -25,6 +25,10 @@
     .meine-hand .karte-svg { width: 100%; display: block; }
     .foto { width: 100%; max-height: 320px; object-fit: contain; border-radius: 14px; background: #000; }
     .ergebnis-liste { display: flex; flex-direction: column; gap: 6px; }
+    .vergleich { border-radius: 16px; padding: 12px 14px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .35); display: flex; flex-direction: column; gap: 6px; }
+    .vergleich.unter { background: rgba(248, 113, 113, .08); border-color: rgba(248, 113, 113, .4); }
+    .vergleich .gross { font-size: 18px; font-weight: 800; }
+    .vergleich .gross b { color: #fde68a; }
     .ergebnis-zeile { display: grid; grid-template-columns: 128px 1fr 48px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; font-size: 14px; }
     .ergebnis-zeile.beste { background: rgba(74, 222, 128, .1); }
     .ergebnis-zeile .name { font-weight: 800; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
@@ -52,6 +56,7 @@
       <div class="reihe" style="justify-content:space-between">
         <h2 id="zaehler">Deine Karten: 0 von 9</h2>
         <div class="reihe">
+          <button class="btn-ghost btn-klein" type="button" id="zufall">🎲 Zufall</button>
           <label class="btn-ghost btn-klein" style="cursor:pointer">📷 Foto<input type="file" accept="image/*" capture="environment" id="kamera" hidden></label>
           <button class="btn-ghost btn-klein" type="button" id="leeren">Leeren</button>
         </div>
@@ -100,6 +105,20 @@
     let lage = gemerkt.lage === 'geschoben' ? 'geschoben' : 'vorhand';
     let rechnung = 0;
     const merke = () => E.schreibe(KEY, { hand, lage });
+    // Die zuletzt errechnete Liste – beim Zurückkommen vom Ausspielen nicht
+    // neu rechnen, damit der Vergleich zum selben Schnitt passt.
+    const gleicheHand = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.slice().sort().join() === b.slice().sort().join();
+    let gemerkteListe = gleicheHand(gemerkt.hand, hand) && Array.isArray(gemerkt.werte) && gemerkt.lage === lage
+      ? gemerkt.werte.map((w) => ({ code: w.c, punkte: w.p, n: gemerkt.n })) : null;
+
+    // Zurück vom Ausspielen: was herauskam, für den Vergleich.
+    let ausgespielt = null;
+    if (new URLSearchParams(location.search).has('ausgespielt')) {
+      const e = E.lese('jass-helfer-ergebnis');
+      try { localStorage.removeItem('jass-helfer-ergebnis'); } catch (x) { /* egal */ }
+      history.replaceState(null, '', location.pathname);
+      if (e && gleicheHand(e.hand, hand)) ausgespielt = e;
+    }
 
     // Reihen der Auswahl: Farben abwechselnd schwarz/rot, Ass links.
     function zeichneAuswahl() {
@@ -122,6 +141,13 @@
     function alles() {
       zeichneHand();
       zeichneAuswahl();
+      if (hand.length === 9 && gemerkteListe) {
+        rechnung++;
+        zeigeErgebnis(gemerkteListe);
+        gemerkteListe = null;
+        return;
+      }
+      ausgespielt = null;
       merke();
       if (hand.length === 9) rechne(); else { rechnung++; $('ergebnis').hidden = true; }
     }
@@ -140,6 +166,12 @@
       alles();
     });
     $('leeren').addEventListener('click', () => { hand = []; alles(); });
+    // Neun zufällige Karten – und gleich ausrechnen, was man ansagen sollte.
+    $('zufall').addEventListener('click', () => {
+      hand = J.mische(Array.from({ length: 36 }, (_, k) => k), Math.random).slice(0, 9);
+      alles();
+      $('ergebnis').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     $('lage').addEventListener('click', (e) => {
       const b = e.target.closest('[data-lage]');
       if (!b) return;
@@ -177,13 +209,40 @@
       setTimeout(schritt, 20);
     }
 
+    // Was beim Ausspielen herauskam, neben dem errechneten Schnitt.
+    function vergleichHtml(liste) {
+      const e = ausgespielt;
+      if (!e) return '';
+      const name = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
+      const ichSchob = e.geschoben && e.vorhand === 0;
+      const eintrag = liste.find((x) => x.code === (ichSchob ? 'SCHIEBEN' : e.code));
+      const erwartet = eintrag ? eintrag.punkte : null;
+      const diff = erwartet == null ? 0 : e.punkte - erwartet;
+      let satz = '';
+      if (erwartet != null) {
+        if (diff >= 10) satz = Math.round(diff) + ' Punkte über dem Schnitt – stark gespielt, oder die anderen Karten lagen gut für euch.';
+        else if (diff <= -10) satz = Math.round(-diff) + ' Punkte unter dem Schnitt – die Karten der anderen lagen gegen euch, oder es gab bessere Züge.';
+        else satz = 'Ziemlich genau im Schnitt.';
+      }
+      const wie = ichSchob ? 'Du hast geschoben, angesagt wurde <b>' + name(e.code) + '</b>' : 'Angesagt: <b>' + name(e.code) + '</b>';
+      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}">
+        <h3>Ausgespielt</h3>
+        <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
+        <p class="muted">${wie}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
+        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=helfer" style="align-self:flex-start">📜 Gespielte Runde ansehen – Zug für Zug</a>` : ''}
+      </div>`;
+    }
+
     function zeigeErgebnis(liste) {
+      E.schreibe(KEY, { hand, lage, werte: liste.map((x) => ({ c: x.code, p: Math.round(x.punkte * 10) / 10 })), n: liste[0].n });
       const beste = liste[0];
       const max = Math.max(...liste.map((x) => x.punkte));
       const min = Math.min(0, ...liste.map((x) => x.punkte));
       const name = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
       const heuristik = B.heuristikAnsage(hand, regeln, lage !== 'geschoben' && regeln.schieben);
+      $('ergebnis').hidden = false;
       $('ergebnis').innerHTML = `
+        ${vergleichHtml(liste)}
         <span class="muted klein" style="text-align:center">Mein Vorschlag</span>
         <div class="empfehlung">${modusHtml(beste.code)}</div>
         <p class="muted" style="text-align:center">${esc(B.faustregel(hand, beste.code))}</p>
@@ -192,7 +251,8 @@
           <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
           <span class="wert">${Math.round(x.punkte)}</span></div>`).join('')}</div>
         <p class="muted klein">Ø Punkte für euer Team${regeln.multiplikatoren ? ' (mit Multiplikator)' : ''}, aus ${liste[0].n} durchgespielten Verteilungen. ${heuristik.code !== beste.code ? 'Die schnelle Faustregel hätte ' + esc(name(heuristik.code)) + ' gesagt – knapp, beides ist vertretbar.' : ''}</p>
-        <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&geschoben=1' : ''}">Mit diesen Karten gegen den Computer spielen</a>`;
+        <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&amp;geschoben=1' : ''}&amp;trainer=1&amp;zurueck=helfer">${ausgespielt ? 'Nochmals eine Runde' : 'Mit diesen Karten eine Runde'} gegen den Computer spielen</a>
+        <p class="muted klein">Gespielt wird genau eine Runde – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert.</p>`;
     }
 
     // Foto: vorbereitet für die Erkennung. Bis sie eingeschaltet ist, dient

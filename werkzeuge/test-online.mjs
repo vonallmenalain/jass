@@ -67,7 +67,7 @@ await papa.seite.goto(BASIS + '?emulator=1&warte=2500');
 await papa.seite.click('#neuBtn');
 await papa.seite.selectOption('[data-neu-sitz="2"]', 'mensch');
 await papa.seite.selectOption('[data-neu-sitz="1"]', 'mensch');
-await papa.seite.selectOption('[data-neu-sitz="3"]', 'mittel');
+await papa.seite.selectOption('[data-neu-sitz="3"]', 'schwer');
 await papa.seite.click('#eroeffnenBtn');
 await papa.seite.waitForSelector('.code-gross');
 const code = (await papa.seite.textContent('.code-gross')).trim();

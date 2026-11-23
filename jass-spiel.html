@@ -41,7 +41,7 @@
 
     <div class="panel stack">
       <h2>Spieler</h2>
-      <p class="muted klein">Du spielst mit dem Computer gegenüber im Team. Jeder Computer hat seine eigene Stärke.</p>
+      <p class="muted klein">Du spielst mit dem Computer gegenüber im Team. Alle Computer spielen so stark sie können: Vor jedem Zug spielen sie viele mögliche Kartenverteilungen durch und nehmen, was im Schnitt am meisten bringt (wie viele, steht unter «Anzeige &amp; Hilfen» bei der Rechentiefe).</p>
       <div class="sitze" id="sitze"></div>
       <label class="schalter"><span class="text"><span>💡 Tipps anbieten</span><small>Der Tipp-Knopf schlägt dir Karte und Ansage vor und sagt warum – mit 🔊 auch zum Anhören</small></span><input type="checkbox" id="tippsSchalter"></label>
     </div>
@@ -89,11 +89,10 @@
     const LAGE = ['Unten', 'Rechts', 'Gegenüber', 'Links'];
     const STANDARD_SPIELER = [
       { name: 'Du', typ: 'mensch' },
-      { name: 'Anna', typ: 'mittel' },
-      { name: 'Ben', typ: 'mittel' },
-      { name: 'Clara', typ: 'mittel' },
+      { name: 'Anna', typ: 'schwer' },
+      { name: 'Ben', typ: 'schwer' },
+      { name: 'Clara', typ: 'schwer' },
     ];
-    const STUFEN = [['leicht', '🤖 Leicht'], ['mittel', '🤖 Mittel'], ['schwer', '🤖 Schwer']];
     const TEMPO = {
       langsam: { denken: 1150, stich: 1700 },
       normal: { denken: 650, stich: 1100 },
@@ -101,12 +100,13 @@
     };
     const $ = (id) => document.getElementById(id);
 
-    // Nur du spielst als Mensch (Sitz 0), die anderen drei sind Computer.
+    // Nur du spielst als Mensch (Sitz 0), die anderen drei sind Computer –
+    // immer die stärksten («schwer»), auch wenn früher eine andere Stufe
+    // gespeichert wurde.
     function bereinige(liste) {
       return [0, 1, 2, 3].map((s) => {
         const x = Object.assign({}, STANDARD_SPIELER[s], (liste || [])[s] || {});
-        if (s === 0) x.typ = 'mensch';
-        else if (!['leicht', 'mittel', 'schwer'].includes(x.typ)) x.typ = 'mittel';
+        x.typ = s === 0 ? 'mensch' : 'schwer';
         x.name = String(x.name || STANDARD_SPIELER[s].name).slice(0, 16);
         return x;
       });
@@ -119,6 +119,11 @@
 
     // Aus dem Trumpf-Trainer: genau eine Runde, danach zurück dorthin.
     const trainerModus = new URLSearchParams(location.search).get('trainer') === '1';
+    // Woher die Hand kam: Trumpf-Trainer (Standard) oder Trumpf-Helfer.
+    const vomHelfer = trainerModus && new URLSearchParams(location.search).get('zurueck') === 'helfer';
+    const ZIEL = vomHelfer
+      ? { text: 'Zurück zum Trumpf-Helfer', ergebnis: 'jass-helfer-ergebnis', fertig: 'trumpf-helfer.html?ausgespielt=1', abbruch: 'trumpf-helfer.html' }
+      : { text: 'Zurück zum Trainer', ergebnis: 'jass-trainer-ergebnis', fertig: 'trumpf-trainer.html?ausgespielt=1', abbruch: 'trumpf-trainer.html?zurueck=1' };
     let spiel = null;
     let partie = null;        // die Aufzeichnung (jass-verlauf.js)
     let letzterTipp = null;   // welche Karte der Tipp zuletzt vorschlug
@@ -144,9 +149,7 @@
         const sp = spieler[s];
         const team = s % 2 === 0 ? 'team-a' : 'team-b';
         const text = s === 0 ? 'Team A · das bist du' : s === 2 ? 'Team A · dein Partner' : 'Team B · Gegner';
-        const auswahl = s === 0
-          ? '<div class="text-feld" style="display:flex;align-items:center">👤 Mensch</div>'
-          : `<select class="text-feld" data-sitz="${s}" data-feld="typ" aria-label="Stärke ${LAGE[s]}">${STUFEN.map(([w, t]) => `<option value="${w}" ${sp.typ === w ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+        const auswahl = `<div class="text-feld" style="display:flex;align-items:center">${s === 0 ? '👤 Mensch' : '🤖 Computer'}</div>`;
         return `<div class="sitz-zeile">
           <div class="lage ${team}">${LAGE[s]}<small>${text}</small></div>
           <div class="felder">
@@ -161,7 +164,8 @@
       const el = e.target;
       if (!el.dataset.sitz) return;
       const s = Number(el.dataset.sitz);
-      spieler[s][el.dataset.feld] = el.dataset.feld === 'name' ? (el.value.trim() || STANDARD_SPIELER[s].name) : el.value;
+      if (el.dataset.feld !== 'name') return;
+      spieler[s].name = el.value.trim() || STANDARD_SPIELER[s].name;
       E.schreibe(KEY_SPIELER, spieler);
     });
 
@@ -194,7 +198,7 @@
       if (!g) return;
       spiel = g.spiel;
       spieler = bereinige(g.spieler);
-      partie = (g.partieId && V.lade(g.partieId)) || V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
+      partie = (g.partieId && V.lade(g.partieId)) || V.neu(spiel, spieler, { rechnen: anzeige.rechnen, welten: B.rechentiefe(anzeige.rechnen).welten });
       starteTisch();
     });
     $('verwerfenBtn').addEventListener('click', () => {
@@ -203,7 +207,7 @@
     });
     $('startBtn').addEventListener('click', () => {
       spiel = J.neuesSpiel(regeln);
-      partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
+      partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen, welten: B.rechentiefe(anzeige.rechnen).welten });
       speichere();
       starteTisch();
     });
@@ -284,7 +288,7 @@
             const w = B.waehleAnsage(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
             wahl = w.code;
             V.ansage(partie, r, s, wahl, { stufe: spieler[s].typ, grund: w.grund, liste: w.liste });
-            if (anzeige.erklaeren && wahl !== 'SCHIEBEN' && spieler[s].typ !== 'leicht') tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(B.faustregel(r.haende[s], wahl)));
+            if (anzeige.erklaeren && wahl !== 'SCHIEBEN') tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(B.faustregel(r.haende[s], wahl)));
             else tisch.kommentar('');
           }
           if (!lebt()) return;
@@ -313,7 +317,7 @@
           const zug = B.waehleKarte(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
           karte = zug.karte;
           V.karte(partie, r, s, karte, { stufe: spieler[s].typ, grund: zug.grund, werte: zug.werte });
-          if (anzeige.erklaeren && spieler[s].typ !== 'leicht') tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(zug.grund));
+          if (anzeige.erklaeren) tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(zug.grund));
         }
         const vorher = r.stoeckGemeldet;
         const erg = J.spiele(spiel, s, karte);
@@ -337,7 +341,7 @@
       const letzte = re.spielende === 'runden' ? spiel.runden.length + 1 >= re.runden : J.zielErreichtVon(spiel.summe, spiel.runde, ab, re) >= 0;
       const neu = [spiel.summe[0] + ab.total[0], spiel.summe[1] + ab.total[1]];
       return new Promise((res) => {
-        const box = tisch.oeffneDialog(tisch.rundenendeHtml(ab, neu) + `<button class="btn btn-voll" type="button" id="rundeWeiter">${trainerModus ? 'Zurück zum Trainer' : letzte ? 'Zum Resultat' : 'Nächste Runde'}</button>`, false);
+        const box = tisch.oeffneDialog(tisch.rundenendeHtml(ab, neu) + `<button class="btn btn-voll" type="button" id="rundeWeiter">${trainerModus ? ZIEL.text : letzte ? 'Zum Resultat' : 'Nächste Runde'}</button>`, false);
         box.querySelector('#rundeWeiter').addEventListener('click', () => { tisch.schliesseDialog(); res(); });
       });
     }
@@ -351,8 +355,8 @@
         hand: r.startHaende[0].slice(), code: ab.code, geschoben: ab.geschoben, vorhand: ab.ansager,
         angesagtVon: ab.angesagtVon, punkte: spiel.summe[0], gegner: spiel.summe[1], partieId: partie && partie.id,
       };
-      E.schreibe('jass-trainer-ergebnis', ergebnis);
-      location.href = 'trumpf-trainer.html?ausgespielt=1';
+      E.schreibe(ZIEL.ergebnis, ergebnis);
+      location.href = ZIEL.fertig;
     }
 
     function zeigeSpielende() {
@@ -367,7 +371,7 @@
       box.querySelector('#nochmals').addEventListener('click', () => {
         tisch.schliesseDialog();
         spiel = J.neuesSpiel(spiel.regeln);
-        partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
+        partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen, welten: B.rechentiefe(anzeige.rechnen).welten });
         speichere();
         starteTisch();
       });
@@ -386,7 +390,7 @@
       box.querySelector('#markieren').addEventListener('click', zeigeMarkieren);
       E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); });
       box.querySelector('#abbrechen').addEventListener('click', () => {
-        if (trainerModus) { location.href = 'trumpf-trainer.html?zurueck=1'; return; }
+        if (trainerModus) { location.href = ZIEL.abbruch; return; }
         zurEinrichtung();
       });
     }
@@ -414,6 +418,30 @@
       });
     }
 
+    // Was der Trumpf-Trainer (oder der Trumpf-Helfer) zu dieser Hand
+    // errechnet hatte – kommt mit in die Aufzeichnung, damit man es im
+    // Verlauf neben dem Spiel sieht.
+    function trainerInfo(hand, geschoben) {
+      const gleicheHand = (x) => Array.isArray(x) && x.length === 9 && x.slice().sort().join() === hand.slice().sort().join();
+      if (vomHelfer) {
+        const h = E.lese('jass-lernen-helfer-v1');
+        const info = { art: 'helfer', geschoben: !!geschoben };
+        if (h && gleicheHand(h.hand) && Array.isArray(h.werte)) { info.werte = h.werte; info.n = h.n; }
+        return info;
+      }
+      const serie = E.lese('jass-trainer-serie');
+      const h = serie && serie.haende && serie.haende[serie.nr];
+      const gleich = h && h.hand && h.hand.length === 9 && h.hand.slice().sort().join() === hand.slice().sort().join();
+      const info = { geschoben: !!geschoben };
+      if (!gleich || !h.liste) return info;
+      info.nr = serie.nr + 1;
+      info.laenge = serie.laenge;
+      info.wahl = h.wahl;
+      info.n = h.liste[0] && h.liste[0].n;
+      info.werte = h.liste.map((x) => ({ c: x.code, p: Math.round(x.punkte * 10) / 10 }));
+      return info;
+    }
+
     // Direkt mit der Hand aus dem Trumpf-Trainer weiterspielen.
     const params = new URLSearchParams(location.search);
     if (params.get('hand')) {
@@ -425,12 +453,14 @@
         const mitSchieben = geschoben && regeln.schieben;
         const regelnRunde = trainerModus ? Object.assign({}, regeln, { spielende: 'runden', runden: 1 }) : regeln;
         spiel = J.neuesSpiel(regelnRunde, { haende, ersterAnsager: mitSchieben ? 2 : 0 });
-        partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
+        partie = V.neu(spiel, spieler, trainerModus
+          ? { rechnen: anzeige.rechnen, welten: B.rechentiefe(anzeige.rechnen).welten, quelle: 'trainer', trainer: trainerInfo(hand, mitSchieben) }
+          : { rechnen: anzeige.rechnen, welten: B.rechentiefe(anzeige.rechnen).welten });
         if (mitSchieben) {
           V.ansage(partie, spiel.runde, 2, 'SCHIEBEN', { stufe: spieler[2].typ, grund: 'Aus dem Trumpf-Trainer: geschoben' });
           J.schieben(spiel);
         }
-        history.replaceState(null, '', location.pathname + (trainerModus ? '?trainer=1' : ''));
+        history.replaceState(null, '', location.pathname + (trainerModus ? '?trainer=1' + (vomHelfer ? '&zurueck=helfer' : '') : ''));
         speichere();
         starteTisch();
       }

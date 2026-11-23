@@ -115,6 +115,7 @@
       </div>
       <button class="btn btn-voll" type="button" id="startBtn">Los geht's</button>
       <p class="muted klein" id="rekord"></p>
+      <a class="btn-ghost btn-voll" href="verlauf.html?quelle=trainer&amp;von=trainerstart">📜 Ausgespielte Hände ansehen</a>
     </section>
 
     <!-- Runde -->
@@ -313,7 +314,7 @@
         <h3>Ausgespielt</h3>
         <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
         <p class="muted">${wie}${anders}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
-        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}" style="align-self:flex-start">Partie im Verlauf ansehen</a>` : ''}
+        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=trainer" style="align-self:flex-start" data-verlauf>📜 Gespielte Runde ansehen – Zug für Zug</a>` : ''}
       </div>`;
     }
 
@@ -353,8 +354,12 @@
           <button class="btn" type="button" id="weiterBtn" style="flex:1">${serie.nr + 1 >= serie.laenge ? 'Zum Ergebnis' : 'Nächste Hand'}</button>
           <button class="btn-ghost" type="button" id="ausspielenBtn">${h.ausgespielt ? 'Nochmals ausspielen' : 'Ausspielen'}</button>
         </div>
-        <p class="muted klein">«Ausspielen» spielt genau diese Hand eine Runde lang gegen den Computer – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt.</p>`;
+        <p class="muted klein">«Ausspielen» spielt genau diese Hand eine Runde lang gegen den Computer – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert (📜 auf der Startseite des Trainers).</p>`;
       zeigeKopf();
+      // Vor dem Wechsel in den Verlauf die Serie merken – der Pfeil dort
+      // führt zu dieser Hand zurück.
+      const verlaufLink = a.querySelector('[data-verlauf]');
+      if (verlaufLink) verlaufLink.addEventListener('click', () => E.schreibe(KEY_SERIE, serie));
       $('weiterBtn').addEventListener('click', weiter);
       $('ausspielenBtn').addEventListener('click', () => {
         E.schreibe(KEY_SERIE, serie);
@@ -459,7 +464,10 @@
       serie = gemerkt;
       const h = aktuelle();
       const gleich = (a, b) => a && b && a.length === b.length && a.slice().sort().join() === b.slice().sort().join();
-      if (ergebnis && gleich(ergebnis.hand, h.hand)) h.ausgespielt = ergebnis;
+      if (ergebnis && gleich(ergebnis.hand, h.hand)) {
+        h.ausgespielt = ergebnis;
+        E.schreibe(KEY_SERIE, serie);
+      }
       $('start').hidden = true;
       $('fertig').hidden = true;
       $('runde').hidden = false;

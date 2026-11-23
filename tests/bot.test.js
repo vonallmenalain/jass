@@ -34,7 +34,7 @@ test('Alle Stufen spielen in allen Modi nur erlaubte Karten', () => {
   ];
   let i = 0;
   for (const regeln of varianten) {
-    for (const stufen of [['leicht', 'mittel', 'schwer', 'mittel'], ['schwer', 'leicht', 'mittel', 'schwer']]) {
+    for (const stufen of [['mittel', 'schwer', 'mittel', 'schwer'], ['schwer', 'mittel', 'schwer', 'mittel']]) {
       const spiel = J.neuesSpiel(Object.assign({ runden: 2 }, regeln), { seed: 300 + i++ });
       while (!spiel.fertig) {
         spieleRunde(spiel, stufen, rng);
@@ -131,7 +131,7 @@ test('Vorlesen: Jeder Satz, den Tipp und Computer sagen können, ist vertonbar',
   const varianten = [{}, { modi: { T: true, OBE: true, UNE: true, SLO: true, SLU: true, MIS: true } }];
   let i = 0;
   for (const regeln of varianten) {
-    for (const stufe of ['mittel', 'schwer', 'leicht']) {
+    for (const stufe of ['mittel', 'schwer']) {
       for (let n = 0; n < 6; n++) {
         const spiel = J.neuesSpiel(Object.assign({ runden: 1 }, regeln), { seed: 900 + i++ });
         const r = spiel.runde;
