@@ -247,3 +247,31 @@ test('Gleichwertige Karten: die höchste zuerst (Buur vor Nell, im Undenufe Sech
   J.ansagen(spiel, 'T2');
   assert.equal(B.mittelZug(B.ansichtAus(spiel, 0)).karte, 23);
 });
+
+test('Ass schmieren als Zeichen: mit Ass, König, Dame geschmiert – der Partner spielt die Farbe zurück', () => {
+  const regeln = J.regelnMitStandard();
+  const haende = [
+    [8, 1, 0, 9, 10, 18, 19, 27, 28],      // Du: Schaufel Ass, kleine Karten
+    [7, 6, 2, 20, 21, 22, 29, 30, 31],
+    [17, 16, 15, 23, 24, 25, 32, 33, 34],  // Partner: Herz Ass, König, Dame – keine Schaufel
+    [3, 4, 5, 11, 12, 13, 14, 26, 35],
+  ];
+  const spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: 0 });
+  J.ansagen(spiel, 'OBE');
+  J.spiele(spiel, 0, 8);   // Schaufel Ass
+  J.spiele(spiel, 1, 2);
+  // Der Partner schmiert das Herz Ass – die Faustregel tut das mit Ass, König, Dame
+  const z = B.mittelZug(B.ansichtAus(spiel, 2));
+  assert.equal(z.karte, 17);
+  assert.match(z.grund, /Zeichen/);
+  J.spiele(spiel, 2, 17);
+  J.spiele(spiel, 3, 3);
+  // Du liest: Partner ist in Herz sehr stark (König oder Dame)
+  const w = B.wissen(spiel, 0);
+  assert.ok(w.angezeigt[2] & 2, 'Herz angezeigt');
+  assert.deepEqual(w.anzeigen, [{ sitz: 2, farbe: 1, hoch: [16, 15], geschmiert: true }]);
+  // … und spielt Herz zurück, die tiefste
+  const r = B.mittelZug(B.ansichtAus(spiel, 0));
+  assert.equal(r.karte, 9);
+  assert.match(r.grund, /angezeigt/);
+});

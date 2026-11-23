@@ -1361,6 +1361,7 @@ window.JassStimmeDateien = {
   "Schieben lohnt sich, wenn keine Ansage richtig stark ist – dann wählt dein Partner mit seinen Karten.": "stimme/13d27e8dc965.mp3",
   "Schieben, wenn nichts davon passt – dein Partner hat vielleicht die besseren Karten.": "stimme/05a0655324eb.mp3",
   "Schieben.": "stimme/2be05dbea2bb.mp3",
+  "Schmieren mit Zeichen: Gib die höchste Karte dieser Farbe – so weiss dein Partner, dass du dort sehr stark bist, und spielt sie dir später zurück.": "stimme/fe76423edbde.mp3",
   "Schmieren: Dein Partner macht diesen Stich sicher – gib ihm Punkte mit.": "stimme/b128775f6564.mp3",
   "Sechs Trümpfe mit Nell und Trumpf-Ass.": "stimme/4a21f9e6df24.mp3",
   "Sechs Trümpfe mit Nell.": "stimme/a447507ccc4f.mp3",
