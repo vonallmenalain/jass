@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Trumpf-Trainer</title>
+  <link rel="stylesheet" href="jass-ui.css" />
+  <style>
+    .fortschritt { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .punkte-reihe { display: flex; gap: 3px; flex-wrap: wrap; }
+    .punkte-reihe i { width: 22px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); }
+    .punkte-reihe i.s1 { background: #fb923c; }
+    .punkte-reihe i.s2 { background: #facc15; }
+    .punkte-reihe i.s3 { background: #4ade80; }
+    .punkte-reihe i.jetzt { outline: 2px solid #fff; outline-offset: 1px; }
+    .lage { font-size: 15px; line-height: 1.4; }
+    .lage b { color: #fde68a; }
+
+    .tisch-hand {
+      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
+      border-radius: 22px; padding: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: inset 0 0 30px rgba(0,0,0,.3);
+    }
+    .karten-raster {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      max-width: 520px; margin: 0 auto;
+    }
+    @media (min-width: 620px) { .karten-raster { grid-template-columns: repeat(9, minmax(0, 1fr)); max-width: 100%; } }
+    .karten-raster .karte { width: 100%; }
+
+    .optionen { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .optionen button {
+      min-height: 50px; border-radius: 14px; border: 1px solid var(--border);
+      background: #fffdf8; color: #111827; font-weight: 800; font-size: 15px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .optionen button .farbzeichen { width: 20px; height: 20px; }
+    .optionen button.schieben { background: rgba(255,255,255,0.08); color: var(--text); grid-column: 1 / -1; }
+
+    .rechnen { display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
+    .balken-leer { width: 100%; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); overflow: hidden; }
+    .balken-voll { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .15s linear; }
+
+    .urteil { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+    .urteil .sterne { font-size: 34px; letter-spacing: 4px; }
+    .urteil .sterne .aus { opacity: .22; }
+    .urteil strong { font-size: 22px; letter-spacing: -0.02em; }
+
+    .ergebnis-liste { display: flex; flex-direction: column; gap: 6px; }
+    .ergebnis-zeile {
+      display: grid; grid-template-columns: 128px 1fr 48px; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 12px; border: 1px solid transparent;
+      font-size: 14px;
+    }
+    .ergebnis-zeile.gewaehlt { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,0.06); }
+    .ergebnis-zeile.beste .name::after { content: " ★"; color: #facc15; }
+    .ergebnis-zeile .name { font-weight: 800; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+    .ergebnis-zeile .name .farbzeichen { background: #fffdf8; border-radius: 6px; padding: 2px; width: 22px; height: 22px; flex-shrink: 0; }
+    .ergebnis-zeile .name .ohne { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #fffdf8; color: #111827; font-size: 13px; flex-shrink: 0; }
+    .ergebnis-zeile .bar { height: 12px; border-radius: 6px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .ergebnis-zeile .bar span { display: block; height: 100%; border-radius: 6px; background: #64748b; }
+    .ergebnis-zeile.beste .bar span { background: #4ade80; }
+    .ergebnis-zeile.gewaehlt:not(.beste) .bar span { background: #facc15; }
+    .ergebnis-zeile .wert { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .erklaerung { font-size: 14px; line-height: 1.45; color: var(--muted); }
+    .erklaerung b { color: var(--text); }
+
+    .regel-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 16px; padding: 12px 14px; }
+    .regel-box ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; font-size: 14px; color: var(--muted); }
+    .regel-box ul b { color: var(--text); }
+
+    .bilanz { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+    .bilanz div { background: rgba(255,255,255,0.05); border-radius: 14px; padding: 10px 6px; }
+    .bilanz strong { display: block; font-size: 24px; }
+    .bilanz span { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="app" style="--max: 720px">
+    <div class="topbar">
+      <a class="icon-btn" href="index.html" aria-label="Zurück zur Startseite">←</a>
+      <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Trumpf-Trainer</h1></div>
+      <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
+    </div>
+
+    <!-- Start -->
+    <section class="panel stack" id="start">
+      <h2>Was ist Trumpf?</h2>
+      <p class="muted">Du bekommst 9 zufällige Karten und entscheidest, was du ansagst – oder ob du schiebst. Danach spielt der Computer deine Hand mit vielen möglichen Verteilungen der anderen Karten durch und zeigt dir, was im Schnitt am meisten Punkte bringt.</p>
+      <div class="regel-box">
+        <h3>Faustregeln</h3>
+        <ul>
+          <li><b>Trumpf</b> mit dem Puur (Bauer) und mindestens drei Trümpfen – noch besser mit Nell (Neun) dazu.</li>
+          <li><b>Obenabe</b> mit drei oder mehr Assen, am besten mit Königen dahinter.</li>
+          <li><b>Undenufe</b> mit vielen Sechsern und Siebnern.</li>
+          <li><b>Schieben</b>, wenn nichts davon passt – dein Partner hat vielleicht die besseren Karten.</li>
+        </ul>
+      </div>
+      <p class="muted klein" id="startRegeln"></p>
+      <div class="reihe">
+        <span>Serie:</span>
+        <div class="segmente" id="serienLaenge"></div>
+      </div>
+      <button class="btn btn-voll" type="button" id="startBtn">Los geht's</button>
+      <p class="muted klein" id="rekord"></p>
+    </section>
+
+    <!-- Runde -->
+    <section class="stack" id="runde" hidden>
+      <div class="panel stack" style="gap:10px">
+        <div class="fortschritt"><span id="handNr"></span><span id="sterneSumme"></span></div>
+        <div class="punkte-reihe" id="punkteReihe"></div>
+        <p class="lage" id="lage"></p>
+      </div>
+      <div class="tisch-hand"><div class="karten-raster" id="hand"></div></div>
+      <div class="panel stack" id="wahlPanel">
+        <div class="optionen" id="optionen"></div>
+      </div>
+      <div class="panel rechnen" id="rechnen" hidden>
+        <p id="rechnenText">Ich spiele deine Hand durch …</p>
+        <div class="balken-leer"><div class="balken-voll" id="balken"></div></div>
+      </div>
+      <div class="panel stack" id="auswertung" hidden></div>
+    </section>
+
+    <!-- Serie fertig -->
+    <section class="panel stack" id="fertig" hidden></section>
+  </div>
+
+  <div class="dialog-hinten" id="dialog"><div class="dialog" id="dialogInhalt" role="dialog" aria-modal="true"></div></div>
+
+  <script src="jass-engine.js"></script>
+  <script src="jass-bot.js"></script>
+  <script src="jass-karten.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const J = window.JassEngine;
+    const B = window.JassBot;
+    const K = window.JassKarten;
+    const E = window.JassEinstellungen;
+    const $ = (id) => document.getElementById(id);
+
+    const KEY_TRAINER = 'jass-lernen-trainer-v1';
+    const STANDARD = { serie: 10, geschoben: 'gemischt', genauigkeit: 300, rekord: null };
+    let einst = Object.assign({}, STANDARD, E.lese(KEY_TRAINER) || {});
+    let regeln = E.ladeRegeln();
+    let anzeige = E.ladeAnzeige();
+    K.setzeFarben(anzeige.farben);
+
+    let serie = null;   // { haende: [{hand, geschoben, wahl, sterne, verlust, liste}], nr }
+    let laeuft = 0;
+
+    function speichereEinst() { E.schreibe(KEY_TRAINER, einst); }
+
+    function zeigeStart() {
+      $('start').hidden = false;
+      $('runde').hidden = true;
+      $('fertig').hidden = true;
+      $('startRegeln').textContent = 'Ansagen: ' + J.erlaubteModi(regeln).map((c) => J.MODI[c].name).join(', ') + (regeln.schieben ? ', Schieben' : '') + (regeln.multiplikatoren ? ' · mit Multiplikatoren' : '') + ' – änderbar unter ⚙.';
+      $('serienLaenge').innerHTML = [5, 10, 20].map((n) => `<button type="button" data-serie="${n}" class="${einst.serie === n ? 'aktiv' : ''}">${n} Hände</button>`).join('');
+      $('rekord').textContent = einst.rekord ? 'Bestes Ergebnis: ' + einst.rekord.sterne + ' von ' + einst.rekord.max + ' Sternen' : '';
+    }
+
+    $('serienLaenge').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-serie]');
+      if (!b) return;
+      einst.serie = Number(b.dataset.serie);
+      speichereEinst();
+      zeigeStart();
+    });
+
+    $('startBtn').addEventListener('click', neueSerie);
+
+    function neueSerie() {
+      serie = { haende: [], nr: 0, laenge: einst.serie };
+      $('start').hidden = true;
+      $('fertig').hidden = true;
+      $('runde').hidden = false;
+      neueHand();
+    }
+
+    function neueHand() {
+      const rng = J.zufall(J.neuerSeed());
+      const hand = J.verteile(rng)[0];
+      let geschoben = false;
+      if (regeln.schieben) {
+        if (einst.geschoben === 'immer') geschoben = true;
+        else if (einst.geschoben === 'gemischt') geschoben = rng() < 0.3;
+      }
+      serie.haende.push({ hand, geschoben, wahl: null, sterne: null });
+      zeigeHand();
+    }
+
+    function aktuelle() { return serie.haende[serie.nr]; }
+
+    function zeigeKopf() {
+      const n = serie.nr + 1;
+      $('handNr').textContent = 'Hand ' + n + ' von ' + serie.laenge;
+      const summe = serie.haende.reduce((s, h) => s + (h.sterne || 0), 0);
+      $('sterneSumme').textContent = '⭐ ' + summe;
+      $('punkteReihe').innerHTML = Array.from({ length: serie.laenge }, (_, i) => {
+        const h = serie.haende[i];
+        const kl = [];
+        if (h && h.sterne != null) kl.push('s' + Math.max(0, h.sterne) );
+        if (i === serie.nr) kl.push('jetzt');
+        return `<i class="${kl.join(' ')}"></i>`;
+      }).join('');
+    }
+
+    function modusHtml(code) {
+      if (code === 'SCHIEBEN') return '<span class="ohne">↔</span><span>Schieben</span>';
+      const m = J.MODI[code];
+      const z = m.trumpf >= 0 ? K.zeichen(m.trumpf) : `<span class="ohne">${m.symbol}</span>`;
+      return z + `<span>${m.name}</span>`;
+    }
+
+    function zeigeHand() {
+      const h = aktuelle();
+      zeigeKopf();
+      $('lage').innerHTML = h.geschoben
+        ? 'Dein Partner hat <b>geschoben</b> – jetzt musst du ansagen. Was ist Trumpf?'
+        : 'Du bist <b>Vorhand</b> und sagst an. Was ist Trumpf – oder schiebst du?';
+      zeichneKarten(null);
+      const modi = J.erlaubteModi(regeln);
+      const optionen = modi.slice();
+      if (!h.geschoben && regeln.schieben) optionen.push('SCHIEBEN');
+      $('optionen').innerHTML = optionen.map((c) => `<button type="button" data-wahl="${c}" class="${c === 'SCHIEBEN' ? 'schieben' : ''}">${c === 'SCHIEBEN' ? 'Schieben ↔' : modusHtml(c)}</button>`).join('');
+      $('wahlPanel').hidden = false;
+      $('rechnen').hidden = true;
+      $('auswertung').hidden = true;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function zeichneKarten(code) {
+      const h = aktuelle();
+      const T = code && code !== 'SCHIEBEN' ? J.MODI[code].trumpf : -1;
+      const sortiert = J.sortiereHand(h.hand, code && code !== 'SCHIEBEN' ? code : null);
+      $('hand').innerHTML = sortiert.map((k) => `<div class="karte">${K.svg(k, { trumpf: J.farbeVon(k) === T, code: code !== 'SCHIEBEN' ? code : null })}</div>`).join('');
+    }
+
+    $('optionen').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-wahl]');
+      if (!b) return;
+      waehle(b.dataset.wahl);
+    });
+
+    function waehle(code) {
+      const h = aktuelle();
+      h.wahl = code;
+      zeichneKarten(code);
+      $('wahlPanel').hidden = true;
+      $('rechnen').hidden = false;
+      $('balken').style.width = '0%';
+      const id = ++laeuft;
+      const b = B.bewertung(h.hand, regeln, { geschoben: h.geschoben });
+      const ziel = einst.genauigkeit;
+      const schritt = () => {
+        if (id !== laeuft) return;
+        const t0 = performance.now();
+        while (b.gemacht < ziel && performance.now() - t0 < 30) b.schritt(5);
+        $('balken').style.width = Math.round((100 * b.gemacht) / ziel) + '%';
+        $('rechnenText').textContent = 'Ich spiele deine Hand durch … ' + b.gemacht + ' von ' + ziel + ' Verteilungen';
+        if (b.gemacht < ziel) { setTimeout(schritt, 0); return; }
+        auswerten(b.ergebnis());
+      };
+      setTimeout(schritt, 30);
+    }
+
+    function auswerten(liste) {
+      const h = aktuelle();
+      h.liste = liste;
+      const beste = liste[0];
+      const meine = liste.find((x) => x.code === h.wahl);
+      // Verlust in eigenen Punkten (diff = eigene − fremde, also halbieren).
+      const verlust = Math.max(0, (beste.diff - meine.diff) / 2);
+      h.verlust = verlust;
+      h.sterne = verlust <= 2.5 ? 3 : verlust <= 8 ? 2 : verlust <= 16 ? 1 : 0;
+      const urteil = ['Da gab es Besseres', 'Geht so', 'Gut!', meine === beste ? 'Perfekt!' : 'Sehr gut!'][h.sterne];
+      const max = Math.max(...liste.map((x) => x.punkte));
+      const min = Math.min(0, ...liste.map((x) => x.punkte));
+      const namen = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
+      const multi = regeln.multiplikatoren ? ' (mit Multiplikator)' : '';
+      let erklaerung = '';
+      if (meine === beste) {
+        erklaerung = `<p class="erklaerung"><b>${namen(beste.code)}</b> ist die beste Wahl. ${escapeHtml(B.faustregel(h.hand, beste.code))}</p>`;
+      } else {
+        erklaerung = `<p class="erklaerung">Am meisten bringt <b>${namen(beste.code)}</b>: ${escapeHtml(B.faustregel(h.hand, beste.code))}</p>
+          <p class="erklaerung">Deine Wahl, <b>${namen(meine.code)}</b>: ${escapeHtml(B.faustregel(h.hand, meine.code))}</p>`;
+      }
+      $('rechnen').hidden = true;
+      const a = $('auswertung');
+      a.hidden = false;
+      a.innerHTML = `
+        <div class="urteil"><div class="sterne">${'⭐'.repeat(h.sterne)}<span class="aus">${'⭐'.repeat(3 - h.sterne)}</span></div><strong>${urteil}</strong>
+          <span class="muted klein">${meine === beste ? 'Genau die beste Ansage.' : 'Im Schnitt ' + Math.round(verlust) + ' Punkte weniger als ' + namen(beste.code) + '.'}</span></div>
+        <div>
+          <p class="muted klein" style="margin-bottom:6px">So viele Punkte macht euer Team im Schnitt${multi}, wenn ihr so ansagt – aus ${liste[0].n} durchgespielten Verteilungen:</p>
+          <div class="ergebnis-liste">${liste.map((x) => `<div class="ergebnis-zeile ${x === beste ? 'beste' : ''} ${x.code === h.wahl ? 'gewaehlt' : ''}">
+            <span class="name">${modusHtml(x.code)}</span>
+            <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
+            <span class="wert">${Math.round(x.punkte)}</span></div>`).join('')}</div>
+        </div>
+        ${erklaerung}
+        <div class="reihe">
+          <button class="btn" type="button" id="weiterBtn" style="flex:1">${serie.nr + 1 >= serie.laenge ? 'Zum Ergebnis' : 'Nächste Hand'}</button>
+          <a class="btn-ghost" href="jass-spiel.html?hand=${h.hand.join('.')}${h.geschoben ? '&geschoben=1' : ''}">Ausspielen</a>
+        </div>
+        <p class="muted klein">«Ausspielen» startet ein Spiel gegen den Computer mit genau dieser Hand.</p>`;
+      zeigeKopf();
+      $('weiterBtn').addEventListener('click', weiter);
+      a.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function weiter() {
+      if (serie.nr + 1 >= serie.laenge) { zeigeFertig(); return; }
+      serie.nr++;
+      neueHand();
+    }
+
+    function zeigeFertig() {
+      $('runde').hidden = true;
+      const f = $('fertig');
+      f.hidden = false;
+      const sterne = serie.haende.reduce((s, h) => s + h.sterne, 0);
+      const max = serie.laenge * 3;
+      const perfekt = serie.haende.filter((h) => h.verlust <= 2.5).length;
+      const verlust = serie.haende.reduce((s, h) => s + h.verlust, 0) / serie.laenge;
+      let neuerRekord = false;
+      if (!einst.rekord || sterne / max > einst.rekord.sterne / einst.rekord.max) {
+        einst.rekord = { sterne, max };
+        neuerRekord = true;
+        speichereEinst();
+      }
+      f.innerHTML = `<div class="urteil"><div class="sterne">🏆</div><strong>${sterne} von ${max} Sternen</strong>${neuerRekord ? '<span style="color:#fde68a;font-weight:800">Neuer Rekord!</span>' : ''}</div>
+        <div class="bilanz">
+          <div><strong>${perfekt}</strong><span>beste Ansage</span></div>
+          <div><strong>${Math.round(verlust)}</strong><span>Ø Punkte verschenkt</span></div>
+          <div><strong>${serie.haende.filter((h) => h.wahl === 'SCHIEBEN').length}</strong><span>geschoben</span></div>
+        </div>
+        <table class="tabelle auf-dunkel"><thead><tr><th>Hand</th><th>Deine Wahl</th><th>Beste</th><th>⭐</th></tr></thead>
+          <tbody>${serie.haende.map((h, i) => `<tr><td>${i + 1}${h.geschoben ? ' <span class="muted klein">(geschoben)</span>' : ''}</td><td>${kurz(h.wahl)}</td><td>${kurz(h.liste[0].code)}</td><td>${h.sterne}</td></tr>`).join('')}</tbody></table>
+        <button class="btn btn-voll" type="button" id="nochmalBtn">Neue Serie</button>`;
+      $('nochmalBtn').addEventListener('click', neueSerie);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function kurz(code) {
+      if (code === 'SCHIEBEN') return 'Schieben';
+      const m = J.MODI[code];
+      return (m.trumpf >= 0 ? K.zeichen(m.trumpf) + ' ' : '') + m.name;
+    }
+
+    // ------------------------------------------------------- Einstellungen
+
+    $('einstellungenBtn').addEventListener('click', () => {
+      laeuft++;
+      const offen = !$('runde').hidden;
+      $('dialogInhalt').innerHTML = `<h2>Einstellungen</h2>
+        <div class="stack" style="gap:8px"><span>Situation</span>
+          <div class="segmente" id="setGeschoben">${[['nie', 'Immer Vorhand'], ['gemischt', 'Gemischt'], ['immer', 'Immer geschoben']].map(([w, t]) => `<button type="button" data-w="${w}" class="${einst.geschoben === w ? 'aktiv' : ''}">${t}</button>`).join('')}</div>
+          <small class="muted klein">«Geschoben»: Dein Partner hat geschoben, du musst ansagen.</small></div>
+        <div class="stack" style="gap:8px"><span>Genauigkeit</span>
+          <div class="segmente" id="setGenau">${[[150, 'Schnell'], [300, 'Genau'], [800, 'Sehr genau']].map(([w, t]) => `<button type="button" data-w="${w}" class="${einst.genauigkeit === w ? 'aktiv' : ''}">${t}</button>`).join('')}</div>
+          <small class="muted klein">Wie viele Kartenverteilungen durchgespielt werden.</small></div>
+        <div class="stack" style="gap:10px" id="setRegeln"></div>
+        <div id="setAnzeige"></div>
+        <button class="btn btn-voll" type="button" id="dialogOk">Fertig</button>`;
+      $('dialog').classList.add('offen');
+      E.regelFormular($('setRegeln'), regeln, (r) => { E.speichereRegeln(r); }, { laenge: false, offen: ['modi'] });
+      E.anzeigeFormular($('setAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { spiel: false, tempo: false });
+      $('setGeschoben').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-w]'); if (!b) return;
+        einst.geschoben = b.dataset.w; speichereEinst();
+        $('setGeschoben').querySelectorAll('button').forEach((x) => x.classList.toggle('aktiv', x === b));
+      });
+      $('setGenau').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-w]'); if (!b) return;
+        einst.genauigkeit = Number(b.dataset.w); speichereEinst();
+        $('setGenau').querySelectorAll('button').forEach((x) => x.classList.toggle('aktiv', x === b));
+      });
+      $('dialogOk').addEventListener('click', () => {
+        $('dialog').classList.remove('offen');
+        if (offen && serie) {
+          // Mit den neuen Regeln dieselbe Hand nochmals zeigen.
+          const h = aktuelle();
+          h.wahl = null; h.sterne = null;
+          if (!regeln.schieben) h.geschoben = false;
+          zeigeHand();
+        } else zeigeStart();
+      });
+    });
+    $('dialog').addEventListener('click', (e) => { if (e.target === $('dialog')) $('dialogOk') && $('dialogOk').click(); });
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    zeigeStart();
+  })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('service-worker.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

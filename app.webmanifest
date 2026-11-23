@@ -1,7 +1,7 @@
 {
   "name": "Jass",
   "short_name": "Jass",
-  "description": "Jass Zähler und Turnier-App",
+  "description": "Jass Zähler, Turniere, Spiel gegen den Computer und Trumpf-Trainer",
   "lang": "de-CH",
   "start_url": "./index.html",
   "scope": "./",
