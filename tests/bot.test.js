@@ -305,23 +305,55 @@ test('Übernehmen müssen ist kein Schmieren: im Undenufe mit 7, 8, 9 (6 drausse
   assert.match(m2.grund, /tiefste Karte, die reicht/);
 });
 
-test('Trumpf ziehen nach dem Schieben: der Schieber spielt im ersten Stich Trumpf an (gemessen +2,6 Punkte)', () => {
+test('Ausspiel des Schiebers: im ersten Stich der höchste Trumpf – der Partner liest daraus', () => {
   // Aus einer Partie: Ben schiebt, du sagst Ecke an. Ben hat Ecke Ass, König,
-  // Acht, Sieben (ohne Buur) – er spielt den kleinsten Trumpf an.
+  // Acht, Sieben – er spielt den höchsten, das Ass.
   const regeln = J.regelnMitStandard({ modi: { T: true, OBE: true, UNE: true, SLO: false, SLU: false, MIS: false }, weisen: false, stoeck: false, matchBonus: false, multiplikatoren: false });
   const haende = [[21, 7, 32, 16, 3, 33, 22, 30, 10], [14, 13, 2, 12, 31, 25, 19, 8, 23], [15, 4, 18, 28, 0, 24, 29, 35, 34], [27, 17, 26, 6, 20, 9, 11, 5, 1]];
   const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 2 });
   J.schieben(spiel); J.ansagen(spiel, 'T3');
   assert.equal(spiel.runde.amZug, 2);
   const z = B.schwerZug(spiel, 2, Object.assign({ rng: J.zufall(2) }, B.rechentiefe('schnell')));
-  assert.equal(z.karte, 28, 'Ecke Sieben');
-  assert.match(z.grund, /Trumpf ziehen/);
-  assert.notEqual(B.schwerZug(spiel, 2, Object.assign({ rng: J.zufall(2), trumpfZiehen: false }, B.rechentiefe('schnell'))).grund, z.grund);
-  // Hat der Schieber den Buur, kommt der Buur.
+  assert.equal(z.karte, 35, 'Ecke Ass');
+  assert.match(z.grund, /höchsten Trumpf/);
+  // Du (Ansager) liest: Ben hat weder Buur noch Nell.
+  J.spiele(spiel, 2, 35);
+  const w = B.wissen(spiel, 0);
+  assert.equal(w.nicht[2][32], 1, 'kein Buur');
+  assert.equal(w.nicht[2][30], 1, 'kein Nell');
+  assert.equal(w.nicht[2][34], 0, 'König ist möglich');
+  // Ohne Regel: die bisherige (Buur, sonst der kleinste)
+  const sp0 = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 2 });
+  J.schieben(sp0); J.ansagen(sp0, 'T3');
+  assert.equal(B.schwerZug(sp0, 2, Object.assign({ rng: J.zufall(2), schieberZeichen: false }, B.rechentiefe('schnell'))).karte, 28);
+  // Hat der Schieber den Buur, ist der Buur der höchste.
   const h2 = haende.map((h) => h.slice());
-  const i = h2[0].indexOf(32); const j = h2[2].indexOf(35);   // Ecke Bauer ↔ Ecke Ass tauschen
-  h2[0][i] = 35; h2[2][j] = 32;
+  h2[0][h2[0].indexOf(32)] = 35; h2[2][h2[2].indexOf(35)] = 32;   // Ecke Bauer ↔ Ecke Ass
   const sp2 = J.neuesSpiel(regeln, { haende: h2, ersterAnsager: 2 });
   J.schieben(sp2); J.ansagen(sp2, 'T3');
   assert.equal(B.schwerZug(sp2, 2, Object.assign({ rng: J.zufall(2) }, B.rechentiefe('schnell'))).karte, 32, 'Ecke Bauer');
+});
+
+test('Ausspiel des Schiebers bei Obenabe: zuerst alle Asse – kommt keins, hat er keins', () => {
+  const regeln = J.regelnMitStandard();
+  // Vorhand (0) schiebt, Partner (2) sagt Obenabe. 0 hat Schaufel- und Herz-Ass.
+  const haende = [[8, 17, 0, 1, 2, 9, 10, 18, 19], [3, 4, 5, 6, 7, 11, 12, 13, 14], [26, 35, 15, 16, 20, 21, 22, 23, 24], [25, 27, 28, 29, 30, 31, 32, 33, 34]];
+  const spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: 0 });
+  J.schieben(spiel); J.ansagen(spiel, 'OBE');
+  const opt = Object.assign({ rng: J.zufall(3) }, B.rechentiefe('schnell'));
+  const z1 = B.schwerZug(spiel, 0, opt);
+  assert.ok([8, 17].includes(z1.karte), 'ein Ass');
+  assert.match(z1.grund, /Asse/);
+  for (const s of [0, 1, 2, 3]) J.spiele(spiel, spiel.runde.amZug, s === 0 ? z1.karte : B.mittelZug(B.ansichtAus(spiel, spiel.runde.amZug)).karte);
+  if (spiel.runde.stiche[0].sieger === 0) {
+    const z2 = B.schwerZug(spiel, 0, opt);
+    assert.ok([8, 17].includes(z2.karte) && z2.karte !== z1.karte, 'das zweite Ass');
+  }
+  // Ohne Ass: der Partner weiss, dass er keines hat.
+  const h3 = [[0, 1, 2, 9, 10, 11, 18, 19, 20], [3, 4, 5, 6, 7, 12, 13, 14, 15], [8, 17, 26, 35, 16, 21, 22, 23, 24], [25, 27, 28, 29, 30, 31, 32, 33, 34]];
+  const sp3 = J.neuesSpiel(regeln, { haende: h3, ersterAnsager: 0 });
+  J.schieben(sp3); J.ansagen(sp3, 'OBE');
+  J.spiele(sp3, 0, 0);
+  const w = B.wissen(sp3, 2);
+  assert.deepEqual([8, 17, 26, 35].map((k) => w.nicht[0][k]), [1, 1, 1, 1]);
 });
