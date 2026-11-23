@@ -114,11 +114,16 @@
 
     let regeln = E.ladeRegeln();
     let anzeige = E.ladeAnzeige();
+    // Im Training (Ausspielen aus Trainer oder Helfer) sind die Gedanken immer
+    // da – gespeichert wird dabei die eigene Einstellung, nicht die des Trainings.
+    const gedankenGespeichert = !!anzeige.gedanken;
+    const speichereAnzeige = (a) => E.speichereAnzeige(new URLSearchParams(location.search).get('trainer') === '1' ? Object.assign({}, a, { gedanken: gedankenGespeichert }) : a);
     let spieler = bereinige(E.lese(KEY_SPIELER));
     K.setzeFarben(anzeige.farben);
 
     // Aus dem Trumpf-Trainer: genau eine Runde, danach zurück dorthin.
     const trainerModus = new URLSearchParams(location.search).get('trainer') === '1';
+    if (trainerModus) anzeige.gedanken = true;
     // Woher die Hand kam: Trumpf-Trainer (Standard) oder Trumpf-Helfer.
     const vomHelfer = trainerModus && new URLSearchParams(location.search).get('zurueck') === 'helfer';
     const ZIEL = vomHelfer
@@ -135,12 +140,65 @@
       beiKarte(k) { if (eingabe && eingabe.art === 'karte') { const f = eingabe.fertig; eingabe = null; f(k); } },
       beiAnsage(code) { if (eingabe && eingabe.art === 'ansage') { const f = eingabe.fertig; eingabe = null; f(code); } },
       beiMenu: zeigeMenu,
+      historie: () => historieHtml(),
+      historieDa: () => !!(partie && partie.runden.length),
       tippKarte() {
         const t = B.schwerZug(spiel, 0, B.rechentiefe(anzeige.rechnen));
         letzterTipp = t.karte;
         return t;
       },
     });
+
+    // «📜 Stiche & Gedanken» (Option «Alle Gedanken und Stiche anzeigen»):
+    // die ganze Partie bis jetzt – Ansagen und Stiche aller Runden mit den
+    // Gedanken jedes Spielers. Fremde Karten auf der Hand zeigt es nicht.
+    function gedankeHtml(z, code) {
+      const name = esc(spieler[z.s].name);
+      const karte = esc(J.kartenName(z.k, code));
+      if (z.stufe === 'mensch') return `<div class="gedanke"><b>${name}</b> ${z.s === 0 ? 'spielst' : 'spielt'} ${karte}${z.tipp != null && z.tipp !== z.k ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : ''}</div>`;
+      const werte = z.werte && z.werte.length > 1 ? `<div class="werte">Rechnung (Ø Vorsprung): ${z.werte.map((w) => esc(J.kurzName(w.k)) + ' ' + w.w).join(' · ')}</div>` : '';
+      return `<div class="gedanke"><b>${name}</b> spielt ${karte}${z.grund ? '<br>' + esc(z.grund) : ''}${werte}</div>`;
+    }
+    function historieHtml() {
+      if (!partie || !spiel || !partie.runden.length) return '<p class="muted">Noch nichts gespielt.</p>';
+      const name = (s) => esc(spieler[s].name);
+      const jetzt = spiel.runde;
+      const modusName = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].name);
+      return partie.runden.map((x) => {
+        const aktuell = !spiel.fertig && x.nr === jetzt.nr;
+        const code = x.code || (aktuell && jetzt.code) || ((x.ansagen.filter((a) => a.wahl !== 'SCHIEBEN').pop() || {}).wahl) || null;
+        const ansagen = x.ansagen.map((a) => {
+          const mensch = a.stufe === 'mensch';
+          const was = a.wahl === 'SCHIEBEN' ? (a.s === 0 ? 'schiebst' : 'schiebt') : (a.s === 0 ? 'sagst ' : 'sagt ') + esc(J.MODI[a.wahl].lang) + ' an';
+          const gedanke = mensch ? '' : a.wahl === 'SCHIEBEN' ? (a.grund || '') : B.faustregel(x.haende[a.s], a.wahl);
+          const werte = !mensch && a.werte ? `<div class="werte">Rechnung (Ø Punkte): ${a.werte.map((w) => esc(modusName(w.c)) + ' ' + w.p).join(' · ')}</div>` : '';
+          return `<div class="gedanke"><b>${name(a.s)}</b> ${was}${gedanke ? '<br>' + esc(gedanke) : ''}${werte}</div>`;
+        }).join('');
+        const stiche = [];
+        for (const z of x.zuege) (stiche[z.stich] = stiche[z.stich] || []).push(z);
+        const sticheHtml = stiche.map((zuege, i) => {
+          if (!zuege) return '';
+          const eff = code ? J.effModus(code, i) : null;
+          const karten = zuege.map((z) => z.k);
+          const fertig = karten.length === 4 && eff != null;
+          const gi = fertig ? J.gewinnerIndex(karten, eff) : -1;
+          let punkte = fertig ? J.stichPunkte(karten, eff) : 0;
+          if (fertig && i === 8) punkte += spiel.regeln.letzterStich;
+          const hier = aktuell && i === stiche.length - 1;
+          return `<div class="hist-stich" ${hier ? 'data-jetzt' : ''}>
+            <div class="hist-kopf"><b>Stich ${i + 1}</b><span>${fertig ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : 'läuft'}</span></div>
+            <div class="hist-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}"><div class="karte">${K.svg(z.k, { code })}</div><figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
+            ${zuege.map((z) => gedankeHtml(z, code)).join('')}
+          </div>`;
+        }).join('');
+        const ab = x.abrechnung;
+        return `<details class="hist-runde" ${aktuell || (spiel.fertig && x === partie.runden[partie.runden.length - 1]) ? 'open' : ''}>
+          <summary>Runde ${x.nr + 1}${code ? ' · ' + esc(J.MODI[code].lang) : ''}${ab ? ' · ' + ab.total[0] + ' : ' + ab.total[1] : ''}</summary>
+          <div class="hist-ansage" ${aktuell && !stiche.length ? 'data-jetzt' : ''}>${ansagen || '<span class="muted">Noch keine Ansage.</span>'}</div>
+          ${sticheHtml}
+        </details>`;
+      }).join('');
+    }
 
     // ---------------------------------------------------------- Einrichten
 
@@ -171,9 +229,9 @@
 
     const zusammenfassung = () => { $('regelZusammenfassung').textContent = E.zusammenfassung(regeln); };
     E.regelFormular($('regelFormular'), regeln, (r) => { E.speichereRegeln(r); zusammenfassung(); });
-    E.anzeigeFormular($('anzeigeFormular'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { tipps: false });
+    E.anzeigeFormular($('anzeigeFormular'), anzeige, (a) => { speichereAnzeige(a); K.setzeFarben(a.farben); }, { tipps: false });
     $('tippsSchalter').checked = anzeige.tipps !== false;
-    $('tippsSchalter').addEventListener('change', (e) => { anzeige.tipps = e.target.checked; E.speichereAnzeige(anzeige); });
+    $('tippsSchalter').addEventListener('change', (e) => { anzeige.tipps = e.target.checked; speichereAnzeige(anzeige); });
     zeichneSitze();
     zusammenfassung();
 
@@ -288,8 +346,7 @@
             const w = B.waehleAnsage(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
             wahl = w.code;
             V.ansage(partie, r, s, wahl, { stufe: spieler[s].typ, grund: w.grund, liste: w.liste });
-            if (anzeige.erklaeren && wahl !== 'SCHIEBEN') tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(B.faustregel(r.haende[s], wahl)));
-            else tisch.kommentar('');
+            tisch.kommentar('');   // Gedanken nur im Dialog «Stiche & Gedanken», nicht live
           }
           if (!lebt()) return;
           if (wahl === 'SCHIEBEN') {
@@ -317,7 +374,6 @@
           const zug = B.waehleKarte(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
           karte = zug.karte;
           V.karte(partie, r, s, karte, { stufe: spieler[s].typ, grund: zug.grund, werte: zug.werte });
-          if (anzeige.erklaeren) tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(zug.grund));
         }
         const vorher = r.stoeckGemeldet;
         const erg = J.spiele(spiel, s, karte);
@@ -388,7 +444,7 @@
         <button class="btn-ghost btn-voll" type="button" id="markieren">🚩 Etwas komisch? Markieren</button>
         <button class="btn-ghost btn-voll" type="button" id="abbrechen">Spiel verlassen (wird gespeichert)</button>`);
       box.querySelector('#markieren').addEventListener('click', zeigeMarkieren);
-      E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); });
+      E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); });
       box.querySelector('#abbrechen').addEventListener('click', () => {
         if (trainerModus) { location.href = ZIEL.abbruch; return; }
         zurEinrichtung();

@@ -254,7 +254,9 @@
       const tippErlaubt = z.tipps !== false && anzeige().tipps !== false;
       el('tipp').hidden = !tippErlaubt;
       el('tipp').disabled = !(meinZug || z.eingabe === 'ansage');
-      el('letzter').disabled = !r.stiche.length;
+      const historie = !!(o.historie && anzeige().gedanken);
+      el('letzter').textContent = historie ? '📜 Stiche & Gedanken' : 'Letzter Stich';
+      el('letzter').disabled = historie ? !(r.stiche.length || r.stich.length || (o.historieDa && o.historieDa())) : !r.stiche.length;
     }
 
     function zeichneAnsage() {
@@ -360,6 +362,14 @@
     });
 
     el('letzter').addEventListener('click', () => {
+      // Mit «Alle Gedanken und Stiche»: die ganze Partie bis jetzt, mit den
+      // Gedanken jedes Spielers (die Seite liefert das HTML).
+      if (o.historie && anzeige().gedanken) {
+        const box = oeffneDialog(`<h2>Stiche &amp; Gedanken</h2>${o.historie()}<button class="btn btn-voll" type="button" data-schliessen>Schliessen</button>`);
+        const jetzt = box.querySelector('[data-jetzt]');
+        if (jetzt) jetzt.scrollIntoView({ block: 'center' });
+        return;
+      }
       const r = z.spiel.runde;
       const st = r.stiche[r.stiche.length - 1];
       if (!st) return;
