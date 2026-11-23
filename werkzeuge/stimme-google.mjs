@@ -3,10 +3,15 @@
  * (Cloud Text-to-Speech, Chirp 3 HD, dieselbe Stimme wie in der Kinder-App:
  * de-DE-Chirp3-HD-Sulafat).
  * ---------------------------------------------------------------------------
- * Welche Sätze es gibt, weiss JassBot.alleSprechTeile(): die Begründungen,
- * «Spiel das Herz Ass.», die Ansage-Tipps mit «Im Schnitt etwa N Punkte»
- * und die Faustregeln. Je Satz eine MP3 in stimme/ (Name: Anfang des
- * SHA-256 des Satzes), das Verzeichnis in jass-stimme-dateien.js.
+ * Welche Sätze es gibt:
+ *   JassBot.alleSprechTeile()      Begründungen, «Spiel das Herz Ass.», die
+ *                                  Ansage-Tipps und die Faustregeln
+ *   JassSprechtexte.alle()         das Training mit Zahlen und Karten
+ *                                  («Ihr habt 51 Punkte gemacht.», «Ass: 11.»)
+ *   die Seiten des Trainings       feste Texte mit data-vorlesen
+ *                                  (JassVorlesen.statischeSaetze)
+ * Je Satz eine MP3 in stimme/ (Name: Anfang des SHA-256 des Satzes), das
+ * Verzeichnis in jass-stimme-dateien.js.
  *
  *   node werkzeuge/stimme-google.mjs texte            wie viele Sätze, Zeichen, Aufnahmen
  *   node werkzeuge/stimme-google.mjs probe "<Satz>" [--aus <ordner>]
@@ -40,6 +45,9 @@ const require = createRequire(import.meta.url);
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const WURZEL = path.resolve(HIER, '..');
 const B = require(path.join(WURZEL, 'jass-bot.js'));
+const S = require(path.join(WURZEL, 'jass-sprechtexte.js'));
+const V = require(path.join(WURZEL, 'jass-vorlesen.js'));
+const TRAINING_SEITEN = ['training.html', 'zaehlen.html', 'trumpf-trainer.html', 'trumpf-helfer.html'];
 
 const API = 'https://texttospeech.googleapis.com/v1';
 const STIMME = 'de-DE-Chirp3-HD-Sulafat';
@@ -149,7 +157,11 @@ ${eintraege.join('\n')}
   return eintraege.length;
 }
 
-const saetze = B.alleSprechTeile();
+const saetze = Array.from(new Set([
+  ...B.alleSprechTeile(),
+  ...S.alle(),
+  ...TRAINING_SEITEN.flatMap((f) => V.statischeSaetze(fs.readFileSync(path.join(WURZEL, f), 'utf8'))),
+]));
 
 if (befehl === 'texte') {
   const da = saetze.filter((t) => fs.existsSync(path.join(WURZEL, dateiFuer(t))));

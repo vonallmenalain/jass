@@ -12,6 +12,11 @@
     .uebung .bild { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
     .uebung strong { display: block; font-size: 17px; }
     .uebung span { color: var(--muted); font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+    .uebung-zeile { display: flex; gap: 8px; align-items: center; }
+    .uebung-zeile .uebung { flex: 1; min-width: 0; }
+    .uebung-zeile .vorlesen-text { display: none; }
+    .uebung-zeile .lautsprecher { flex: 0 0 auto; width: 40px; height: 40px; font-size: 18px; margin: 0; }
+    .einleitung { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   </style>
 </head>
 <body>
@@ -20,10 +25,14 @@
       <a class="icon-btn" href="index.html" aria-label="Zurück zur Startseite">←</a>
       <div class="topbar-titel"><span class="eyebrow">Schieber</span><h1>Jass lernen</h1></div>
     </div>
-    <a class="btn-ghost uebung" href="zaehlen.html"><span class="bild">🔢</span><span><strong>Stiche zählen</strong><span>Vier Karten, wie viele Punkte? Mit Trumpf, Obenabe und Undenufe.</span></span></a>
-    <a class="btn-ghost uebung" href="trumpf-trainer.html"><span class="bild">🃏</span><span><strong>Trumpf wählen</strong><span>Neun zufällige Karten – was sagst du an? Der Computer rechnet nach, was am meisten bringt.</span></span></a>
-    <a class="btn-ghost uebung" href="trumpf-helfer.html"><span class="bild">💡</span><span><strong>Trumpf-Helfer</strong><span>Deine echten Karten eingeben und einen Vorschlag bekommen.</span></span></a>
+    <p class="muted einleitung" data-vorlesen>Hier übst du Jassen. Tippe auf den Lautsprecher, dann wird dir alles vorgelesen.</p>
+    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="zaehlen.html"><span class="bild">🔢</span><span><strong>Stiche zählen</strong><span>Vier Karten, wie viele Punkte? Mit Trumpf, Obenabe und Undenufe.</span></span></a></div>
+    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="trumpf-trainer.html"><span class="bild">🃏</span><span><strong>Trumpf wählen</strong><span>Neun zufällige Karten – was sagst du an? Der Computer rechnet nach, was am meisten bringt.</span></span></a></div>
+    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="trumpf-helfer.html"><span class="bild">💡</span><span><strong>Trumpf-Helfer</strong><span>Deine echten Karten eingeben und einen Vorschlag bekommen.</span></span></a></div>
   </div>
+  <script src="jass-stimme-dateien.js"></script>
+  <script src="jass-stimme.js"></script>
+  <script src="jass-vorlesen.js"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(function () {});
   </script>
