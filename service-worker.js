@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v4';
+const CACHE_NAME = 'jass-shell-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -10,6 +10,11 @@ const APP_SHELL = [
   './jass-spiel.html',
   './trumpf-trainer.html',
   './jass-online.html',
+  './training.html',
+  './zaehlen.html',
+  './trumpf-helfer.html',
+  './verlauf.html',
+  './jass-verlauf.js',
   './jass-engine.js',
   './jass-protokoll.js',
   './jass-tisch.js',
@@ -18,6 +23,7 @@ const APP_SHELL = [
   './jass-karten.js',
   './jass-einstellungen.js',
   './jass-ui.css',
+  './karten/svg-cards.svg',
   './app.webmanifest'
 ];
 

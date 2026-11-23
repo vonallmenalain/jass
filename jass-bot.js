@@ -477,7 +477,7 @@
     const rng = o.rng || J.zufall(J.neuerSeed());
     const restKarten = runde.haende.reduce((n, h) => n + h.length, 0);
     const exaktAb = o.exaktAb != null ? o.exaktAb : 12;
-    const welten = o.welten || (restKarten <= exaktAb ? 30 : 120);
+    const welten = restKarten <= exaktAb ? (o.weltenExakt || 30) : (o.welten || 120);
     const summe = new Map(legal.map((k) => [k, 0]));
     const meinTeam = team(sitz);
     for (let i = 0; i < welten; i++) {
@@ -501,6 +501,22 @@
       ? mittel.grund
       : 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
     return { karte: wahl.karte, grund, werte };
+  }
+
+  // Mit allen Karten offen: Wie viel bringt jede erlaubte Karte, wenn danach
+  // alle perfekt spielen? Nur für die Analyse – im Spiel sieht niemand die
+  // Karten der anderen. Ab vielen Karten zu langsam: dann null.
+  function offenBewerten(spiel, sitz, maxKarten) {
+    const runde = spiel.runde;
+    const rest = runde.haende.reduce((n, h) => n + h.length, 0);
+    if (rest > (maxKarten || 20)) return null;
+    const legal = J.erlaubteFuer(spiel, sitz);
+    const w = wissen(spiel, sitz);
+    return legal.map((k) => {
+      const s = simAusSpiel(spiel, runde.haende.map((h) => h.slice()), w);
+      simSpiele(s, k);
+      return { karte: k, wert: exakt(s, team(sitz), -Infinity, Infinity) };
+    }).sort((a, b) => b.wert - a.wert);
   }
 
   function ansichtAus(spiel, sitz) {
@@ -749,6 +765,19 @@
 
   function zufallsQuelle(o) { return (o && o.rng) || Math.random; }
 
+  // Wie gründlich «Schwer» und der Tipp rechnen (Einstellung Rechentiefe).
+  //   welten       so viele Kartenverteilungen werden durchgespielt
+  //   weltenExakt  … wenn die letzten Stiche exakt gerechnet werden
+  //   exaktAb      ab so vielen Karten auf dem Tisch wird exakt gerechnet
+  //   ansage       so viele Verteilungen für die Wahl des Trumpfs
+  const RECHENTIEFE = {
+    schnell: { welten: 40, weltenExakt: 16, exaktAb: 8, ansage: 40 },
+    normal: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80 },
+    gruendlich: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200 },
+    maximal: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400 },
+  };
+  function rechentiefe(name) { return RECHENTIEFE[name] || RECHENTIEFE.normal; }
+
   function waehleKarte(spiel, sitz, stufe, optionen) {
     const rng = zufallsQuelle(optionen);
     if (stufe === 'schwer') return schwerZug(spiel, sitz, optionen);
@@ -770,7 +799,7 @@
     }
     if (stufe === 'schwer') {
       const b = bewertung(hand, spiel.regeln, { geschoben: !darf, rng: (optionen && optionen.rng) || J.zufall(J.neuerSeed()) });
-      b.schritt((optionen && optionen.welten) || 80);
+      b.schritt((optionen && (optionen.ansage || optionen.welten)) || 80);
       const liste = b.ergebnis();
       return { code: liste[0].code, grund: 'Durchgerechnet.', liste };
     }
@@ -779,7 +808,7 @@
   }
 
   const api = {
-    waehleKarte, waehleAnsage, mittelZug, schwerZug, ansichtAus, wissen, welt,
+    waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, merkmaleTrumpf, merkmaleObe,
     simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE,
   };

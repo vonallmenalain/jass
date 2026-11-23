@@ -55,6 +55,8 @@
       <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="anzeigeFormular"></div></details>
     </div>
 
+    <a class="btn-ghost btn-voll" href="verlauf.html" style="margin-bottom:4px">📜 Gespielte Partien ansehen</a>
+
     <div class="start-leiste">
       <button class="btn btn-voll" type="button" id="startBtn">Spiel starten</button>
     </div>
@@ -67,6 +69,7 @@
   <script src="jass-karten.js"></script>
   <script src="jass-einstellungen.js"></script>
   <script src="jass-tisch.js"></script>
+  <script src="jass-verlauf.js"></script>
   <script>
   (function () {
     'use strict';
@@ -75,6 +78,7 @@
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
     const T = window.JassTisch;
+    const V = window.JassVerlauf;
     const esc = T.escapeHtml;
 
     const KEY_SPIEL = 'jass-lernen-spiel-v1';
@@ -111,6 +115,8 @@
     K.setzeFarben(anzeige.farben);
 
     let spiel = null;
+    let partie = null;        // die Aufzeichnung (jass-verlauf.js)
+    let letzterTipp = null;   // welche Karte der Tipp zuletzt vorschlug
     let laufId = 0;
     let eingabe = null; // { art, fertig }
 
@@ -119,6 +125,11 @@
       beiKarte(k) { if (eingabe && eingabe.art === 'karte') { const f = eingabe.fertig; eingabe = null; f(k); } },
       beiAnsage(code) { if (eingabe && eingabe.art === 'ansage') { const f = eingabe.fertig; eingabe = null; f(code); } },
       beiMenu: zeigeMenu,
+      tippKarte() {
+        const t = B.schwerZug(spiel, 0, B.rechentiefe(anzeige.rechnen));
+        letzterTipp = t.karte;
+        return t;
+      },
     });
 
     // ---------------------------------------------------------- Einrichten
@@ -176,6 +187,7 @@
       if (!g) return;
       spiel = g.spiel;
       spieler = bereinige(g.spieler);
+      partie = (g.partieId && V.lade(g.partieId)) || V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
       starteTisch();
     });
     $('verwerfenBtn').addEventListener('click', () => {
@@ -184,12 +196,14 @@
     });
     $('startBtn').addEventListener('click', () => {
       spiel = J.neuesSpiel(regeln);
+      partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
       speichere();
       starteTisch();
     });
 
     function speichere() {
-      if (spiel) E.schreibe(KEY_SPIEL, { spiel, spieler, ansichtSitz: 0 });
+      if (spiel) E.schreibe(KEY_SPIEL, { spiel, spieler, ansichtSitz: 0, partieId: partie && partie.id });
+      if (partie) V.speichere(partie);
     }
 
     // --------------------------------------------------------------- Tisch
@@ -237,7 +251,9 @@
         if (r.phase === 'ende') {
           await zeigeRundenende();
           if (!lebt()) return;
+          V.rundeFertig(partie, r, r.abrechnung);
           J.rundeAbschliessen(spiel);
+          if (spiel.fertig) V.spielFertig(partie, spiel);
           speichere();
           tisch.kommentar('');
           continue;
@@ -247,11 +263,14 @@
           let wahl;
           if (s === 0) {
             wahl = await warteAufMensch('ansage');
+            V.ansage(partie, r, 0, wahl, { stufe: 'mensch' });
           } else {
             tisch.kommentar(esc(spieler[s].name) + ' überlegt …');
             await tisch.warte(tempo().denken + 250);
             if (!lebt()) return;
-            wahl = B.waehleAnsage(spiel, s, spieler[s].typ).code;
+            const w = B.waehleAnsage(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
+            wahl = w.code;
+            V.ansage(partie, r, s, wahl, { stufe: spieler[s].typ, grund: w.grund, liste: w.liste });
             if (anzeige.erklaeren && wahl !== 'SCHIEBEN' && spieler[s].typ !== 'leicht') tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(B.faustregel(r.haende[s], wahl)));
             else tisch.kommentar('');
           }
@@ -273,11 +292,14 @@
           karte = await warteAufMensch('karte');
           if (!lebt()) return;
           tisch.kommentar('');
+          V.karte(partie, r, 0, karte, { stufe: 'mensch', tipp: letzterTipp });
+          letzterTipp = null;
         } else {
           await tisch.warte(tempo().denken);
           if (!lebt()) return;
-          const zug = B.waehleKarte(spiel, s, spieler[s].typ);
+          const zug = B.waehleKarte(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
           karte = zug.karte;
+          V.karte(partie, r, s, karte, { stufe: spieler[s].typ, grund: zug.grund, werte: zug.werte });
           if (anzeige.erklaeren && spieler[s].typ !== 'leicht') tisch.kommentar('<b>' + esc(spieler[s].name) + ':</b> ' + esc(zug.grund));
         }
         const vorher = r.stoeckGemeldet;
@@ -309,14 +331,17 @@
 
     function zeigeSpielende() {
       try { localStorage.removeItem(KEY_SPIEL); } catch (e) { /* egal */ }
+      if (partie) { V.spielFertig(partie, spiel); V.speichere(partie); }
       const box = tisch.oeffneDialog(`<div class="ergebnis-titel">🏆 ${esc(tisch.siegerText())}</div>
         <p class="muted" style="text-align:center">${spiel.summe[0]} : ${spiel.summe[1]}</p>
         ${tisch.verlaufHtml()}
         <div class="reihe"><button class="btn" type="button" id="nochmals" style="flex:1">Nochmals spielen</button>
-        <button class="btn-ghost" type="button" id="zurueck">Einstellungen</button></div>`, false);
+        <button class="btn-ghost" type="button" id="zurueck">Einstellungen</button></div>
+        <a class="btn-ghost btn-voll" href="verlauf.html?p=${encodeURIComponent(partie ? partie.id : '')}">Partie nochmals ansehen</a>`, false);
       box.querySelector('#nochmals').addEventListener('click', () => {
         tisch.schliesseDialog();
         spiel = J.neuesSpiel(spiel.regeln);
+        partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
         speichere();
         starteTisch();
       });
@@ -330,9 +355,34 @@
           <p class="muted klein">${spiel.regeln.untertrumpfen ? 'Untertrumpfen erlaubt' : 'Untertrumpfen verboten'} · ${spiel.regeln.puurFrei ? 'Puur muss nicht angegeben werden' : 'Puur muss angegeben werden'} · letzter Stich ${spiel.regeln.letzterStich} Punkte</p></div></details>
         <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="menuAnzeige"></div></details>
         <button class="btn btn-voll" type="button" data-schliessen>Weiterspielen</button>
+        <button class="btn-ghost btn-voll" type="button" id="markieren">🚩 Etwas komisch? Markieren</button>
         <button class="btn-ghost btn-voll" type="button" id="abbrechen">Spiel verlassen (wird gespeichert)</button>`);
+      box.querySelector('#markieren').addEventListener('click', zeigeMarkieren);
       E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); });
       box.querySelector('#abbrechen').addEventListener('click', zurEinrichtung);
+    }
+
+    // Eine Notiz zum aktuellen Moment – landet in der Aufzeichnung und lässt
+    // sich später im Verlauf (und in der exportierten Datei) wiederfinden.
+    function zeigeMarkieren() {
+      const r = spiel.runde;
+      const wo = 'Runde ' + (r.nr + 1) + (r.phase === 'ansage' ? ', bei der Ansage' : ', Stich ' + Math.min(r.stichNr + 1, 9));
+      const box = tisch.oeffneDialog(`<h2>🚩 Markieren</h2>
+        <p class="muted">${wo}. Was war komisch? Zum Beispiel: «Anna hat das Ass weggeworfen, obwohl …»</p>
+        <textarea class="text-feld" id="notizText" rows="4" style="min-height:96px;padding:10px" maxlength="600"></textarea>
+        <button class="btn btn-voll" type="button" id="notizOk">Speichern</button>
+        <button class="btn-ghost btn-voll" type="button" data-schliessen>Abbrechen</button>`);
+      const feld = box.querySelector('#notizText');
+      setTimeout(() => feld.focus(), 50);
+      box.querySelector('#notizOk').addEventListener('click', () => {
+        const text = feld.value.trim();
+        if (!text) { feld.focus(); return; }
+        const letzter = r.stiche[r.stiche.length - 1];
+        V.notiz(partie, { runde: r.nr, stich: r.phase === 'ansage' ? null : r.stichNr, text, letzterStich: letzter ? letzter.karten : null });
+        V.speichere(partie);
+        tisch.schliesseDialog();
+        tisch.toast('Markiert – im Verlauf zu finden');
+      });
     }
 
     // Direkt mit der Hand aus dem Trumpf-Trainer weiterspielen.
@@ -345,7 +395,11 @@
         const haende = [hand, rest.slice(0, 9), rest.slice(9, 18), rest.slice(18, 27)];
         const mitSchieben = geschoben && regeln.schieben;
         spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: mitSchieben ? 2 : 0 });
-        if (mitSchieben) J.schieben(spiel);
+        partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
+        if (mitSchieben) {
+          V.ansage(partie, spiel.runde, 2, 'SCHIEBEN', { stufe: spieler[2].typ, grund: 'Aus dem Trumpf-Trainer: geschoben' });
+          J.schieben(spiel);
+        }
         history.replaceState(null, '', location.pathname);
         speichere();
         starteTisch();
