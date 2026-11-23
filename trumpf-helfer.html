@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Trumpf-Helfer</title>
   <link rel="stylesheet" href="jass-ui.css" />
   <style>
@@ -16,7 +19,7 @@
     .farb-reihe button.gewaehlt .karte-svg { filter: drop-shadow(0 0 6px rgba(253, 224, 71, .95)); }
     .farb-reihe button:disabled { opacity: .35; }
     .meine-hand {
-      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
+      background: radial-gradient(ellipse at center, #252832 0%, #15171d 60%, #0c0d11 100%);
       border-radius: 20px; padding: 10px; border: 1px solid rgba(255,255,255,0.12);
       display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; min-height: 80px;
     }
@@ -35,7 +38,7 @@
     .vergleich { border-radius: 16px; padding: 12px 14px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .35); display: flex; flex-direction: column; gap: 6px; }
     .vergleich.unter { background: rgba(248, 113, 113, .08); border-color: rgba(248, 113, 113, .4); }
     .vergleich .gross { font-size: 18px; font-weight: 800; }
-    .vergleich .gross b { color: #fde68a; }
+    .vergleich .gross b { color: #ff9d96; }
     .ergebnis-zeile { display: grid; grid-template-columns: 128px 1fr 48px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; font-size: 14px; }
     .ergebnis-zeile.beste { background: rgba(74, 222, 128, .1); }
     .ergebnis-zeile .name { font-weight: 800; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
@@ -68,7 +71,6 @@
           <button class="btn-ghost btn-klein" type="button" id="leeren">Leeren</button>
         </div>
       </div>
-      <p class="muted klein" data-vorlesen>Tippe unten deine 9 Karten an, nimm «Zufall» – oder fotografiere deine Hand. Dann zeige ich dir, was du ansagen solltest.</p>
       <div class="meine-hand" id="hand"></div>
       <div class="segmente" id="lage">
         <button type="button" data-lage="vorhand" class="aktiv">Ich sage an (darf schieben)</button>
@@ -248,7 +250,7 @@
         <h3>Ausgespielt</h3>
         <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
         <p class="muted">${wie}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
-        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=helfer" style="align-self:flex-start">📜 Gespielte Runde ansehen – Zug für Zug</a>` : ''}
+        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=helfer" style="align-self:flex-start">📜 Gespielte Runde</a>` : ''}
       </div>`;
     }
 
@@ -271,9 +273,7 @@
           <span class="name">${modusHtml(x.code)}</span>
           <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
           <span class="wert">${Math.round(x.punkte)}</span></div>`).join('')}</div>
-        <p class="muted klein">Ø Punkte für euer Team${regeln.multiplikatoren ? ' (mit Multiplikator)' : ''}, aus ${liste[0].n} durchgespielten Verteilungen. ${heuristik.code !== beste.code ? 'Die schnelle Faustregel hätte ' + esc(name(heuristik.code)) + ' gesagt – knapp, beides ist vertretbar.' : ''}</p>
-        <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&amp;geschoben=1' : ''}&amp;trainer=1&amp;zurueck=helfer">${ausgespielt ? 'Nochmals eine Runde' : 'Mit diesen Karten eine Runde'} gegen den Computer spielen</a>
-        <p class="muted klein" data-vorlesen data-sprechen="${esc(JSON.stringify(S.HELFER_RUNDE))}">Gespielt wird genau eine Runde – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert.</p>`;
+        <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&amp;geschoben=1' : ''}&amp;trainer=1&amp;zurueck=helfer">${ausgespielt ? 'Nochmals eine Runde' : 'Mit diesen Karten eine Runde'} spielen</a>`;
     }
 
     // Foto der Hand: Karten erkennen (jass-erkennung.js), vorwählen, rechnen.

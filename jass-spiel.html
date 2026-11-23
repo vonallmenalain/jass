@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Jass gegen Computer</title>
   <link rel="stylesheet" href="jass-ui.css" />
   <style>
@@ -20,7 +23,7 @@
     .sitz-zeile .lage { font-weight: 800; font-size: 13px; line-height: 1.2; }
     .sitz-zeile .lage small { color: var(--muted-2); font-weight: 600; font-size: 12px; margin-left: 6px; }
     .sitz-zeile .felder { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 8px; }
-    .start-leiste { position: sticky; bottom: 0; padding: 10px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, transparent, #0f172a 40%); }
+    .start-leiste { position: sticky; bottom: 0; padding: 10px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, transparent, #0c0e13 40%); }
   </style>
 </head>
 <body>
@@ -41,14 +44,13 @@
 
     <div class="panel stack">
       <h2>Spieler</h2>
-      <p class="muted klein">Du spielst mit dem Computer gegenüber im Team. Alle Computer spielen so stark sie können: Vor jedem Zug spielen sie viele mögliche Kartenverteilungen durch und nehmen, was im Schnitt am meisten bringt (wie viele, steht unter «Anzeige &amp; Hilfen» bei der Rechentiefe).</p>
       <div class="sitze" id="sitze"></div>
-      <label class="schalter"><span class="text"><span>💡 Tipps anbieten</span><small>Der Tipp-Knopf schlägt dir Karte und Ansage vor und sagt warum – mit 🔊 auch zum Anhören</small></span><input type="checkbox" id="tippsSchalter"></label>
+      <label class="schalter"><span class="text"><span>💡 Tipps anbieten</span></span><input type="checkbox" id="tippsSchalter"></label>
     </div>
 
     <div class="panel stack">
       <h2>Regeln</h2>
-      <p class="muted klein" id="regelZusammenfassung"></p>
+      <p class="muted klein" id="regelZusammenfassung" hidden></p>
       <div class="stack" id="regelFormular" style="gap:10px"></div>
     </div>
 
@@ -56,7 +58,7 @@
       <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="anzeigeFormular"></div></details>
     </div>
 
-    <a class="btn-ghost btn-voll" href="verlauf.html" style="margin-bottom:4px">📜 Gespielte Partien ansehen</a>
+    <a class="btn-ghost btn-voll" href="verlauf.html" style="margin-bottom:4px">📜 Gespielte Partien</a>
 
     <div class="start-leiste">
       <button class="btn btn-voll" type="button" id="startBtn">Spiel starten</button>
@@ -265,6 +267,8 @@
       try { localStorage.removeItem(KEY_SPIEL); } catch (e) { /* egal */ }
       zeigeWeiter();
     });
+    // Von der Startseite («Weiterspielen»): direkt zurück an den Tisch.
+    if (new URLSearchParams(location.search).has('weiter') && gespeichertesSpiel()) setTimeout(() => $('weiterBtn').click(), 0);
     $('startBtn').addEventListener('click', () => {
       spiel = J.neuesSpiel(regeln);
       partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen, welten: B.rechentiefe(anzeige.rechnen).welten });

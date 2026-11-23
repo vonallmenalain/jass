@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Stiche zählen</title>
   <link rel="stylesheet" href="jass-ui.css" />
   <style>
@@ -12,22 +15,22 @@
     .modus-chip .farbzeichen { width: 20px; height: 20px; }
     .aufgabe-zeile { display: flex; align-items: center; justify-content: center; gap: 8px; }
     .stich-feld {
-      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
+      background: radial-gradient(ellipse at center, #252832 0%, #15171d 60%, #0c0d11 100%);
       border-radius: 22px; padding: 14px; border: 1px solid rgba(255,255,255,0.12);
       display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: 520px; width: 100%; margin: 0 auto;
     }
     .stich-feld .karte { width: 100%; }
     .stich-feld .wert {
-      display: block; text-align: center; font-weight: 900; font-size: 15px; margin-top: 4px; color: #fde68a; min-height: 20px;
+      display: block; text-align: center; font-weight: 900; font-size: 15px; margin-top: 4px; color: #ff9d96; min-height: 20px;
     }
     .antwort { font-size: 44px; font-weight: 900; text-align: center; letter-spacing: .04em; min-height: 56px; font-variant-numeric: tabular-nums; }
     .antwort.richtig { color: #4ade80; }
     .antwort.falsch { color: #f87171; }
     .tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 360px; margin: 0 auto; width: 100%; }
     .tasten button { min-height: 58px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,0.08); font-size: 24px; font-weight: 900; }
-    .tasten button.ok { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #fff; }
+    .tasten button.ok { background: var(--accent); border: none; color: #1a0c0b; }
     .rechnung { text-align: center; line-height: 1.6; font-size: 15px; }
-    .rechnung b { color: #fde68a; }
+    .rechnung b { color: #ff9d96; }
     .werte-tabelle { width: 100%; border-collapse: collapse; font-size: 14px; }
     .werte-tabelle td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
     .werte-tabelle td:last-child { text-align: right; font-weight: 800; }
@@ -202,7 +205,7 @@
       const neu = !einst.rekord || serie.richtig / serie.laenge > einst.rekord.richtig / einst.rekord.laenge;
       if (neu) { einst.rekord = { richtig: serie.richtig, laenge: serie.laenge }; speichere(); }
       $('dialogInhalt').innerHTML = `<div class="ergebnis-titel" data-vorlesen>${serie.richtig === serie.laenge ? '🏆' : '⭐'} ${serie.richtig} von ${serie.laenge} richtig</div>
-        ${neu ? '<p style="text-align:center;color:#fde68a;font-weight:800">Neuer Rekord!</p>' : ''}
+        ${neu ? '<p style="text-align:center;color:#ff9d96;font-weight:800">Neuer Rekord!</p>' : ''}
         <button class="btn btn-voll" type="button" id="nochmal">Nochmals</button>
         <a class="btn-ghost btn-voll" href="training.html">Andere Übung</a>`;
       $('dialogInhalt').querySelector('.ergebnis-titel').dataset.sprechen = JSON.stringify(S.zaehlenErgebnis(serie.richtig, serie.laenge, neu));
