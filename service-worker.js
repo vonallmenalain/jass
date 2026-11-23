@@ -20,6 +20,7 @@ const APP_SHELL = [
   './jass-vorlesen.js',
   './jass-sprechtexte.js',
   './jass-erkennung.js',
+  './jass-toene.js',
   './jass-engine.js',
   './jass-protokoll.js',
   './jass-tisch.js',

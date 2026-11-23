@@ -48,6 +48,15 @@
   const KLASSISCH_LAGE = `translate(${((100 - 166.58 * KLASSISCH_MASS) / 2).toFixed(2)} 0) scale(${KLASSISCH_MASS.toFixed(5)}) translate(-1.25 5.01)`;
 
   function setzeBild(name) { bild = name === 'klassisch' || name === 'foto' ? name : 'eigen'; }
+  // Kartenrücken: 'alae' (schwarz mit dem Zeichen von alae.app) oder 'rot'.
+  let ruecken = 'alae';
+  function setzeRuecken(name) { ruecken = name === 'rot' ? 'rot' : 'alae'; }
+  // Das Zeichen von alae.app (zwei Winkel), aus dem Logopaket, Breite 1120.
+  const ALAE_ZEICHEN = '<path fill="#ECEDF2" d="M65.03 509.42L294.2 82.33A42.36 42.36 0 0 1 368.85 82.33L483.44 295.87A42.36 42.36 0 0 1 466.14 353.23A42.36 42.36 0 0 1 408.78 335.93L331.53 191.95L139.69 549.47A42.36 42.36 0 0 1 82.33 566.77A42.36 42.36 0 0 1 65.03 509.42Z"/><path fill="#FE7971" d="M521.98 509.42L751.15 82.33A42.36 42.36 0 0 1 825.8 82.33L1054.97 509.42A42.36 42.36 0 0 1 1037.67 566.77A42.36 42.36 0 0 1 980.31 549.47L788.47 191.95L596.63 549.47A42.36 42.36 0 0 1 539.28 566.77A42.36 42.36 0 0 1 521.98 509.42Z"/>';
+  function alaeZeichen(cx, cy, breite) {
+    const s = breite / 1120;
+    return `<g transform="translate(${(cx - 560 * s).toFixed(2)} ${(cy - 324 * s).toFixed(2)}) scale(${s.toFixed(5)})">${ALAE_ZEICHEN}</g>`;
+  }
 
   // Unsere Karten: Fotos, 400 × 625 (Seitenverhältnis wie die echten Karten),
   // im Feld 100 × 140 auf volle Höhe eingepasst.
@@ -142,6 +151,14 @@
   }
 
   function rueckseite() {
+    if (ruecken === 'alae') {
+      const schmalA = bild === 'foto' ? `transform="translate(${FOTO_X.toFixed(2)} 0) scale(${(FOTO_B / 100).toFixed(4)} 1)"` : '';
+      return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true"><g ${schmalA}>
+        <rect x="1" y="1" width="98" height="138" rx="9" fill="#0b0c10" stroke="#2a2d36" stroke-width="1.5"/>
+        <rect x="6.5" y="6.5" width="87" height="127" rx="6" fill="none" stroke="#FE7971" stroke-opacity=".45" stroke-width="1"/>
+        ${alaeZeichen(50, 70, 54)}
+      </g></svg>`;
+    }
     if (bild === 'klassisch') {
       return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true"><use href="${KLASSISCH_DATEI}#back" transform="${KLASSISCH_LAGE}" fill="#991b1b"/></svg>`;
     }
@@ -156,5 +173,5 @@
     </g></svg>`;
   }
 
-  root.JassKarten = { svg, rueckseite, zeichen, setzeFarben, setzeBild, farbeHex, FARBSCHEMA };
+  root.JassKarten = { svg, rueckseite, zeichen, setzeFarben, setzeBild, setzeRuecken, alaeZeichen, farbeHex, FARBSCHEMA };
 })(typeof self !== 'undefined' ? self : this);

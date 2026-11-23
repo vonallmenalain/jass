@@ -32,17 +32,41 @@
     return zeichen + (mitText ? `<span>${m.name}</span>` : '');
   }
 
+  // Jassteppiche (Anzeige & Hilfen → «Jassteppich», am Tisch mit ✏️).
+  const TEPPICHE = [
+    ['gruen', 'Klassisch grün'],
+    ['ecken', 'Vier Farben'],
+    ['trumpf', 'Trumpf in der Mitte'],
+    ['alae', 'alae.app'],
+    ['kreuz', 'Schweizerkreuz'],
+  ];
+  const KREUZ = '<svg class="deko-mitte deko-kreuz" viewBox="0 0 32 32"><path d="M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z" fill="#fff"/></svg>';
+  function teppichDeko(art, code) {
+    if (art === 'ecken') return `<div class="deko-ecke">${[0, 1, 2, 3].map((f) => K.zeichen(f)).join('')}</div>`;
+    if (art === 'trumpf') {
+      if (!code) return '';
+      const m = J.MODI[code];
+      return m.trumpf >= 0 ? `<div class="deko-mitte deko-trumpf">${K.zeichen(m.trumpf)}</div>` : `<div class="deko-mitte deko-trumpf deko-text">${m.symbol}</div>`;
+    }
+    if (art === 'alae') return `<svg class="deko-mitte deko-alae" viewBox="0 0 100 100">${K.alaeZeichen ? K.alaeZeichen(50, 50, 70) : ''}</svg>`;
+    if (art === 'kreuz') return KREUZ;
+    return '';
+  }
+
   const VORLAGE = `
     <div class="kopf">
       <button class="icon-btn" type="button" data-rolle="menu" aria-label="Menü">☰</button>
       <div class="info"><strong data-rolle="runden"></strong><span data-rolle="ansageInfo"></span></div>
+      <button class="icon-btn ton-btn" type="button" data-rolle="ton" aria-label="Töne aus">🔊</button>
       <div data-rolle="trumpf"></div>
     </div>
     <div class="stand">
       <div><span class="name team-a" data-rolle="teamA"></span><span><span class="runde" data-rolle="rundeA"></span> <span class="summe" data-rolle="summeA">0</span></span></div>
       <div><span class="name team-b" data-rolle="teamB"></span><span><span class="runde" data-rolle="rundeB"></span> <span class="summe" data-rolle="summeB">0</span></span></div>
     </div>
-    <div class="feld" data-rolle="feld">
+    <div class="feld-rahmen"><div class="feld" data-rolle="feld">
+      <div class="teppich-deko" data-rolle="deko" aria-hidden="true"></div>
+      <button class="teppich-stift" type="button" data-rolle="stift" aria-label="Jassteppich wählen">✏️</button>
       <div class="faecher" data-pos="1"></div>
       <div class="faecher" data-pos="2"></div>
       <div class="faecher" data-pos="3"></div>
@@ -53,7 +77,7 @@
       <div class="stich-info" data-rolle="stichInfo" hidden></div>
       <div class="hinweis-feld" data-rolle="hinweis" hidden></div>
       <div class="ansage" data-rolle="ansage" hidden></div>
-    </div>
+    </div></div>
     <div class="hand-bereich">
       <div class="kommentar" data-rolle="kommentar"></div>
       <div class="mein-name" data-rolle="meinName"></div>
@@ -103,8 +127,27 @@
       if (z.eingabe !== 'karte') gewaehlt = null;
     }
 
+    let teppichStand = '';
+    function zeichneTeppich() {
+      const art = TEPPICHE.some((t) => t[0] === anzeige().teppich) ? anzeige().teppich : 'gruen';
+      const code = z.spiel && z.spiel.runde.code;
+      const stand = art + '|' + (art === 'trumpf' ? code : '');
+      if (stand === teppichStand) return;
+      teppichStand = stand;
+      const feld = el('feld');
+      TEPPICHE.forEach((t) => feld.classList.toggle('teppich-' + t[0], t[0] === art));
+      el('deko').innerHTML = teppichDeko(art, code);
+    }
+    function zeichneTon() {
+      const aus = !root.JassToene || anzeige().klang === 'aus';
+      el('ton').textContent = aus ? '🔇' : '🔊';
+      el('ton').setAttribute('aria-label', aus ? 'Töne an' : 'Töne aus');
+    }
+
     function zeichne() {
       if (!z.spiel) return;
+      zeichneTeppich();
+      zeichneTon();
       zeichneKopf();
       zeichnePlaetze();
       zeichneStich();
@@ -172,9 +215,10 @@
     function zeichneFaecher(lage, n) {
       const f = wurzel.querySelector(`.faecher[data-pos="${lage}"]`);
       if (!f) return;
-      if (Number(f.dataset.n) === n && f.dataset.bild === (o.anzeige && o.anzeige.kartenbild)) return;
+      const bild = (o.anzeige && o.anzeige.kartenbild) + '|' + (o.anzeige && o.anzeige.ruecken);
+      if (Number(f.dataset.n) === n && f.dataset.bild === bild) return;
       f.dataset.n = n;
-      f.dataset.bild = o.anzeige && o.anzeige.kartenbild;
+      f.dataset.bild = bild;
       const schritt = n > 1 ? Math.min(6, 44 / (n - 1)) : 0;
       const rueck = rueckSeiteHtml();
       let html = '';
@@ -295,6 +339,7 @@
       }
       if (!anzeige().einTipp && gewaehlt !== k) {
         gewaehlt = k;
+        if (root.JassToene) root.JassToene.klick();
         zeichneHand();
         return;
       }
@@ -317,6 +362,7 @@
       if (e.target.closest('.lautsprecher')) { if (ansageSprache) root.JassStimme.sage(ansageSprache); return; }
       const b = e.target.closest('[data-ansage]');
       if (b && z.eingabe === 'ansage') {
+        if (root.JassToene) root.JassToene.klick();
         z.eingabe = null;
         el('ansage').hidden = true;
         if (o.beiAnsage) o.beiAnsage(b.dataset.ansage);
@@ -380,6 +426,42 @@
     });
 
     el('menu').addEventListener('click', () => { if (o.beiMenu) o.beiMenu(); });
+
+    function speichereAnzeige() {
+      if (o.speichereAnzeige) o.speichereAnzeige();
+      else if (root.JassEinstellungen) root.JassEinstellungen.speichereAnzeige(anzeige());
+    }
+    // 🔊/🔇: Töne schnell aus und wieder an (mit dem Klang von vorher).
+    let klangVorher = null;
+    el('ton').addEventListener('click', () => {
+      const a = anzeige();
+      if (!root.JassToene) return;
+      if (a.klang !== 'aus') { klangVorher = a.klang; a.klang = 'aus'; } else a.klang = klangVorher || 'papier';
+      root.JassToene.setze({ klang: a.klang, lautstaerke: a.lautstaerke });
+      speichereAnzeige();
+      zeichneTon();
+      if (a.klang !== 'aus') root.JassToene.klick();
+    });
+    // ✏️: Jassteppich wählen.
+    el('stift').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const code = (z.spiel && z.spiel.runde.code) || 'T1';
+      const jetzt = anzeige().teppich || 'gruen';
+      const box = oeffneDialog(`<h2>Jassteppich</h2>
+        <div class="teppich-wahl">${TEPPICHE.map(([id, titel]) => `<button type="button" class="teppich-probe ${id === jetzt ? 'aktiv' : ''}" data-teppich="${id}">
+          <span class="feld teppich-${id}"><span class="teppich-deko">${teppichDeko(id, code)}</span></span><span>${titel}</span></button>`).join('')}</div>
+        <button class="btn btn-voll" type="button" data-schliessen>Fertig</button>`);
+      box.querySelector('.teppich-wahl').addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-teppich]');
+        if (!b) return;
+        anzeige().teppich = b.dataset.teppich;
+        speichereAnzeige();
+        box.querySelectorAll('[data-teppich]').forEach((x) => x.classList.toggle('aktiv', x === b));
+        teppichStand = '';
+        zeichneTeppich();
+        if (root.JassToene) root.JassToene.klick();
+      });
+    });
     el('kommentar').addEventListener('click', (e) => {
       if (e.target.closest('.lautsprecher') && sprache && root.JassStimme) root.JassStimme.sage(sprache);
     });
@@ -422,6 +504,7 @@
       const stichEl = el('stich');
       stichEl.dataset.ziel = pos(eintrag.sieger);
       stichEl.classList.add('weg');
+      if (root.JassToene) root.JassToene.stich();
       await new Promise((r) => setTimeout(r, 420));
       anzeigeStich = null;
       zeichne();
@@ -485,6 +568,7 @@
       for (let runde = 0; runde < 3 && !fertig; runde++) {
         for (let i = 0; i < 4 && !fertig; i++) {
           const s = (geber + 1 + i) % 4;
+          if (root.JassToene) root.JassToene.austeilen();
           unterwegs.push(fliege(mitte, zielPunkt(s), breite, 3).then(() => {
             if (!austeilStand) return;
             austeilStand[s] = Math.min(9, austeilStand[s] + 3);
@@ -612,11 +696,14 @@
     }
 
     return {
-      setze, zeichne, zeichneHand, stichZeigen, austeilen, warte, kommentar, hinweis, blase, toast,
+      setze, zeichne, zeichneHand, stichZeigen, austeilen, warte, kommentar, hinweis, blase, toast, TEPPICHE,
       oeffneDialog, schliesseDialog, dialogOffen,
       abrechnungHtml, rundenendeHtml, verlaufHtml, siegerText, zeigeWeise,
       teamName, vonWem, tut, name, modusHtml, escapeHtml,
-      neueKarte(k) { neueKarte = k; },
+      neueKarte(k, sitz) {
+        neueKarte = k;
+        if (root.JassToene) root.JassToene.karte(sitz == null ? 0 : [0, 0.6, 0, -0.6][pos(sitz)]);
+      },
       get zustand() { return z; },
     };
   }

@@ -685,7 +685,7 @@ async function praesentiere() {
         tisch.zeichne();
         tisch.blase(Number(ev.s), T.modusHtml(ev.c, true) + (J.MODI[ev.c] && J.MODI[ev.c].trumpf >= 0 ? ' Trumpf' : ''));
       } else if (ev.t === 'k') {
-        tisch.neueKarte(Number(ev.k));
+        tisch.neueKarte(Number(ev.k), Number(ev.s));
         if (ev.st && s.regeln.stoeck) tisch.blase(Number(ev.s), 'Stöck!');
         const fertig = r.stich.length === 0 && r.stiche.length > 0;
         if (fertig) {

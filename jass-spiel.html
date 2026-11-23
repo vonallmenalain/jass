@@ -68,6 +68,7 @@
   <script src="jass-engine.js"></script>
   <script src="jass-bot.js"></script>
   <script src="jass-karten.js"></script>
+  <script src="jass-toene.js"></script>
   <script src="jass-einstellungen.js"></script>
   <script src="jass-stimme-dateien.js"></script>
   <script src="jass-stimme.js"></script>
@@ -141,6 +142,7 @@
       beiAnsage(code) { if (eingabe && eingabe.art === 'ansage') { const f = eingabe.fertig; eingabe = null; f(code); } },
       beiMenu: zeigeMenu,
       historie: () => historieHtml(),
+      speichereAnzeige: () => speichereAnzeige(anzeige),
       historieDa: () => !!(partie && partie.runden.length),
       tippKarte() {
         const t = B.schwerZug(spiel, 0, B.rechentiefe(anzeige.rechnen));
@@ -377,7 +379,7 @@
         }
         const vorher = r.stoeckGemeldet;
         const erg = J.spiele(spiel, s, karte);
-        tisch.neueKarte(karte);
+        tisch.neueKarte(karte, s);
         if (!vorher && r.stoeckGemeldet) tisch.blase(s, 'Stöck!');
         speichere();
         if (erg.stichFertig) {
