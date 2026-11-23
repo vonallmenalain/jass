@@ -19,7 +19,7 @@
     farben: 'klassisch',  // klassisch | vier
     einTipp: false,       // Karte mit einem Tipp spielen (sonst: antippen, dann nochmals)
     rechnen: 'normal',    // Rechentiefe der Computer und Tipps, «normal» = 300 Verteilungen (JassBot.RECHENTIEFE)
-    kartenbild: 'eigen',  // eigen | klassisch (SVG-cards, karten/README.md)
+    kartenbild: 'foto',   // foto (unsere Karten) | eigen | klassisch (SVG-cards) – karten/README.md
     stichWarten: true,    // gegen den Computer: der volle Stich bleibt liegen, bis man tippt
     austeilen: true,      // das Austeilen zeigen (Karten fliegen zu den Plätzen)
   };
@@ -221,7 +221,7 @@
       container.innerHTML = `
         ${o.tempo !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Tempo der Computer</span>${segmente('tempo', [['langsam', 'Langsam'], ['normal', 'Normal'], ['schnell', 'Schnell']], a.tempo)}</div>` : ''}
         ${o.rechnen !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Rechentiefe</span>${segmente('rechnen', [['schnell', 'Schnell'], ['normal', 'Normal'], ['gruendlich', 'Gründlich'], ['maximal', 'Maximal']], a.rechnen)}<small class="muted klein">Wie viele mögliche Kartenverteilungen die Computer und der Tipp vor jedem Zug durchspielen: 120, 300 (Standard), 600 oder 1000. Mehr rechnet länger (auf dem Handy bis zu ein paar Sekunden), wird aber nur wenig stärker.</small></div>` : ''}
-        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenbild</span>${segmente('kartenbild', [['eigen', 'Jass-App'], ['klassisch', 'Klassisch']], a.kartenbild)}<small class="muted klein">Klassisch: echte französische Karten mit Bildfiguren (SVG-cards von David Bellot, frei unter LGPL). Die Kartenfarben unten gelten nur für «Jass-App».</small></div>
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenbild</span>${segmente('kartenbild', [['foto', 'Unsere Karten'], ['eigen', 'Jass-App'], ['klassisch', 'Klassisch']], a.kartenbild)}<small class="muted klein">Unsere Karten: der Kartensatz, mit dem wir spielen, fotografiert. Klassisch: französische Karten von SVG-cards (David Bellot, frei unter LGPL). Die Kartenfarben unten gelten nur für «Jass-App».</small></div>
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}<small class="muted klein">Vier Farben: Kreuz grün, Ecke blau – leichter zu unterscheiden.</small></div>
         ${o.spiel !== false ? `
         ${schalter('hilfen', 'Erlaubte Karten hervorheben', 'Karten, die du nicht spielen darfst, werden abgedunkelt', a.hilfen)}
