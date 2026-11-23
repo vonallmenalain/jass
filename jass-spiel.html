@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Jass spielen</title>
+  <link rel="stylesheet" href="jass-ui.css" />
+  <style>
+    /* ------------------------------------------------------------ Einrichten */
+    .sitze { display: grid; gap: 10px; }
+    .sitz-zeile {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .sitz-zeile .lage { font-weight: 800; font-size: 13px; line-height: 1.2; }
+    .sitz-zeile .lage small { color: var(--muted-2); font-weight: 600; font-size: 12px; margin-left: 6px; }
+    .sitz-zeile .felder { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 8px; }
+    .team-a { color: #fcd34d; }
+    .team-b { color: #93c5fd; }
+    .start-leiste { position: sticky; bottom: 0; padding: 10px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, transparent, #0f172a 40%); }
+
+    /* ---------------------------------------------------------------- Tisch */
+    #tisch {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      padding: calc(8px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+      gap: 8px;
+      max-width: 980px; margin: 0 auto;
+    }
+    .kopf { display: flex; align-items: center; gap: 8px; }
+    .kopf .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .kopf .info strong { font-size: 15px; }
+    .kopf .info span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .trumpf-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 999px;
+      background: #fffdf8; color: #111827; font-weight: 800; font-size: 14px;
+      box-shadow: 0 6px 14px rgba(0,0,0,.3);
+      white-space: nowrap;
+    }
+    .trumpf-chip .farbzeichen { width: 18px; height: 18px; }
+    .stand { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stand > div {
+      border-radius: 14px; padding: 6px 10px;
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0;
+    }
+    .stand .name { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stand .summe { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .stand .runde { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .feld {
+      position: relative; flex: 1; min-height: 220px;
+      border-radius: 28px;
+      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 45%, var(--felt-2) 100%);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: inset 0 0 40px rgba(0,0,0,.35), var(--shadow);
+      overflow: hidden;
+      --tw: clamp(48px, min(15vw, 10.5vh), 86px);
+    }
+    .platz {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      width: 84px; text-align: center; z-index: 3;
+    }
+    .platz[data-pos="2"] { top: 8px; left: 50%; transform: translateX(-50%); flex-direction: row; width: auto; gap: 8px; text-align: left; }
+    .platz[data-pos="2"] .ptext { align-items: flex-start; }
+    .ptext { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+    .platz[data-pos="1"] { right: 4px; top: 50%; transform: translateY(-50%); }
+    .platz[data-pos="3"] { left: 4px; top: 50%; transform: translateY(-50%); }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-weight: 900; font-size: 16px; color: #111827;
+      border: 2px solid rgba(255,255,255,.8);
+      transition: box-shadow .2s ease;
+    }
+    .platz.team0 .avatar { background: #fcd34d; }
+    .platz.team1 .avatar { background: #93c5fd; }
+    .platz.dran .avatar { box-shadow: 0 0 0 4px rgba(255,255,255,.35), 0 0 18px rgba(253, 224, 71, .9); }
+    .platz .pname { font-size: 12px; font-weight: 800; max-width: 84px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+    .platz .pinfo { font-size: 11px; color: #d1fae5; opacity: .85; }
+    .mini-karten { display: flex; height: 18px; }
+    .mini-karten i { width: 9px; height: 16px; border-radius: 2px; background: #991b1b; border: 1px solid #fffdf8; margin-left: -4px; }
+    .mini-karten i:first-child { margin-left: 0; }
+    .blase {
+      position: absolute; z-index: 6;
+      background: #fffdf8; color: #111827;
+      padding: 6px 10px; border-radius: 14px;
+      font-weight: 800; font-size: 13px; white-space: nowrap;
+      box-shadow: 0 8px 18px rgba(0,0,0,.35);
+      animation: blase 2.6s ease forwards;
+      pointer-events: none;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .blase .farbzeichen { width: 15px; height: 15px; }
+    @keyframes blase { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.9); } 8% { opacity: 1; transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+    .stich {
+      position: absolute; left: 50%; top: 55%;
+      width: 0; height: 0;
+      z-index: 2;
+      transition: transform .45s ease, opacity .45s ease;
+    }
+    .stich .karte {
+      position: absolute;
+      width: var(--tw);
+      margin-left: calc(var(--tw) / -2);
+      margin-top: calc(var(--tw) * -0.7);
+      transition: transform .2s ease;
+    }
+    .stich .karte[data-pos="0"] { transform: translate(0, calc(var(--tw) * 0.55)); z-index: 4; }
+    .stich .karte[data-pos="1"] { transform: translate(calc(var(--tw) * 0.78), 0); }
+    .stich .karte[data-pos="2"] { transform: translate(0, calc(var(--tw) * -0.55)); }
+    .stich .karte[data-pos="3"] { transform: translate(calc(var(--tw) * -0.78), 0); }
+    .stich .karte.neu { animation: rein .28s ease-out; }
+    .stich .karte[data-pos="0"].neu { --vx: 0; --vy: 40vh; }
+    .stich .karte[data-pos="1"].neu { --vx: 40vw; --vy: 0; }
+    .stich .karte[data-pos="2"].neu { --vx: 0; --vy: -40vh; }
+    .stich .karte[data-pos="3"].neu { --vx: -40vw; --vy: 0; }
+    @keyframes rein { from { translate: var(--vx) var(--vy); opacity: .2; } to { translate: 0 0; opacity: 1; } }
+    .stich .karte.sieger .karte-svg { filter: drop-shadow(0 0 10px rgba(253, 224, 71, .95)) drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+    .stich.weg { opacity: 0; }
+    .stich.weg[data-ziel="0"] { transform: translate(0, 40vh) scale(.6); }
+    .stich.weg[data-ziel="1"] { transform: translate(40vw, 0) scale(.6); }
+    .stich.weg[data-ziel="2"] { transform: translate(0, -40vh) scale(.6); }
+    .stich.weg[data-ziel="3"] { transform: translate(-40vw, 0) scale(.6); }
+    .stich-info {
+      position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+      font-size: 12.5px; font-weight: 700; color: #d1fae5;
+      background: rgba(0,0,0,.25); padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+      z-index: 3;
+    }
+
+    /* Ansage */
+    .ansage {
+      position: absolute; inset: 0; z-index: 8;
+      display: flex; flex-direction: column;
+      overflow: auto; padding: 8px;
+      background: rgba(6, 30, 17, .35);
+    }
+    .ansage-box {
+      background: rgba(15, 23, 42, .92); border: 1px solid var(--border);
+      border-radius: 20px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+      box-shadow: var(--shadow); max-width: 420px; width: 100%; margin: auto;
+    }
+    .ansage-box h2 { font-size: 16px; text-align: center; }
+    .ansage-knoepfe { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+    @media (max-height: 700px) { .ansage-knoepfe button { min-height: 36px; } .ansage-box { padding: 10px; gap: 6px; } }
+    .ansage-knoepfe button {
+      min-height: 42px; border-radius: 12px; border: 1px solid var(--border);
+      background: #fffdf8; color: #111827; font-weight: 800; font-size: 14px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+    }
+    .ansage-knoepfe button .farbzeichen { width: 18px; height: 18px; }
+    .ansage-knoepfe button.empfohlen { outline: 3px solid var(--accent); outline-offset: 1px; }
+    .ansage-box .zeile { display: flex; gap: 6px; }
+    .ansage-box .zeile > * { flex: 1; }
+    .tipp-text { font-size: 13px; color: #fde68a; line-height: 1.4; }
+
+    /* Hand */
+    .hand-bereich { display: flex; flex-direction: column; gap: 6px; }
+    .kommentar {
+      min-height: 20px; font-size: 13px; color: var(--muted); line-height: 1.35;
+      padding: 0 4px; text-align: center;
+    }
+    .kommentar b { color: var(--text); }
+    .hand { position: relative; height: calc(var(--kw, 60px) * 1.4 + 16px); }
+    .hand .karte { position: absolute; bottom: 0; transition: transform .15s ease, filter .15s ease, left .2s ease; }
+    .hand .karte.gesperrt .karte-svg { filter: brightness(.55) saturate(.6) drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+    .hand .karte.gewaehlt { transform: translateY(-14px); }
+    .hand .karte.vorschlag { animation: puls 1s ease-in-out 3; }
+    .hand.aktiv .karte:not(.gesperrt):hover { transform: translateY(-8px); }
+    .hand.aktiv .karte.gewaehlt:hover { transform: translateY(-14px); }
+    @keyframes puls { 50% { transform: translateY(-16px); } }
+    .aktionen { display: flex; gap: 8px; justify-content: center; }
+    .aktionen .btn-ghost { min-height: 36px; font-size: 14px; flex: 1; max-width: 200px; border-radius: 12px; }
+    .mein-name { text-align: center; font-size: 12.5px; font-weight: 800; color: #fcd34d; }
+
+    /* Weitergeben */
+    .weitergeben {
+      position: fixed; inset: 0; z-index: 70;
+      background: linear-gradient(180deg, #0b1120, #111827);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+      padding: 24px; text-align: center;
+    }
+    .weitergeben .gross { font-size: 28px; font-weight: 900; letter-spacing: -0.03em; }
+
+    .ergebnis-titel { font-size: 26px; font-weight: 900; text-align: center; letter-spacing: -0.03em; }
+    .letzter-stich { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .letzter-stich figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
+    .letzter-stich .karte { --kw: 64px; }
+    .letzter-stich figure.sieger figcaption { color: #fde68a; font-weight: 800; }
+
+    @media (min-width: 700px) {
+      .feld { --tw: clamp(60px, min(11vw, 12vh), 96px); }
+      .platz { width: 110px; }
+    }
+    @media (max-height: 620px) {
+      .stand .summe { font-size: 17px; }
+      .avatar { width: 32px; height: 32px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ======================================================== Einrichten -->
+  <div class="app" id="einrichten" style="--max: 640px">
+    <div class="topbar">
+      <a class="icon-btn" href="index.html" aria-label="Zurück zur Startseite">←</a>
+      <div class="topbar-titel"><span class="eyebrow">Schieber</span><h1>Jass spielen</h1></div>
+    </div>
+
+    <div class="panel stack" id="weiterPanel" hidden>
+      <h2>Angefangenes Spiel</h2>
+      <p class="muted" id="weiterText"></p>
+      <div class="reihe">
+        <button class="btn" type="button" id="weiterBtn" style="flex:1">Weiterspielen</button>
+        <button class="btn-ghost" type="button" id="verwerfenBtn">Verwerfen</button>
+      </div>
+    </div>
+
+    <div class="panel stack">
+      <h2>Spieler</h2>
+      <p class="muted klein">Wer gegenübersitzt, spielt mit dir im Team. Mehrere Menschen an einem Gerät: Das Gerät wird vor jedem Zug weitergegeben.</p>
+      <div class="sitze" id="sitze"></div>
+    </div>
+
+    <div class="panel stack">
+      <h2>Regeln</h2>
+      <p class="muted klein" id="regelZusammenfassung"></p>
+      <div class="stack" id="regelFormular" style="gap:10px"></div>
+    </div>
+
+    <div class="panel stack">
+      <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="anzeigeFormular"></div></details>
+    </div>
+
+    <div class="start-leiste">
+      <button class="btn btn-voll" type="button" id="startBtn">Spiel starten</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= Tisch -->
+  <div id="tisch" hidden>
+    <div class="kopf">
+      <button class="icon-btn" type="button" id="menuBtn" aria-label="Menü">☰</button>
+      <div class="info"><strong id="rundenInfo">Runde 1</strong><span id="ansageInfo"></span></div>
+      <div id="trumpfChip"></div>
+    </div>
+    <div class="stand">
+      <div><span class="name team-a" id="teamNameA"></span><span><span class="runde" id="rundeA"></span> <span class="summe" id="summeA">0</span></span></div>
+      <div><span class="name team-b" id="teamNameB"></span><span><span class="runde" id="rundeB"></span> <span class="summe" id="summeB">0</span></span></div>
+    </div>
+    <div class="feld" id="feld">
+      <div class="platz" data-pos="1"></div>
+      <div class="platz" data-pos="2"></div>
+      <div class="platz" data-pos="3"></div>
+      <div class="stich" id="stich"></div>
+      <div class="stich-info" id="stichInfo" hidden></div>
+      <div class="ansage" id="ansage" hidden></div>
+    </div>
+    <div class="hand-bereich">
+      <div class="kommentar" id="kommentar"></div>
+      <div class="mein-name" id="meinName"></div>
+      <div class="hand" id="hand"></div>
+      <div class="aktionen">
+        <button class="btn-ghost" type="button" id="tippBtn">💡 Tipp</button>
+        <button class="btn-ghost" type="button" id="letzterBtn">Letzter Stich</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="weitergeben" id="weitergeben" hidden>
+    <div class="muted">Bitte das Gerät weitergeben an</div>
+    <div class="gross" id="weitergebenName"></div>
+    <p class="muted klein" style="max-width:320px">Die anderen schauen bitte weg. Erst tippen, wenn du das Gerät in der Hand hast.</p>
+    <button class="btn" type="button" id="weitergebenBtn" style="min-width:240px"></button>
+  </div>
+
+  <div class="dialog-hinten" id="dialog"><div class="dialog" id="dialogInhalt" role="dialog" aria-modal="true"></div></div>
+
+  <script src="jass-engine.js"></script>
+  <script src="jass-bot.js"></script>
+  <script src="jass-karten.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const J = window.JassEngine;
+    const B = window.JassBot;
+    const K = window.JassKarten;
+    const E = window.JassEinstellungen;
+
+    const KEY_SPIEL = 'jass-lernen-spiel-v1';
+    const KEY_SPIELER = 'jass-lernen-spieler-v1';
+    const LAGE = ['Unten', 'Rechts', 'Gegenüber', 'Links'];
+    const LAGE_TEXT = ['Du', 'Gegner', 'Partner', 'Gegner'];
+    const STANDARD_SPIELER = [
+      { name: 'Du', typ: 'mensch' },
+      { name: 'Anna', typ: 'mittel' },
+      { name: 'Ben', typ: 'mittel' },
+      { name: 'Clara', typ: 'mittel' },
+    ];
+    const TYPEN = [['mensch', '👤 Mensch'], ['leicht', '🤖 Leicht'], ['mittel', '🤖 Mittel'], ['schwer', '🤖 Schwer']];
+    const TEMPO = {
+      langsam: { denken: 1150, stich: 1700 },
+      normal: { denken: 650, stich: 1100 },
+      schnell: { denken: 260, stich: 600 },
+    };
+
+    let regeln = E.ladeRegeln();
+    let anzeige = E.ladeAnzeige();
+    let spieler = (E.lese(KEY_SPIELER) || STANDARD_SPIELER).map((s, i) => Object.assign({}, STANDARD_SPIELER[i], s));
+    K.setzeFarben(anzeige.farben);
+
+    // Laufender Zustand
+    let spiel = null;
+    let ansichtSitz = 0;
+    let laufId = 0;
+    let warteKarte = null;     // resolve-Funktion, wenn ein Mensch spielen soll
+    let warteAnsage = null;
+    let gewaehlt = null;
+    let anzeigeStich = null;   // ein fertiger Stich, der noch kurz liegen bleibt
+    let neueKarte = -1;
+    let ueberspringen = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    // ---------------------------------------------------------- Einrichten
+
+    function zeichneSitze() {
+      const reihenfolge = [0, 2, 1, 3];
+      $('sitze').innerHTML = reihenfolge.map((s) => {
+        const sp = spieler[s];
+        const teamKlasse = s % 2 === 0 ? 'team-a' : 'team-b';
+        return `<div class="sitz-zeile">
+          <div class="lage ${teamKlasse}">${LAGE[s]}<small>${s === 0 ? 'Team A' : s === 2 ? 'Team A · dein Partner' : 'Team B · Gegner'}</small></div>
+          <div class="felder">
+            <input class="text-feld" data-sitz="${s}" data-feld="name" maxlength="16" value="${escapeHtml(sp.name)}" aria-label="Name ${LAGE[s]}">
+            <select class="text-feld" data-sitz="${s}" data-feld="typ" aria-label="Wer spielt ${LAGE[s]}">${TYPEN.map(([w, t]) => `<option value="${w}" ${sp.typ === w ? 'selected' : ''}>${t}</option>`).join('')}</select>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    $('sitze').addEventListener('input', (e) => {
+      const el = e.target;
+      if (!el.dataset.sitz) return;
+      const s = Number(el.dataset.sitz);
+      spieler[s][el.dataset.feld] = el.dataset.feld === 'name' ? el.value.trim() || LAGE_TEXT[s] : el.value;
+      E.schreibe(KEY_SPIELER, spieler);
+    });
+
+    function zeigeZusammenfassung() {
+      $('regelZusammenfassung').textContent = E.zusammenfassung(regeln);
+    }
+
+    E.regelFormular($('regelFormular'), regeln, (r) => { E.speichereRegeln(r); zeigeZusammenfassung(); });
+    E.anzeigeFormular($('anzeigeFormular'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); });
+    zeichneSitze();
+    zeigeZusammenfassung();
+
+    function gespeichertesSpiel() {
+      const g = E.lese(KEY_SPIEL);
+      if (!g || !g.spiel || g.spiel.fertig || g.spiel.version !== 1) return null;
+      return g;
+    }
+
+    function zeigeWeiter() {
+      const g = gespeichertesSpiel();
+      $('weiterPanel').hidden = !g;
+      if (g) {
+        const s = g.spiel;
+        $('weiterText').textContent = 'Runde ' + (s.rundeNr + 1) + ' · ' + g.spieler.map((x) => x.name).join(', ') + ' · Stand ' + s.summe[0] + ' : ' + s.summe[1];
+      }
+    }
+    zeigeWeiter();
+
+    $('weiterBtn').addEventListener('click', () => {
+      const g = gespeichertesSpiel();
+      if (!g) return;
+      spiel = g.spiel;
+      spieler = g.spieler;
+      ansichtSitz = g.ansichtSitz || erstesMensch();
+      starteTisch();
+    });
+    $('verwerfenBtn').addEventListener('click', () => {
+      try { localStorage.removeItem(KEY_SPIEL); } catch (e) { /* egal */ }
+      zeigeWeiter();
+    });
+    $('startBtn').addEventListener('click', () => {
+      spiel = J.neuesSpiel(regeln);
+      ansichtSitz = erstesMensch();
+      speichere();
+      starteTisch();
+    });
+
+    function erstesMensch() {
+      const i = spieler.findIndex((s) => s.typ === 'mensch');
+      return i < 0 ? 0 : i;
+    }
+    const istMensch = (s) => spieler[s].typ === 'mensch';
+    const anzahlMenschen = () => spieler.filter((s) => s.typ === 'mensch').length;
+
+    function speichere() {
+      if (!spiel) return;
+      E.schreibe(KEY_SPIEL, { spiel, spieler, ansichtSitz });
+    }
+
+    // --------------------------------------------------------------- Tisch
+
+    function starteTisch() {
+      $('einrichten').hidden = true;
+      $('tisch').hidden = false;
+      document.title = 'Jass · Runde ' + (spiel.rundeNr + 1);
+      zeichneAlles();
+      ablauf();
+    }
+
+    function zurEinrichtung() {
+      laufId++;
+      warteKarte = null;
+      warteAnsage = null;
+      schliesseDialog();
+      $('weitergeben').hidden = true;
+      $('tisch').hidden = true;
+      $('einrichten').hidden = false;
+      regeln = E.ladeRegeln();
+      zeichneSitze();
+      zeigeWeiter();
+      window.scrollTo(0, 0);
+    }
+
+    const pos = (sitz) => (sitz - ansichtSitz + 4) % 4;
+    const teamName = (t) => spieler[t].name + ' & ' + spieler[t + 2].name;
+    const istDu = (s) => /^du$/i.test(spieler[s].name.trim());
+    const vonWem = (s) => (istDu(s) ? 'dir' : spieler[s].name);
+    const tut = (s, er, du) => spieler[s].name + ' ' + (istDu(s) ? du : er);
+
+    function modusHtml(code, mitText) {
+      const m = J.MODI[code];
+      const zeichen = m.trumpf >= 0 ? K.zeichen(m.trumpf) : `<span>${m.symbol}</span>`;
+      return zeichen + (mitText ? `<span>${m.name}</span>` : '');
+    }
+
+    function zeichneAlles() {
+      zeichneKopf();
+      zeichnePlaetze();
+      zeichneStich();
+      zeichneHand();
+    }
+
+    function zeichneKopf() {
+      const r = spiel.runde;
+      const re = spiel.regeln;
+      $('rundenInfo').textContent = re.spielende === 'punkte'
+        ? 'Runde ' + (spiel.rundeNr + 1) + ' · bis ' + re.zielPunkte
+        : 'Runde ' + Math.min(spiel.rundeNr + 1, re.runden) + ' von ' + re.runden;
+      if (r.code) {
+        const f = re.multiplikatoren ? Number(re.faktoren[r.code]) || 1 : 1;
+        $('trumpfChip').innerHTML = `<span class="trumpf-chip">${modusHtml(r.code, true)}${f > 1 ? ' ×' + f : ''}</span>`;
+        $('ansageInfo').textContent = 'angesagt von ' + vonWem(r.angesagtVon) + (r.geschoben ? ' (geschoben von ' + vonWem(r.ansager) + ')' : '');
+      } else {
+        $('trumpfChip').innerHTML = '';
+        $('ansageInfo').textContent = tut(J.ansageAmZug(r), 'sagt an', 'sagst an') + (r.geschoben ? ' (geschoben)' : '');
+      }
+      $('teamNameA').textContent = teamName(0);
+      $('teamNameB').textContent = teamName(1);
+      $('summeA').textContent = spiel.summe[0];
+      $('summeB').textContent = spiel.summe[1];
+      const imSpiel = r.phase !== 'ansage';
+      const rp = r.code === 'MIS' ? [r.punkte[1], r.punkte[0]] : r.punkte;
+      $('rundeA').textContent = imSpiel ? '+' + rp[0] : '';
+      $('rundeB').textContent = imSpiel ? '+' + rp[1] : '';
+    }
+
+    function amZugSitz() {
+      const r = spiel.runde;
+      if (r.phase === 'ansage') return J.ansageAmZug(r);
+      if (r.phase === 'spiel') return r.amZug;
+      return -1;
+    }
+
+    function zeichnePlaetze() {
+      const r = spiel.runde;
+      const dran = anzeigeStich ? -1 : amZugSitz();
+      document.querySelectorAll('.platz').forEach((el) => {
+        const p = Number(el.dataset.pos);
+        const s = (ansichtSitz + p) % 4;
+        const sp = spieler[s];
+        const anzahl = r.haende[s].length;
+        const rolle = [];
+        if (s === r.ansager) rolle.push('Vorhand');
+        if (r.code && s === r.angesagtVon) rolle.push('Ansage');
+        const typ = sp.typ === 'mensch' ? '' : ' · ' + { leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer' }[sp.typ];
+        el.className = 'platz team' + (s % 2) + (s === dran ? ' dran' : '');
+        el.innerHTML = `<div class="avatar">${escapeHtml(sp.name.charAt(0).toUpperCase())}</div>
+          <div class="ptext"><div class="pname">${escapeHtml(sp.name)}</div>
+          <div class="mini-karten">${'<i></i>'.repeat(anzahl)}</div>
+          <div class="pinfo">${rolle.join(' · ') || (p === 2 ? 'Partner' : 'Gegner')}${typ}</div></div>`;
+      });
+      const ich = spieler[ansichtSitz];
+      $('meinName').textContent = ich.name + (ansichtSitz === r.ansager ? ' · Vorhand' : '') + (r.code && ansichtSitz === r.angesagtVon ? ' · Ansage' : '');
+    }
+
+    function zeichneStich() {
+      const r = spiel.runde;
+      const st = anzeigeStich || { karten: r.stich, sitze: r.stichSitze };
+      const el = $('stich');
+      if (el.classList.contains('weg')) {
+        el.style.transition = 'none';
+        el.classList.remove('weg');
+        void el.offsetWidth;
+        el.style.transition = '';
+      }
+      el.innerHTML = st.karten.map((k, i) => {
+        const s = st.sitze[i];
+        const klassen = ['karte'];
+        if (k === neueKarte) klassen.push('neu');
+        if (anzeigeStich && s === anzeigeStich.sieger) klassen.push('sieger');
+        const trumpf = r.code && J.MODI[r.code].trumpf === J.farbeVon(k);
+        return `<div class="${klassen.join(' ')}" data-pos="${pos(s)}">${K.svg(k, { trumpf, code: r.code })}</div>`;
+      }).join('');
+      neueKarte = -1;
+      const info = $('stichInfo');
+      if (anzeigeStich) {
+        info.hidden = false;
+        info.textContent = tut(anzeigeStich.sieger, 'macht', 'machst') + ' den Stich · ' + anzeigeStich.punkte + ' Punkte';
+      } else if (r.phase === 'spiel') {
+        info.hidden = false;
+        let t = 'Stich ' + (r.stichNr + 1) + ' von 9';
+        if (r.code === 'SLO' || r.code === 'SLU') t += ' · ' + (J.aktuellerEff(r) === J.EFF_OBE ? 'obenabe' : 'undenufe');
+        info.textContent = t;
+      } else info.hidden = true;
+    }
+
+    function zeichneHand() {
+      const r = spiel.runde;
+      const hand = J.sortiereHand(r.haende[ansichtSitz], r.code);
+      const el = $('hand');
+      const breite = el.clientWidth || 320;
+      const n = hand.length;
+      const kw = Math.min(92, Math.max(46, breite / (1 + Math.max(n - 1, 1) * 0.6)));
+      const schritt = n > 1 ? Math.min(kw * 1.06, (breite - kw) / (n - 1)) : 0;
+      const start = (breite - (kw + schritt * (n - 1))) / 2;
+      el.style.setProperty('--kw', kw + 'px');
+      const meinZug = !!warteKarte && r.amZug === ansichtSitz && r.phase === 'spiel';
+      const erlaubt = meinZug ? J.erlaubteFuer(spiel, ansichtSitz) : null;
+      el.classList.toggle('aktiv', meinZug);
+      const T = r.code ? J.MODI[r.code].trumpf : -1;
+      el.innerHTML = hand.map((k, i) => {
+        const kl = ['karte'];
+        if (meinZug && anzeige.hilfen && !erlaubt.includes(k)) kl.push('gesperrt');
+        if (k === gewaehlt) kl.push('gewaehlt');
+        return `<button type="button" class="${kl.join(' ')}" data-karte="${k}" style="left:${start + i * schritt}px;z-index:${i + 1}" aria-label="${J.kartenName(k, r.code)}">${K.svg(k, { trumpf: J.farbeVon(k) === T, code: r.code })}</button>`;
+      }).join('');
+      $('tippBtn').hidden = !anzeige.tipps;
+      $('tippBtn').disabled = !(meinZug || warteAnsage);
+      $('letzterBtn').disabled = !r.stiche.length;
+    }
+
+    window.addEventListener('resize', () => { if (spiel && !$('tisch').hidden) zeichneHand(); });
+
+    $('hand').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-karte]');
+      if (!b || !warteKarte) return;
+      const k = Number(b.dataset.karte);
+      const erlaubt = J.erlaubteFuer(spiel, ansichtSitz);
+      if (!erlaubt.includes(k)) {
+        kommentar(warumNicht(k));
+        return;
+      }
+      if (!anzeige.einTipp && gewaehlt !== k) {
+        gewaehlt = k;
+        zeichneHand();
+        return;
+      }
+      gewaehlt = null;
+      const f = warteKarte;
+      warteKarte = null;
+      f(k);
+    });
+
+    function warumNicht(k) {
+      const r = spiel.runde;
+      const led = J.farbeVon(r.stich[0]);
+      const eff = J.aktuellerEff(r);
+      const T = J.trumpfVon(eff);
+      const name = J.FARBEN[led].name;
+      if (led === T) return 'Es wurde Trumpf gespielt – du musst Trumpf angeben.';
+      if (J.farbeVon(k) === T) return 'Untertrumpfen ist nicht erlaubt: Dein Trumpf ist tiefer als der im Stich.';
+      return 'Es wurde ' + name + ' angespielt – du musst ' + name + ' angeben' + (T >= 0 ? ' (oder stechen).' : '.');
+    }
+
+    function kommentar(text) {
+      $('kommentar').innerHTML = text || '';
+    }
+
+    function blase(sitz, html, dauer) {
+      const feld = $('feld');
+      const p = pos(sitz);
+      const el = document.createElement('div');
+      el.className = 'blase';
+      el.innerHTML = html;
+      const lagen = [
+        { left: '50%', bottom: '14px' },
+        { left: 'calc(100% - 70px)', top: 'calc(50% - 62px)' },
+        { left: '50%', top: '64px' },
+        { left: '70px', top: 'calc(50% - 62px)' },
+      ];
+      Object.assign(el.style, lagen[p]);
+      if (dauer) el.style.animationDuration = dauer + 'ms';
+      feld.appendChild(el);
+      setTimeout(() => el.remove(), dauer || 2600);
+    }
+
+    function warte(ms) {
+      return new Promise((res) => {
+        const fertig = async () => {
+          ueberspringen = null;
+          while (menuOffen()) await new Promise((r) => setTimeout(r, 200));
+          res();
+        };
+        const t = setTimeout(fertig, ms);
+        ueberspringen = () => { clearTimeout(t); fertig(); };
+      });
+    }
+    const menuOffen = () => $('dialog').classList.contains('offen') && dialogSchliessbar;
+    $('feld').addEventListener('click', (e) => {
+      if (e.target.closest('.ansage')) return;
+      if (ueberspringen && anzeigeStich) ueberspringen();
+    });
+
+    // ----------------------------------------------------------- Ablauf
+
+    async function ablauf() {
+      const id = ++laufId;
+      const lebt = () => id === laufId;
+      while (lebt()) {
+        if (spiel.fertig) { zeigeSpielende(); return; }
+        const r = spiel.runde;
+        zeichneAlles();
+        if (r.phase === 'ende') {
+          await zeigeRundenende();
+          if (!lebt()) return;
+          J.rundeAbschliessen(spiel);
+          speichere();
+          kommentar('');
+          document.title = 'Jass · Runde ' + (spiel.rundeNr + 1);
+          continue;
+        }
+        if (r.phase === 'ansage') {
+          const s = J.ansageAmZug(r);
+          let wahl;
+          if (istMensch(s)) {
+            await sicherAnsicht(s);
+            if (!lebt()) return;
+            wahl = await new Promise((res) => { warteAnsage = res; zeigeAnsage(s); zeichneHand(); });
+            warteAnsage = null;
+            $('ansage').hidden = true;
+          } else {
+            kommentar(escapeHtml(spieler[s].name) + ' überlegt …');
+            await warte(TEMPO[anzeige.tempo].denken + 250);
+            if (!lebt()) return;
+            const w = B.waehleAnsage(spiel, s, spieler[s].typ);
+            wahl = w.code;
+            if (anzeige.erklaeren && wahl !== 'SCHIEBEN' && spieler[s].typ !== 'leicht') kommentar('<b>' + escapeHtml(spieler[s].name) + ':</b> ' + B.faustregel(r.haende[s], wahl));
+            else kommentar('');
+          }
+          if (!lebt()) return;
+          if (wahl === 'SCHIEBEN') {
+            J.schieben(spiel);
+            blase(s, 'Schiebe!');
+          } else {
+            J.ansagen(spiel, wahl);
+            blase(s, modusHtml(wahl, true) + (J.MODI[wahl].trumpf >= 0 ? ' Trumpf' : ''));
+            zeigeWeise();
+          }
+          speichere();
+          continue;
+        }
+        // Spielen
+        const s = r.amZug;
+        let karte;
+        if (istMensch(s)) {
+          await sicherAnsicht(s);
+          if (!lebt()) return;
+          if (r.stich.length === 0 && r.stichNr === 0 && !$('kommentar').textContent) kommentar('Du spielst aus.');
+          karte = await new Promise((res) => { warteKarte = res; zeichneHand(); zeichnePlaetze(); });
+          if (!lebt()) return;
+          kommentar('');
+        } else {
+          zeichnePlaetze();
+          await warte(TEMPO[anzeige.tempo].denken);
+          if (!lebt()) return;
+          const z = B.waehleKarte(spiel, s, spieler[s].typ);
+          karte = z.karte;
+          if (anzeige.erklaeren && spieler[s].typ !== 'leicht') kommentar('<b>' + escapeHtml(spieler[s].name) + ':</b> ' + escapeHtml(z.grund));
+        }
+        const vorher = r.stoeckGemeldet;
+        const erg = J.spiele(spiel, s, karte);
+        neueKarte = karte;
+        if (!vorher && r.stoeckGemeldet) blase(s, 'Stöck!');
+        speichere();
+        if (erg.stichFertig) {
+          anzeigeStich = erg.stich;
+          zeichneAlles();
+          if (erg.stich === r.stiche[0] && r.weis && r.weis.siegerTeam >= 0) {
+            toast(teamName(r.weis.siegerTeam) + ' schreiben ' + r.weis.punkte[r.weis.siegerTeam] + ' Weispunkte');
+          }
+          await warte(TEMPO[anzeige.tempo].stich);
+          if (!lebt()) return;
+          const el = $('stich');
+          el.dataset.ziel = pos(erg.stich.sieger);
+          el.classList.add('weg');
+          await new Promise((res) => setTimeout(res, 420));
+          anzeigeStich = null;
+          if (!lebt()) return;
+        }
+      }
+    }
+
+    async function sicherAnsicht(s) {
+      if (s === ansichtSitz) return;
+      if (anzahlMenschen() <= 1) { ansichtSitz = s; zeichneAlles(); return; }
+      $('weitergebenName').textContent = spieler[s].name;
+      $('weitergebenBtn').textContent = 'Ich bin ' + spieler[s].name + ' – Karten zeigen';
+      $('weitergeben').hidden = false;
+      await new Promise((res) => { $('weitergebenBtn').onclick = res; });
+      $('weitergeben').hidden = true;
+      ansichtSitz = s;
+      speichere();
+      zeichneAlles();
+    }
+
+    function zeigeWeise() {
+      const r = spiel.runde;
+      if (!r.weis) return;
+      for (let s = 0; s < 4; s++) {
+        const w = r.weis.proSitz[s];
+        if (!w.length) continue;
+        const summe = w.reduce((a, x) => a + x.punkte, 0);
+        setTimeout(() => blase(s, 'Weis ' + summe, 3200), 900 + s * 150);
+      }
+      const eigene = r.weis.proSitz[ansichtSitz];
+      if (eigene.length && istMensch(ansichtSitz)) {
+        kommentar('Dein Weis: ' + eigene.map((w) => J.weisName(w) + ' (' + w.punkte + ')').join(', '));
+      }
+    }
+
+    function zeigeAnsage(s) {
+      const r = spiel.runde;
+      const modi = J.erlaubteModi(spiel.regeln);
+      const darf = J.darfSchieben(r, spiel.regeln);
+      const el = $('ansage');
+      el.hidden = false;
+      el.innerHTML = `<div class="ansage-box">
+        <h2>${r.geschoben ? escapeHtml(spieler[r.ansager].name) + ' hat geschoben – du musst ansagen' : 'Was ist Trumpf?'}</h2>
+        <div class="tipp-text" id="ansageTipp"></div>
+        <div class="ansage-knoepfe">${modi.map((c) => `<button type="button" data-ansage="${c}">${modusHtml(c, true)}</button>`).join('')}</div>
+        <div class="zeile">
+          ${darf ? '<button class="btn-ghost btn-klein" type="button" data-ansage="SCHIEBEN">Schieben ↔</button>' : ''}
+          ${anzeige.tipps ? '<button class="btn-ghost btn-klein" type="button" data-tipp-ansage>💡 Tipp</button>' : ''}
+        </div>
+      </div>`;
+    }
+
+    $('ansage').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ansage]');
+      if (b && warteAnsage) { const f = warteAnsage; warteAnsage = null; f(b.dataset.ansage); return; }
+      if (e.target.closest('[data-tipp-ansage]')) tippAnsage();
+    });
+
+    function tippAnsage() {
+      const r = spiel.runde;
+      const s = J.ansageAmZug(r);
+      const hand = r.haende[s];
+      const box = $('ansageTipp');
+      box.textContent = 'Ich spiele deine Karten durch …';
+      const b = B.bewertung(hand, spiel.regeln, { geschoben: r.geschoben || !J.darfSchieben(r, spiel.regeln) });
+      const ziel = 160;
+      const schritt = () => {
+        if (!warteAnsage) return;
+        b.schritt(20);
+        if (b.gemacht < ziel) { setTimeout(schritt, 0); return; }
+        const liste = b.ergebnis();
+        const best = liste[0];
+        document.querySelectorAll('[data-ansage]').forEach((x) => x.classList.toggle('empfohlen', x.dataset.ansage === best.code));
+        const name = best.code === 'SCHIEBEN' ? 'Schieben' : J.MODI[best.code].lang;
+        box.innerHTML = '<b>' + name + '</b> – im Schnitt etwa ' + Math.round(best.punkte) + ' Punkte für euch' + (spiel.regeln.multiplikatoren ? ' (mit Multiplikator)' : '') + '. ' + escapeHtml(B.faustregel(hand, best.code));
+      };
+      setTimeout(schritt, 30);
+    }
+
+    $('tippBtn').addEventListener('click', () => {
+      if (warteAnsage) { tippAnsage(); return; }
+      if (!warteKarte) return;
+      const z = B.schwerZug(spiel, ansichtSitz);
+      gewaehlt = anzeige.einTipp ? null : z.karte;
+      zeichneHand();
+      const b = document.querySelector(`#hand [data-karte="${z.karte}"]`);
+      if (b && anzeige.einTipp) b.classList.add('vorschlag');
+      kommentar('💡 <b>' + J.kartenName(z.karte, spiel.runde.code) + ':</b> ' + escapeHtml(z.grund));
+    });
+
+    $('letzterBtn').addEventListener('click', () => {
+      const r = spiel.runde;
+      const st = r.stiche[r.stiche.length - 1];
+      if (!st) return;
+      oeffneDialog(`<h2>Letzter Stich</h2>
+        <div class="letzter-stich">${st.karten.map((k, i) => `<figure class="${st.sitze[i] === st.sieger ? 'sieger' : ''}"><div class="karte">${K.svg(k, { code: r.code })}</div><figcaption>${escapeHtml(spieler[st.sitze[i]].name)}</figcaption></figure>`).join('')}</div>
+        <p class="muted" style="text-align:center">${escapeHtml(tut(st.sieger, 'hat', 'hast'))} ihn gemacht · ${st.punkte} Punkte</p>
+        <button class="btn btn-voll" type="button" data-schliessen>OK</button>`);
+    });
+
+    // ------------------------------------------------------ Abrechnungen
+
+    function abrechnungTabelle(ab) {
+      const z = (titel, w, immer) => (immer || w[0] || w[1]) ? `<tr><td>${titel}</td><td>${w[0]}</td><td>${w[1]}</td></tr>` : '';
+      return `<table class="tabelle">
+        <thead><tr><th></th><th class="team-a">${escapeHtml(teamName(0))}</th><th class="team-b">${escapeHtml(teamName(1))}</th></tr></thead>
+        <tbody>
+          ${z(ab.code === 'MIS' ? 'Stiche (Misère: Punkte der Gegner)' : 'Stiche', ab.stich, true)}
+          ${z('Weisen', ab.weis)}
+          ${z('Stöck', ab.stoeck)}
+          ${z('Matchbonus', ab.match)}
+          ${ab.faktor > 1 ? `<tr><td>Multiplikator</td><td>×${ab.faktor}</td><td>×${ab.faktor}</td></tr>` : ''}
+        </tbody>
+        <tfoot><tr><td>Runde</td><td>${ab.total[0]}</td><td>${ab.total[1]}</td></tr></tfoot>
+      </table>`;
+    }
+
+    function zeigeRundenende() {
+      const r = spiel.runde;
+      const ab = r.abrechnung;
+      const modus = J.MODI[ab.code].lang;
+      let titel = modus;
+      if (ab.matchTeam >= 0 && ab.code !== 'MIS') titel = 'Match für ' + teamName(ab.matchTeam) + '!';
+      const re = spiel.regeln;
+      const letzte = re.spielende === 'runden' && spiel.runden.length + 1 >= re.runden;
+      const neu = [spiel.summe[0] + ab.total[0], spiel.summe[1] + ab.total[1]];
+      return new Promise((res) => {
+        oeffneDialog(`<div class="ergebnis-titel">${escapeHtml(titel)}</div>
+          <p class="muted" style="text-align:center">${modusHtml(ab.code, false)} angesagt von ${escapeHtml(vonWem(ab.angesagtVon))}${ab.geschoben ? ' (geschoben)' : ''}</p>
+          ${abrechnungTabelle(ab)}
+          <table class="tabelle"><tfoot><tr><td>Total</td><td class="team-a">${neu[0]}</td><td class="team-b">${neu[1]}</td></tr></tfoot></table>
+          <button class="btn btn-voll" type="button" id="rundeWeiter">${letzte ? 'Zum Resultat' : 'Nächste Runde'}</button>`, false);
+        $('rundeWeiter').addEventListener('click', () => { schliesseDialog(); res(); });
+      });
+    }
+
+    function verlaufTabelle() {
+      return `<table class="tabelle">
+        <thead><tr><th>Runde</th><th class="team-a">${escapeHtml(teamName(0))}</th><th class="team-b">${escapeHtml(teamName(1))}</th></tr></thead>
+        <tbody>${spiel.runden.map((ab, i) => `<tr><td>${i + 1}. ${modusHtml(ab.code, true)} <span class="muted klein">${escapeHtml(spieler[ab.angesagtVon].name)}</span></td><td>${ab.total[0]}</td><td>${ab.total[1]}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Noch keine Runde gespielt.</td></tr>'}</tbody>
+        <tfoot><tr><td>Total</td><td>${spiel.summe[0]}</td><td>${spiel.summe[1]}</td></tr></tfoot>
+      </table>`;
+    }
+
+    function zeigeSpielende() {
+      try { localStorage.removeItem(KEY_SPIEL); } catch (e) { /* egal */ }
+      const w = spiel.sieger;
+      const titel = w < 0 ? 'Unentschieden!' : teamName(w) + ' gewinnen!';
+      oeffneDialog(`<div class="ergebnis-titel">🏆 ${escapeHtml(titel)}</div>
+        <p class="muted" style="text-align:center">${spiel.summe[0]} : ${spiel.summe[1]}</p>
+        ${verlaufTabelle()}
+        <div class="reihe"><button class="btn" type="button" id="nochmals" style="flex:1">Nochmals spielen</button>
+        <button class="btn-ghost" type="button" id="zurueck">Einstellungen</button></div>`, false);
+      $('nochmals').addEventListener('click', () => {
+        schliesseDialog();
+        spiel = J.neuesSpiel(spiel.regeln);
+        ansichtSitz = erstesMensch();
+        speichere();
+        starteTisch();
+      });
+      $('zurueck').addEventListener('click', zurEinrichtung);
+    }
+
+    // ---------------------------------------------------------------- Menü
+
+    $('menuBtn').addEventListener('click', () => {
+      oeffneDialog(`<h2>Menü</h2>
+        <details class="abschnitt" open><summary>Spielstand</summary><div class="inhalt">${verlaufTabelle()}</div></details>
+        <details class="abschnitt"><summary>Regeln dieses Spiels</summary><div class="inhalt"><p class="muted">${escapeHtml(E.zusammenfassung(spiel.regeln))}</p>
+          <p class="muted klein">${spiel.regeln.untertrumpfen ? 'Untertrumpfen erlaubt' : 'Untertrumpfen verboten'} · ${spiel.regeln.puurFrei ? 'Puur muss nicht angegeben werden' : 'Puur muss angegeben werden'} · letzter Stich ${spiel.regeln.letzterStich} Punkte</p></div></details>
+        <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="menuAnzeige"></div></details>
+        <button class="btn btn-voll" type="button" data-schliessen>Weiterspielen</button>
+        <button class="btn-ghost btn-voll" type="button" id="abbrechen">Spiel verlassen (wird gespeichert)</button>`);
+      E.anzeigeFormular($('menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); zeichneAlles(); });
+      $('abbrechen').addEventListener('click', zurEinrichtung);
+    });
+
+    let dialogSchliessbar = true;
+    function oeffneDialog(html, schliessbar) {
+      dialogSchliessbar = schliessbar !== false;
+      $('dialogInhalt').innerHTML = html;
+      $('dialog').classList.add('offen');
+    }
+    function schliesseDialog() { $('dialog').classList.remove('offen'); }
+    $('dialog').addEventListener('click', (e) => {
+      if (e.target.closest('[data-schliessen]') || (e.target === $('dialog') && dialogSchliessbar)) schliesseDialog();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dialogSchliessbar) schliesseDialog(); });
+
+    function toast(text) {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.textContent = text;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2800);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Direkt mit der Hand aus dem Trumpf-Trainer weiterspielen.
+    const params = new URLSearchParams(location.search);
+    if (params.get('hand')) {
+      const hand = params.get('hand').split('.').map(Number).filter((k) => k >= 0 && k < 36);
+      if (hand.length === 9 && new Set(hand).size === 9) {
+        const rest = J.mische(Array.from({ length: 36 }, (_, k) => k).filter((k) => !hand.includes(k)), Math.random);
+        const geschoben = params.get('geschoben') === '1';
+        const haende = [hand, rest.slice(0, 9), rest.slice(9, 18), rest.slice(18, 27)];
+        spiel = J.neuesSpiel(Object.assign({}, regeln, { ersterAnsager: geschoben ? 'zufall' : 'sitz0' }), { haende });
+        spiel.regeln.ersterAnsager = regeln.ersterAnsager;
+        if (geschoben && spiel.regeln.schieben) {
+          spiel.ersterAnsager = 2;
+          spiel.runde.ansager = 2;
+          spiel.runde.amZug = 2;
+          J.schieben(spiel);
+        }
+        spieler[0].typ = 'mensch';
+        ansichtSitz = 0;
+        history.replaceState(null, '', location.pathname);
+        speichere();
+        starteTisch();
+      }
+    }
+  })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('service-worker.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
