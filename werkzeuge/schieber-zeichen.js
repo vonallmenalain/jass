@@ -12,6 +12,14 @@
 //            alle obersten Karten – und alle lesen daraus, was er nicht hat
 // Ausgabe: Ø Punkte des ansagenden Teams, getrennt nach Trumpf und
 // Obenabe/Undenufe. Mehrere Prozesse mit verschiedenem [start] laufen lassen.
+//
+// Ergebnis (23.11.2026, Rechentiefe normal, 3 × 400 Verteilungen, Vorsprung
+// «zeichen» gegenüber «bisher» in Punkten des ansagenden Teams):
+//   Trumpf               932 Runden   +0,15 ± 0,57
+//   Obenabe/Undenufe     268 Runden   −0,98 ± 1,56
+//   alle                1200 Runden   −0,10 ± 0,56
+// Kein messbarer Unterschied – die Regel kostet nichts und ist so, wie
+// Jasser es erwarten.
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
 
