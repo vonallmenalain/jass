@@ -153,7 +153,7 @@ test('Vorlesen: Jeder Satz, den Tipp und Computer sagen können, ist vertonbar',
   }
   for (let n = 0; n < 300; n++) {
     const hand = J.verteile(J.zufall(5000 + n))[0];
-    for (const code of J.MODUS_REIHENFOLGE.concat('SCHIEBEN')) B.faustregelTeile(hand, code).forEach(pruefe);
+    for (const code of J.MODUS_REIHENFOLGE.concat('SCHIEBEN')) B.faustregelTeile(hand, code).map(B.sprechform).forEach(pruefe);
   }
   for (const p of [-5, 0, 77, 160, 161, 300]) pruefe(B.sprechSchnitt(p, false));
   // «Zufällig gewählt.» und «Nach Gefühl.» sagt nur «Leicht» über sich selbst – nie als Tipp.

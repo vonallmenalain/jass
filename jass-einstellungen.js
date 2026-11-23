@@ -21,6 +21,7 @@
     rechnen: 'normal',    // Rechentiefe von «Schwer» und den Tipps (JassBot.RECHENTIEFE)
     kartenbild: 'eigen',  // eigen | klassisch (SVG-cards, karten/README.md)
     stichWarten: true,    // gegen den Computer: der volle Stich bleibt liegen, bis man tippt
+    austeilen: true,      // das Austeilen zeigen (Karten fliegen zu den Plätzen)
   };
 
   const VORLAGEN = [
@@ -147,7 +148,7 @@
       }
       html.push(`<details class="abschnitt" data-abschnitt="regeln" ${offen.has('regeln') ? 'open' : ''}><summary>Spielregeln im Detail</summary><div class="inhalt">
         ${schalter('untertrumpfen', 'Untertrumpfen erlaubt', 'Aus: Hat schon jemand gestochen, darf man keinen tieferen Trumpf geben – ausser man hat nur noch Trümpfe', r.untertrumpfen)}
-        ${schalter('puurFrei', 'Puur muss nicht angegeben werden', 'Wird Trumpf gespielt und man hat nur noch den Bauer, darf man ihn behalten', r.puurFrei)}
+        ${schalter('puurFrei', 'Buur muss nicht angegeben werden', 'Wird Trumpf gespielt und man hat nur noch den Bauer, darf man ihn behalten', r.puurFrei)}
         <div class="schalter" style="cursor:default"><span class="text"><span>Erste Ansage</span><small>Wer in der ersten Runde Trumpf macht. Danach geht es reihum.</small></span></div>
         ${auswahl('ersterAnsager', [['ecke7', 'Wer die Ecken-7 hat'], ['zufall', 'Zufällig'], ['sitz0', 'Der Spieler unten (Du)']], r.ersterAnsager)}
         <div class="schalter" style="cursor:default"><span class="text"><span>Ausspielen nach dem Schieben</span><small>Wer den ersten Stich anspielt, wenn geschoben wurde</small></span></div>
@@ -225,6 +226,7 @@
         ${o.spiel !== false ? `
         ${schalter('hilfen', 'Erlaubte Karten hervorheben', 'Karten, die du nicht spielen darfst, werden abgedunkelt', a.hilfen)}
         ${o.tipps !== false ? schalter('tipps', 'Tipp-Knopf', 'Der Computer schlägt dir eine Karte oder Ansage vor und sagt warum', a.tipps) : ''}
+        ${schalter('austeilen', 'Austeilen zeigen', 'Zu Beginn jeder Runde fliegen die Karten aus der Mitte zu den Plätzen', a.austeilen)}
         ${o.stichWarten !== false ? schalter('stichWarten', 'Stich liegen lassen, bis ich tippe', 'Die vier Karten bleiben liegen, bis du aufs Feld tippst – so kannst du den Stich in Ruhe anschauen', a.stichWarten) : ''}
         ${schalter('erklaeren', 'Computer erklären ihre Züge', 'Unter dem Tisch steht, warum der Computer so gespielt hat', a.erklaeren)}
         ${schalter('einTipp', 'Mit einem Tipp spielen', 'Aus: Karte antippen hebt sie an, nochmals tippen spielt sie', a.einTipp)}` : ''}`;

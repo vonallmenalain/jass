@@ -44,6 +44,9 @@
       <div><span class="name team-b" data-rolle="teamB"></span><span><span class="runde" data-rolle="rundeB"></span> <span class="summe" data-rolle="summeB">0</span></span></div>
     </div>
     <div class="feld" data-rolle="feld">
+      <div class="faecher" data-pos="1"></div>
+      <div class="faecher" data-pos="2"></div>
+      <div class="faecher" data-pos="3"></div>
       <div class="platz" data-pos="1"></div>
       <div class="platz" data-pos="2"></div>
       <div class="platz" data-pos="3"></div>
@@ -86,6 +89,7 @@
     let anzeigeStich = null;
     let ueberspringen = null;
     let wartetAufKlick = false;
+    let austeilStand = null;   // während des Austeilens: so viele Karten hat jeder schon
 
     const anzeige = () => o.anzeige || {};
     const pos = (sitz) => (sitz - z.ansichtSitz + 4) % 4;
@@ -149,7 +153,7 @@
         const lage = Number(p.dataset.pos);
         const s = (z.ansichtSitz + lage) % 4;
         const sp = z.spieler[s] || {};
-        const anzahl = r.haende[s].length;
+        const anzahl = austeilStand ? austeilStand[s] : r.haende[s].length;
         const rolle = [];
         if (s === r.ansager) rolle.push('Vorhand');
         if (r.code && s === r.angesagtVon) rolle.push('Ansage');
@@ -158,10 +162,25 @@
         p.className = 'platz team' + (s % 2) + (s === dran ? ' dran' : '') + (sp.online === false ? ' weg' : '');
         p.innerHTML = `<div class="avatar">${escapeHtml(name(s).charAt(0).toUpperCase())}</div>
           <div class="ptext"><div class="pname">${escapeHtml(name(s))}</div>
-          <div class="mini-karten">${'<i></i>'.repeat(anzahl)}</div>
           <div class="pinfo">${rolle.join(' · ') || (lage === 2 ? 'Partner' : 'Gegner')}${typ}</div></div>`;
+        zeichneFaecher(lage, anzahl);
       });
       el('meinName').textContent = name(z.ansichtSitz) + (z.ansichtSitz === r.ansager ? ' · Vorhand' : '') + (r.code && z.ansichtSitz === r.angesagtVon ? ' · Ansage' : '');
+    }
+
+    // Ein Fächer aus n Kartenrücken am Rand des Platzes.
+    const rueckSeiteHtml = () => K.rueckseite();
+    function zeichneFaecher(lage, n) {
+      const f = wurzel.querySelector(`.faecher[data-pos="${lage}"]`);
+      if (!f) return;
+      if (Number(f.dataset.n) === n && f.dataset.bild === (o.anzeige && o.anzeige.kartenbild)) return;
+      f.dataset.n = n;
+      f.dataset.bild = o.anzeige && o.anzeige.kartenbild;
+      const schritt = n > 1 ? Math.min(6, 44 / (n - 1)) : 0;
+      const rueck = rueckSeiteHtml();
+      let html = '';
+      for (let i = 0; i < n; i++) html += `<div class="rueck" style="transform: rotate(${((i - (n - 1) / 2) * schritt).toFixed(1)}deg)">${rueck}</div>`;
+      f.innerHTML = html;
     }
 
     function zeichneStich() {
@@ -205,14 +224,15 @@
       const r = z.spiel.runde;
       const roh = r.haende[z.ansichtSitz].filter((k) => k >= 0);
       const hand = J.sortiereHand(roh, r.code);
+      const verdeckt = austeilStand ? austeilStand[z.ansichtSitz] : -1;
       const handEl = el('hand');
       const breite = handEl.clientWidth || 320;
       const n = hand.length;
       // Die Karten richten sich nach der Breite – und nach der Höhe, damit
       // im Querformat das Feld nicht verschwindet.
       const quer = window.innerWidth > window.innerHeight && window.innerHeight < 600;
-      const nachHoehe = (window.innerHeight * (quer ? 0.26 : 0.19)) / 1.4;
-      const kw = Math.min(92, nachHoehe, Math.max(46, breite / (1 + Math.max(n - 1, 1) * 0.6)));
+      const nachHoehe = (window.innerHeight * (quer ? 0.26 : 0.2)) / 1.4;
+      const kw = Math.min(130, nachHoehe, Math.max(46, breite / (1 + Math.max(n - 1, 1) * 0.48)));
       const schritt = n > 1 ? Math.min(kw * 1.06, (breite - kw) / (n - 1)) : 0;
       const start = (breite - (kw + schritt * (n - 1))) / 2;
       handEl.style.setProperty('--kw', kw + 'px');
@@ -220,11 +240,17 @@
       const erlaubt = meinZug ? J.erlaubteFuer(z.spiel, z.ansichtSitz) : null;
       handEl.classList.toggle('aktiv', meinZug);
       const T = r.code ? J.MODI[r.code].trumpf : -1;
+      if (verdeckt >= 0) {
+        handEl.classList.remove('aktiv');
+        const rueck = K.rueckseite();
+        handEl.innerHTML = Array.from({ length: verdeckt }, (_, i) => `<div class="karte" style="left:${start + i * schritt}px;z-index:${i + 1}">${rueck}</div>`).join('');
+        return;
+      }
       handEl.innerHTML = hand.map((k, i) => {
         const kl = ['karte'];
         if (meinZug && anzeige().hilfen !== false && !erlaubt.includes(k)) kl.push('gesperrt');
         if (k === gewaehlt) kl.push('gewaehlt');
-        return `<button type="button" class="${kl.join(' ')}" data-karte="${k}" style="left:${start + i * schritt}px;z-index:${i + 1}" aria-label="${J.kartenName(k, r.code)}">${K.svg(k, { trumpf: J.farbeVon(k) === T, code: r.code })}</button>`;
+        return `<button type="button" class="${kl.join(' ')}" data-karte="${k}" style="left:${start + i * schritt}px;z-index:${i + 1};--i:${i}" aria-label="${J.kartenName(k, r.code)}">${K.svg(k, { trumpf: J.farbeVon(k) === T, code: r.code })}</button>`;
       }).join('');
       const tippErlaubt = z.tipps !== false && anzeige().tipps !== false;
       el('tipp').hidden = !tippErlaubt;
@@ -351,7 +377,7 @@
 
     el('feld').addEventListener('click', (e) => {
       if (e.target.closest('.ansage')) return;
-      if (ueberspringen && anzeigeStich) ueberspringen();
+      if (ueberspringen && (anzeigeStich || austeilStand)) ueberspringen();
     });
 
     window.addEventListener('resize', () => { if (z.spiel && wurzel.offsetParent !== null) zeichneHand(); });
@@ -394,6 +420,84 @@
 
     // Mit sprache (Liste fester Sätze) gibt es daneben einen 🔊-Knopf.
     let sprache = null;
+    // ---------------------------------------------------------- Austeilen
+    // Aus einem Stapel in der Mitte, in Dreierpäckchen gegen den
+    // Uhrzeigersinn, beim Spieler nach dem Geber beginnend – dreimal rundum.
+    // Danach dreht sich die eigene Hand auf. Ein Tipp ins Feld überspringt.
+    const ruhig = () => root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function zielPunkt(s) {
+      const lage = pos(s);
+      if (lage === 0) {
+        const h = el('hand').getBoundingClientRect();
+        return { x: h.left + h.width / 2, y: h.top + h.height / 2, dreh: 0 };
+      }
+      const f = el('feld').getBoundingClientRect();
+      const tief = Math.min(f.width, f.height) * 0.23 * 0.62;
+      if (lage === 2) return { x: f.left + f.width / 2, y: f.top + tief * 0.6, dreh: 180 };
+      if (lage === 1) return { x: f.right - tief * 0.6, y: f.top + f.height * 0.42, dreh: -90 };
+      return { x: f.left + tief * 0.6, y: f.top + f.height * 0.42, dreh: 90 };
+    }
+
+    function fliege(von, nach, breite, anzahl) {
+      const rueck = K.rueckseite();
+      const fluege = [];
+      for (let j = 0; j < anzahl; j++) {
+        const d = document.createElement('div');
+        d.className = 'flug';
+        d.style.width = breite + 'px';
+        d.innerHTML = rueck;
+        document.body.appendChild(d);
+        const h = breite * 1.4;
+        const a = d.animate([
+          { transform: `translate(${von.x - breite / 2}px, ${von.y - h / 2}px) rotate(-8deg)` },
+          { transform: `translate(${nach.x - breite / 2 + (j - 1) * 6}px, ${nach.y - h / 2}px) rotate(${nach.dreh + (j - 1) * 6}deg)` },
+        ], { duration: 300, delay: j * 45, easing: 'cubic-bezier(.2,.75,.3,1)', fill: 'both' });
+        fluege.push(a.finished.catch(() => {}).then(() => d.remove()));
+      }
+      return Promise.all(fluege);
+    }
+
+    async function austeilen(geber) {
+      if (!z.spiel || ruhig() || (o.anzeige && o.anzeige.austeilen === false)) return;
+      austeilStand = [0, 0, 0, 0];
+      zeichne();
+      const feld = el('feld');
+      const fr = feld.getBoundingClientRect();
+      const mitte = { x: fr.left + fr.width / 2, y: fr.top + fr.height / 2 };
+      const breite = Math.max(28, Math.min(fr.width, fr.height) * 0.23 * 0.62);
+      const stapel = document.createElement('div');
+      stapel.className = 'austeil-stapel';
+      stapel.innerHTML = K.rueckseite();
+      feld.appendChild(stapel);
+      let fertig = false;
+      ueberspringen = () => { fertig = true; };
+      const unterwegs = [];
+      for (let runde = 0; runde < 3 && !fertig; runde++) {
+        for (let i = 0; i < 4 && !fertig; i++) {
+          const s = (geber + 1 + i) % 4;
+          unterwegs.push(fliege(mitte, zielPunkt(s), breite, 3).then(() => {
+            if (!austeilStand) return;
+            austeilStand[s] = Math.min(9, austeilStand[s] + 3);
+            zeichnePlaetze();
+            if (s === z.ansichtSitz) zeichneHand();
+          }));
+          await new Promise((w) => setTimeout(w, 150));
+        }
+      }
+      if (!fertig) await Promise.all(unterwegs);
+      document.querySelectorAll('.flug').forEach((d) => d.remove());
+      ueberspringen = null;
+      stapel.remove();
+      austeilStand = null;
+      // Die Hand dreht sich einmal auf; danach zeichnet sie normal.
+      const hand = el('hand');
+      hand.classList.add('aufdecken');
+      zeichne();
+      hand.classList.remove('aufdecken');
+      hand.querySelectorAll('.karte').forEach((k) => { k.style.animation = 'aufdecken .38s ease-out backwards'; k.style.animationDelay = (Number(k.style.getPropertyValue('--i')) || 0) * 35 + 'ms'; });
+    }
+
     function kommentar(html, satzliste) {
       sprache = satzliste || null;
       el('kommentar').innerHTML = (html || '') + (sprache && root.JassStimme ? ' ' + root.JassStimme.knopf('Tipp vorlesen') : '');
@@ -499,7 +603,7 @@
     }
 
     return {
-      setze, zeichne, zeichneHand, stichZeigen, warte, kommentar, hinweis, blase, toast,
+      setze, zeichne, zeichneHand, stichZeigen, austeilen, warte, kommentar, hinweis, blase, toast,
       oeffneDialog, schliesseDialog, dialogOffen,
       abrechnungHtml, rundenendeHtml, verlaufHtml, siegerText, zeigeWeise,
       teamName, vonWem, tut, name, modusHtml, escapeHtml,

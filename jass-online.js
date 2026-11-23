@@ -487,7 +487,7 @@ async function praesentiere() {
       if (ev.t === 'r') {
         if (dialogFuer.startsWith('runde')) { tisch.schliesseDialog(); dialogFuer = ''; }
         tisch.kommentar('');
-        tisch.zeichne();
+        await tisch.austeilen((Number(ev.a) + 3) % 4);
       } else if (ev.t === 'p') {
         tisch.zeichne();
         tisch.blase(Number(ev.s), 'Schiebe!');

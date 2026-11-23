@@ -245,6 +245,7 @@
       });
     }
 
+    let ausgeteilt = -1;   // für welche Runde das Austeilen schon gezeigt wurde
     async function ablauf() {
       const id = ++laufId;
       const lebt = () => id === laufId;
@@ -262,6 +263,11 @@
           speichere();
           tisch.kommentar('');
           continue;
+        }
+        if (r.phase === 'ansage' && ausgeteilt !== spiel.rundeNr && !r.geschoben) {
+          ausgeteilt = spiel.rundeNr;
+          await tisch.austeilen((r.ansager + 3) % 4);
+          if (!lebt()) return;
         }
         if (r.phase === 'ansage') {
           const s = J.ansageAmZug(r);
@@ -357,7 +363,7 @@
       const box = tisch.oeffneDialog(`<h2>Menü</h2>
         <details class="abschnitt" open><summary>Spielstand</summary><div class="inhalt">${tisch.verlaufHtml()}</div></details>
         <details class="abschnitt"><summary>Regeln dieses Spiels</summary><div class="inhalt"><p class="muted">${esc(E.zusammenfassung(spiel.regeln))}</p>
-          <p class="muted klein">${spiel.regeln.untertrumpfen ? 'Untertrumpfen erlaubt' : 'Untertrumpfen verboten'} · ${spiel.regeln.puurFrei ? 'Puur muss nicht angegeben werden' : 'Puur muss angegeben werden'} · letzter Stich ${spiel.regeln.letzterStich} Punkte</p></div></details>
+          <p class="muted klein">${spiel.regeln.untertrumpfen ? 'Untertrumpfen erlaubt' : 'Untertrumpfen verboten'} · ${spiel.regeln.puurFrei ? 'Buur muss nicht angegeben werden' : 'Buur muss angegeben werden'} · letzter Stich ${spiel.regeln.letzterStich} Punkte</p></div></details>
         <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="menuAnzeige"></div></details>
         <button class="btn btn-voll" type="button" data-schliessen>Weiterspielen</button>
         <button class="btn-ghost btn-voll" type="button" id="markieren">🚩 Etwas komisch? Markieren</button>

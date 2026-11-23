@@ -23,7 +23,7 @@ test('Kartenwerte ergeben 152 Punkte pro Modus', () => {
   }
 });
 
-test('Trumpf: Puur vor Nell vor Ass', () => {
+test('Trumpf: Buur vor Nell vor Ass', () => {
   const eff = 1; // Herz Trumpf
   const stich = [karte(H, WA), karte(H, W9), karte(H, WB), karte(H, WK)];
   assert.equal(J.gewinnerIndex(stich, eff), 2);
@@ -77,7 +77,7 @@ test('Untertrumpfen verboten auch, wenn man die Farbe angeben könnte', () => {
   assert.deepEqual(J.erlaubteKarten(hand, stich, eff, R), [karte(S, W6)]);
 });
 
-test('Den Puur muss man nicht angeben', () => {
+test('Den Buur muss man nicht angeben', () => {
   const eff = 1;
   const hand = [karte(H, WB), karte(S, W6), karte(K, W7)];
   assert.equal(J.erlaubteKarten(hand, [karte(H, W6)], eff, R).length, 3);
