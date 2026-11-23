@@ -160,3 +160,43 @@ test('Vorlesen: Jeder Satz, den Tipp und Computer sagen können, ist vertonbar',
   fehlt.delete('Zufällig gewählt.');
   assert.deepEqual([...fehlt], []);
 });
+
+test('Ansage-Wissen: Welten passen zu Ansage und Schieben', () => {
+  const regeln = J.regelnMitStandard();
+  // Du (0) sagt nach Bens Schieben Kreuz an; Ben (2) ist am Zug.
+  const haende = [
+    [23, 17, 3, 24, 4, 0, 31, 13, 16],
+    [14, 27, 8, 28, 20, 29, 2, 26, 1],
+    [18, 25, 34, 15, 6, 33, 22, 21, 9],
+    [10, 35, 32, 19, 5, 12, 30, 7, 11],
+  ];
+  const spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: 2 });
+  J.schieben(spiel);
+  J.ansagen(spiel, 'T2');
+  const info = B.ansageWissen(spiel, 2);
+  assert.equal(info.ansager, 0);
+  assert.equal(info.schieber, -1, 'Ben hat selbst geschoben');
+  assert.equal(info.darfSchieben, false);
+  // Für den Ansager selbst gibt es nichts zu beachten – ausser dem Schieber.
+  assert.equal(B.ansageWissen(spiel, 0).ansager, -1);
+  assert.equal(B.ansageWissen(spiel, 0).schieber, 2);
+  // Gleich verteilt hat Du den Buur in einem Drittel der Welten, passend zur Ansage fast immer.
+  const w = B.wissen(spiel, 2);
+  const rng = J.zufall(99);
+  let passend = 0, mitBuur = 0;
+  for (let i = 0; i < 3000 && passend < 300; i++) {
+    const h = B.welt(spiel, 2, w, rng);
+    if (!B.passtZumWissen(h, regeln, info)) continue;
+    passend++;
+    if (h[0].includes(23)) mitBuur++;
+  }
+  assert.ok(passend >= 100, 'genug passende Welten: ' + passend);
+  assert.ok(mitBuur / passend > 0.85, 'Buur beim Ansager in ' + Math.round(100 * mitBuur / passend) + '%');
+  // Eine schwache Hand passt zum Schieben, eine starke nicht.
+  const schwach = [3, 4, 12, 13, 22, 30, 31, 2, 15];
+  const stark = [23, 21, 26, 25, 22, 8, 17, 35, 34];
+  assert.equal(B.passtZumSchieben(schwach, regeln), true);
+  assert.equal(B.passtZumSchieben(stark, regeln), false);
+  assert.equal(B.passtZurAnsage(stark, regeln, 'T2', true), true);
+  assert.equal(B.passtZurAnsage(schwach, regeln, 'T2', true), false);
+});

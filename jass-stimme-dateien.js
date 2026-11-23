@@ -520,6 +520,7 @@ window.JassStimmeDateien = {
   "Herz Trumpf.": "stimme/9d5bc00dd0bd.mp3",
   "Herz Zehn.": "stimme/9ff9eb9bc7a0.mp3",
   "Hier übst du Jassen.": "stimme/60e1033802ec.mp3",
+  "Ich habe viele Kartenverteilungen durchgespielt, die zur Ansage passen: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.": "stimme/15443cbefad9.mp3",
   "Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.": "stimme/75ba803003a9.mp3",
   "Ihr habt 0 Punkte gemacht.": "stimme/282ca64c2bfa.mp3",
   "Ihr habt 1 Punkt gemacht.": "stimme/a2d1effc149f.mp3",
