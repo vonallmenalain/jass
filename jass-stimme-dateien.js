@@ -317,7 +317,6 @@ window.JassStimmeDateien = {
   "Spiel die Schaufel Zehn.": "stimme/e3d4be29f33d.mp3",
   "Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.": "stimme/7d6025ec0113.mp3",
   "Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.": "stimme/c65321429934.mp3",
-  "Trumpf ziehen: Mit dem Puur zuerst – er macht den Stich sicher, und wer das Nell allein hat, muss es hergeben.": "stimme/fe7b6a9bd67f.mp3",
   "Viele Asse – gut für Obenabe.": "stimme/737602e9a23f.mp3",
   "Viele Sechser – gut für Undenufe.": "stimme/620df3a28c76.mp3",
   "Viele Trümpfe – auch ohne Puur ordentlich.": "stimme/497502b3816d.mp3",

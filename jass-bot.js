@@ -473,10 +473,6 @@
     const ansicht = ansichtAus(spiel, sitz);
     const mittel = mittelZug(ansicht);
     if (legal.length === 1) return { karte: legal[0], grund: mittel.grund, werte: null };
-    if (o.puurZuerst !== false) {
-      const puur = puurZiehen(spiel, sitz, legal);
-      if (puur != null) return { karte: puur, grund: 'Trumpf ziehen: Mit dem Buur zuerst – er macht den Stich sicher, und wer das Nell allein hat, muss es hergeben.', werte: null };
-    }
     const w = wissen(spiel, sitz);
     const rng = o.rng || J.zufall(J.neuerSeed());
     const restKarten = runde.haende.reduce((n, h) => n + h.length, 0);
@@ -521,23 +517,6 @@
       simSpiele(s, k);
       return { karte: k, wert: exakt(s, team(sitz), -Infinity, Infinity) };
     }).sort((a, b) => b.wert - a.wert);
-  }
-
-  // «Buur zuerst»: Wer selbst (oder dessen Partner) Trumpf gemacht hat, den
-  // Buur hält und ausspielt, zieht mit ihm an, solange die Gegner noch
-  // Trümpfe haben könnten.
-  function puurZiehen(spiel, sitz, legal) {
-    const runde = spiel.runde;
-    if (runde.stich.length || runde.angesagtVon < 0 || team(runde.angesagtVon) !== team(sitz)) return null;
-    const T = trumpfVon(effModus(runde.code, runde.stichNr));
-    if (T < 0) return null;
-    const puur = J.karte(T, WB);
-    if (!legal.includes(puur)) return null;
-    const w = wissen(spiel, sitz);
-    let draussen = 0;
-    for (let x = T * 9; x < T * 9 + 9; x++) if (!w.gespielt[x] && !runde.haende[sitz].includes(x)) draussen++;
-    const gegnerKoennen = [1, 3].some((i) => !(w.leer[(sitz + i) % 4] & bit(T)));
-    return draussen > 0 && gegnerKoennen ? puur : null;
   }
 
   function ansichtAus(spiel, sitz) {
@@ -887,7 +866,6 @@
     'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.',
     'Misère: Du musst überstechen – mit der kleinstmöglichen Karte.',
     'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.',
-    'Trumpf ziehen: Mit dem Buur zuerst – er macht den Stich sicher, und wer das Nell allein hat, muss es hergeben.',
   ];
   function alleSprechTeile() {
     const s = new Set(GRUENDE.map(sprechform));
