@@ -1,0 +1,6 @@
+tex/
+daten/
+*.pt
+*-f32.onnx
+browser-test.png
+__pycache__/
