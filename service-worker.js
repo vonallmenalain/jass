@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v16';
+const CACHE_NAME = 'jass-shell-v17';
 const APP_SHELL = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const APP_SHELL = [
   './jass-stimme-dateien.js',
   './jass-vorlesen.js',
   './jass-sprechtexte.js',
+  './jass-erkennung.js',
   './jass-engine.js',
   './jass-protokoll.js',
   './jass-tisch.js',
@@ -99,7 +100,9 @@ self.addEventListener('fetch', (event) => {
     if (cached) return cached;
     try {
       const networkResponse = await fetch(request);
-      if (networkResponse && networkResponse.ok && ['image', 'manifest', 'font', 'audio'].includes(request.destination)) {
+      // Das Netz der Kartenerkennung (.onnx) erst beim ersten Gebrauch
+      // ablegen – der Dateiname trägt die Version.
+      if (networkResponse && networkResponse.ok && (['image', 'manifest', 'font', 'audio'].includes(request.destination) || url.pathname.endsWith('.onnx'))) {
         const cache = await caches.open(CACHE_NAME);
         cache.put(request, networkResponse.clone());
       }

@@ -155,6 +155,14 @@
 
   const HELFER_RUNDE = ['Gespielt wird genau eine Runde.', 'Danach geht es hierher zurück, mit euren Punkten neben dem Schnitt.', IM_VERLAUF];
 
+  // Trumpf-Helfer: Karten auf dem Foto erkannt (jass-erkennung.js)
+  const FOTO_LADEN = 'Ich suche deine Karten auf dem Foto …';
+  const FOTO_FEHLER = 'Die Erkennung hat nicht geklappt. Tippe die Karten unten an – das Foto hilft beim Abschreiben.';
+  function fotoErkannt(unsicher) {
+    return ['Ich habe 9 Karten erkannt.', 'Schau sie oben an: Eine falsche Karte tippst du weg und wählst unten die richtige.']
+      .concat(unsicher ? ['Bei den Karten mit gelbem Rand bin ich mir nicht sicher.'] : []);
+  }
+
   // ------------------------------------------------------------- Alle
 
   function alle() {
@@ -202,13 +210,14 @@
     for (let n = 0; n <= SCHNITT_MAX; n++) add('Im Schnitt etwa ' + punkte(n) + ' verschenkt.');
     // Helfer
     add(HELFER_RUNDE);
+    add(fotoErkannt(true)); add(FOTO_FEHLER);
     return Array.from(s).map(B.sprechform);
   }
 
   const api = {
     modus, karte, hand, zaehlenAufgabe, zaehlenLoesung, zaehlenErgebnis, werteTabelle,
     trainerLage, trainerAuswertung, vergleich, trainerFertig, AUSSPIELEN_HINWEIS,
-    helferVorschlag, HELFER_RUNDE, alle,
+    helferVorschlag, HELFER_RUNDE, FOTO_LADEN, FOTO_FEHLER, fotoErkannt, alle,
   };
   if (node) module.exports = api;
   else root.JassSprechtexte = api;

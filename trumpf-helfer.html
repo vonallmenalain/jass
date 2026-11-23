@@ -23,7 +23,14 @@
     .meine-hand .leer { border: 2px dashed rgba(255,255,255,.25); border-radius: 8px; aspect-ratio: 100 / 140; }
     .meine-hand button { padding: 0; border: none; background: none; }
     .meine-hand .karte-svg { width: 100%; display: block; }
-    .foto { width: 100%; max-height: 320px; object-fit: contain; border-radius: 14px; background: #000; }
+    .foto { width: 100%; height: auto; display: block; border-radius: 14px; background: #000; }
+    .meine-hand button { position: relative; }
+    .meine-hand button.unsicher .karte-svg { outline: 3px dashed #fbbf24; outline-offset: 1px; border-radius: 7px; }
+    .meine-hand button.unsicher::after { content: '?'; position: absolute; top: -7px; right: -5px; width: 18px; height: 18px; border-radius: 50%;
+      background: #fbbf24; color: #111827; font: 800 12px/18px system-ui, sans-serif; text-align: center; }
+    .foto-status { display: flex; align-items: center; gap: 10px; }
+    .kreisel { width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(255,255,255,.2); border-top-color: var(--accent); animation: dreh 0.8s linear infinite; flex-shrink: 0; }
+    @keyframes dreh { to { transform: rotate(360deg); } }
     .ergebnis-liste { display: flex; flex-direction: column; gap: 6px; }
     .vergleich { border-radius: 16px; padding: 12px 14px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .35); display: flex; flex-direction: column; gap: 6px; }
     .vergleich.unter { background: rgba(248, 113, 113, .08); border-color: rgba(248, 113, 113, .4); }
@@ -61,7 +68,7 @@
           <button class="btn-ghost btn-klein" type="button" id="leeren">Leeren</button>
         </div>
       </div>
-      <p class="muted klein" data-vorlesen>Tippe unten deine 9 Karten an – oder nimm «Zufall». Dann zeige ich dir, was du ansagen solltest.</p>
+      <p class="muted klein" data-vorlesen>Tippe unten deine 9 Karten an, nimm «Zufall» – oder fotografiere deine Hand. Dann zeige ich dir, was du ansagen solltest.</p>
       <div class="meine-hand" id="hand"></div>
       <div class="segmente" id="lage">
         <button type="button" data-lage="vorhand" class="aktiv">Ich sage an (darf schieben)</button>
@@ -70,8 +77,8 @@
     </div>
 
     <div class="panel stack" id="fotoPanel" hidden>
-      <img class="foto" id="foto" alt="Foto deiner Karten">
-      <p class="muted klein" data-vorlesen>Die automatische Erkennung der Karten ist vorbereitet, aber noch nicht eingeschaltet. Tippe die Karten unten an – das Foto hilft beim Abschreiben.</p>
+      <canvas class="foto" id="foto" role="img" aria-label="Foto deiner Karten"></canvas>
+      <div id="fotoText"></div>
     </div>
 
     <div class="panel stack" id="ergebnis" hidden></div>
@@ -92,6 +99,7 @@
   <script src="jass-stimme-dateien.js"></script>
   <script src="jass-stimme.js"></script>
   <script src="jass-vorlesen.js"></script>
+  <script src="jass-erkennung.js"></script>
   <script>
   (function () {
     'use strict';
@@ -136,9 +144,13 @@
       }).join('')}</div>`).join('');
     }
 
+    // Karten, die die Erkennung nur unsicher gefunden hat (gelber Rand).
+    let unsicher = new Set();
+
     function zeichneHand() {
       const sortiert = J.sortiereHand(hand, null);
-      $('hand').innerHTML = sortiert.map((k) => `<button type="button" data-weg="${k}" aria-label="${J.kartenName(k)} entfernen">${K.svg(k)}</button>`).join('') + '<div class="leer"></div>'.repeat(9 - hand.length);
+      unsicher = new Set([...unsicher].filter((k) => hand.includes(k)));
+      $('hand').innerHTML = sortiert.map((k) => `<button type="button" data-weg="${k}" class="${unsicher.has(k) ? 'unsicher' : ''}" aria-label="${J.kartenName(k)}${unsicher.has(k) ? ' (unsicher erkannt)' : ''} entfernen">${K.svg(k)}</button>`).join('') + '<div class="leer"></div>'.repeat(9 - hand.length);
       $('zaehler').textContent = 'Deine Karten: ' + hand.length + ' von 9';
       $('lage').querySelectorAll('button').forEach((b) => b.classList.toggle('aktiv', b.dataset.lage === lage));
       $('lage').hidden = !regeln.schieben;
@@ -264,15 +276,69 @@
         <p class="muted klein" data-vorlesen data-sprechen="${esc(JSON.stringify(S.HELFER_RUNDE))}">Gespielt wird genau eine Runde – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert.</p>`;
     }
 
-    // Foto: vorbereitet für die Erkennung. Bis sie eingeschaltet ist, dient
-    // das Bild als Vorlage zum Antippen.
-    $('kamera').addEventListener('change', (e) => {
+    // Foto der Hand: Karten erkennen (jass-erkennung.js), vorwählen, rechnen.
+    // Was unsicher ist, bekommt einen gelben Rand; korrigiert wird wie immer
+    // durch Antippen.
+    const R = window.JassErkennung;
+    let fotoNr = 0;
+    function fotoText(saetze, laden) {
+      const text = saetze.map(esc).join(' ');
+      $('fotoText').innerHTML = laden
+        ? `<div class="foto-status"><span class="kreisel"></span><p class="muted klein">${text}</p></div>`
+        : `<p class="muted klein" data-vorlesen data-sprechen="${esc(JSON.stringify(saetze))}">${text}</p>`;
+    }
+    // Foto zeichnen, mit den Fundstellen der erkannten Karten.
+    function zeichneFoto(bild, karten) {
+      const c = $('foto');
+      const bw = bild.naturalWidth || bild.width, bh = bild.naturalHeight || bild.height;
+      const s = Math.min(1, 1100 / Math.max(bw, bh));
+      c.width = Math.round(bw * s); c.height = Math.round(bh * s);
+      const ctx = c.getContext('2d');
+      ctx.drawImage(bild, 0, 0, c.width, c.height);
+      const r = Math.max(14, c.width / 28);
+      ctx.font = `800 ${Math.round(r * 0.9)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (const k of karten || []) {
+        const x = k.x * c.width, y = k.y * c.height;
+        const name = J.kurzName(k.karte);
+        const breit = Math.max(r * 2.2, ctx.measureText(name).width + r);
+        ctx.fillStyle = k.wert >= R.SICHER ? 'rgba(15, 23, 42, .85)' : 'rgba(251, 191, 36, .95)';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x - breit / 2, y - r * 0.75, breit, r * 1.5, r * 0.5); else ctx.rect(x - breit / 2, y - r * 0.75, breit, r * 1.5);
+        ctx.fill();
+        ctx.fillStyle = k.wert >= R.SICHER ? '#fff' : '#111827';
+        ctx.fillText(name, x, y + 1);
+      }
+    }
+    // Schon beim Antippen von «Foto» die Erkennung laden (beim ersten Mal ein paar MB).
+    $('kamera').closest('label').addEventListener('pointerdown', () => R.vorladen());
+    $('kamera').addEventListener('change', async (e) => {
       const f = e.target.files[0];
+      e.target.value = '';
       if (!f) return;
-      const url = URL.createObjectURL(f);
-      $('foto').src = url;
+      const nr = ++fotoNr;
+      const bild = new Image();
+      bild.src = URL.createObjectURL(f);
+      try { await bild.decode(); } catch (x) { /* zeigt dann kein Bild */ }
+      if (nr !== fotoNr) return;
       $('fotoPanel').hidden = false;
+      zeichneFoto(bild, []);
+      fotoText([S.FOTO_LADEN], true);
       $('fotoPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        const r = await R.erkenne(f);
+        if (nr !== fotoNr) return;
+        zeichneFoto(bild, r.karten);
+        hand = r.karten.map((k) => k.karte);
+        unsicher = new Set(r.karten.filter((k) => k.wert < R.SICHER).map((k) => k.karte));
+        gemerkteListe = null;
+        alles();
+        fotoText(S.fotoErkannt(unsicher.size > 0), false);
+      } catch (x) {
+        if (nr !== fotoNr) return;
+        console.warn(x);
+        fotoText([S.FOTO_FEHLER], false);
+      }
     });
 
     $('einstellungenBtn').addEventListener('click', () => {
