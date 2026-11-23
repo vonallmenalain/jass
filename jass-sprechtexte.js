@@ -157,10 +157,10 @@
 
   // Trumpf-Helfer: Karten auf dem Foto erkannt (jass-erkennung.js)
   const FOTO_LADEN = 'Ich suche deine Karten auf dem Foto …';
-  const FOTO_FEHLER = 'Die Erkennung hat nicht geklappt. Tippe die Karten unten an – das Foto hilft beim Abschreiben.';
+  const FOTO_FEHLER = 'Erkennung hat nicht geklappt. Tippe die Karten unten an.';
   function fotoErkannt(unsicher) {
-    return ['Ich habe 9 Karten erkannt.', 'Schau sie oben an: Eine falsche Karte tippst du weg und wählst unten die richtige.']
-      .concat(unsicher ? ['Bei den Karten mit gelbem Rand bin ich mir nicht sicher.'] : []);
+    return ['9 Karten erkannt.', 'Falsche Karte oben wegtippen, unten die richtige wählen.']
+      .concat(unsicher ? ['Gelb: unsicher.'] : []);
   }
 
   // ------------------------------------------------------------- Alle

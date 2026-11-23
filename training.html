@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Jass lernen</title>
   <link rel="stylesheet" href="jass-ui.css" />
   <style>
     .uebung { display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: center; text-align: left; padding: 14px; width: 100%; }
-    .uebung .bild { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+    .uebung .bild { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; background: rgba(254, 121, 113, 0.16); border: 1px solid rgba(254, 121, 113, 0.3); }
     .uebung strong { display: block; font-size: 17px; }
     .uebung span { color: var(--muted); font-size: 13.5px; font-weight: 600; line-height: 1.35; }
     .uebung-zeile { display: flex; gap: 8px; align-items: center; }
@@ -23,12 +26,11 @@
   <div class="app" style="--max: 640px">
     <div class="topbar">
       <a class="icon-btn" href="index.html" aria-label="Zurück zur Startseite">←</a>
-      <div class="topbar-titel"><span class="eyebrow">Schieber</span><h1>Jass lernen</h1></div>
+      <div class="topbar-titel"><h1>Jass lernen</h1></div>
     </div>
-    <p class="muted einleitung" data-vorlesen>Hier übst du Jassen. Tippe auf den Lautsprecher, dann wird dir alles vorgelesen.</p>
-    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="zaehlen.html"><span class="bild">🔢</span><span><strong>Stiche zählen</strong><span>Vier Karten, wie viele Punkte? Mit Trumpf, Obenabe und Undenufe.</span></span></a></div>
-    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="trumpf-trainer.html"><span class="bild">🃏</span><span><strong>Trumpf wählen</strong><span>Neun zufällige Karten – was sagst du an? Der Computer rechnet nach, was am meisten bringt.</span></span></a></div>
-    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="trumpf-helfer.html"><span class="bild">💡</span><span><strong>Trumpf-Helfer</strong><span>Deine echten Karten eingeben und einen Vorschlag bekommen.</span></span></a></div>
+    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="zaehlen.html"><span class="bild">🔢</span><strong>Stiche zählen</strong></a></div>
+    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="trumpf-trainer.html"><span class="bild">🃏</span><strong>Trumpf wählen</strong></a></div>
+    <div class="uebung-zeile" data-vorlesen><a class="btn-ghost uebung" href="trumpf-helfer.html"><span class="bild">💡</span><strong>Trumpf-Helfer</strong></a></div>
   </div>
   <script src="jass-stimme-dateien.js"></script>
   <script src="jass-stimme.js"></script>

@@ -64,13 +64,13 @@
   const FOTO_WERT = ['6', '7', '8', '9', '10', 'bauer', 'dame', 'koenig', 'ass'];
   const FOTO_B = 140 * 400 / 625;
   const FOTO_X = (100 - FOTO_B) / 2;
-  const STERN = (x) => `<g transform="translate(${x} 6)"><circle cx="8" cy="8" r="8" fill="#f59e0b"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`;
+  const STERN = (x) => `<g transform="translate(${x} 6)"><circle cx="8" cy="8" r="8" fill="#fe7971"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`;
 
   function svgFoto(k, o) {
     const datei = 'karten/foto/' + FOTO_FARBE[J.farbeVon(k)] + '-' + FOTO_WERT[J.wertVon(k)] + '.webp';
     const titel = J.kartenName(k, o.code);
     const trumpf = o.trumpf
-      ? `<rect x="${(FOTO_X + 1.2).toFixed(2)}" y="1.2" width="${(FOTO_B - 2.4).toFixed(2)}" height="137.6" rx="4.5" fill="none" stroke="#f59e0b" stroke-width="3"/>${STERN(FOTO_X + FOTO_B - 21)}`
+      ? `<rect x="${(FOTO_X + 1.2).toFixed(2)}" y="1.2" width="${(FOTO_B - 2.4).toFixed(2)}" height="137.6" rx="4.5" fill="none" stroke="#fe7971" stroke-width="3"/>${STERN(FOTO_X + FOTO_B - 21)}`
       : '';
     return `<svg class="karte-svg" viewBox="0 0 100 140" role="img" aria-label="${titel}"><title>${titel}</title><image href="${datei}" x="${FOTO_X.toFixed(2)}" y="0" width="${FOTO_B.toFixed(2)}" height="140" preserveAspectRatio="none"/>${trumpf}</svg>`;
   }
@@ -109,7 +109,7 @@
     const id = KLASSISCH_FARBE[J.farbeVon(k)] + '_' + KLASSISCH_WERT[J.wertVon(k)];
     const titel = J.kartenName(k, o.code);
     const trumpf = o.trumpf
-      ? `<rect x="2" y="1.5" width="96" height="137" rx="7" fill="none" stroke="#f59e0b" stroke-width="3.5"/><g transform="translate(78 6)"><circle cx="8" cy="8" r="8" fill="#f59e0b"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`
+      ? `<rect x="2" y="1.5" width="96" height="137" rx="7" fill="none" stroke="#fe7971" stroke-width="3.5"/><g transform="translate(78 6)"><circle cx="8" cy="8" r="8" fill="#fe7971"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`
       : '';
     return `<svg class="karte-svg" viewBox="0 0 100 140" role="img" aria-label="${titel}"><title>${titel}</title><use href="${KLASSISCH_DATEI}#${id}" transform="${KLASSISCH_LAGE}"/>${trumpf}</svg>`;
   }
@@ -123,7 +123,7 @@
     const farbe = farben[f];
     const wert = J.WERTE[w];
     const teile = [];
-    teile.push(`<rect x="1.5" y="1.5" width="97" height="137" rx="9" fill="#fffdf8" stroke="${o.trumpf ? '#f59e0b' : '#d6d3d1'}" stroke-width="${o.trumpf ? 3 : 1.5}"/>`);
+    teile.push(`<rect x="1.5" y="1.5" width="97" height="137" rx="9" fill="#fffdf8" stroke="${o.trumpf ? '#fe7971' : '#d6d3d1'}" stroke-width="${o.trumpf ? 3 : 1.5}"/>`);
     // Ecken: Wert und Zeichen.
     const gr = wert === '10' ? 25 : 30;
     teile.push(`<text x="15" y="31" font-size="${gr}" font-weight="800" text-anchor="middle" fill="${farbe}" font-family="Inter, system-ui, sans-serif" letter-spacing="-2">${wert}</text>`);
@@ -144,7 +144,7 @@
       teile.push(zeichenPfad(f, 41, 90, 18));
     }
     if (o.trumpf) {
-      teile.push(`<g transform="translate(78 6)"><circle cx="8" cy="8" r="8" fill="#f59e0b"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`);
+      teile.push(`<g transform="translate(78 6)"><circle cx="8" cy="8" r="8" fill="#fe7971"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`);
     }
     const titel = J.kartenName(k, o.code);
     return `<svg class="karte-svg" viewBox="0 0 100 140" role="img" aria-label="${titel}"><title>${titel}</title>${teile.join('')}</svg>`;
