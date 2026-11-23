@@ -34,6 +34,16 @@
     .lobby-sitz select.text-feld, .lobby-sitz .btn-klein { min-height: 36px; font-size: 14px; }
     .meine-tische { display: flex; flex-direction: column; gap: 6px; }
     .meine-tische button { justify-content: space-between; }
+    .tisch-zeile { display: flex; gap: 6px; align-items: stretch; }
+    .tisch-zeile > button:first-child { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: 8px; text-align: left; }
+    .tisch-zeile > button:first-child span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tisch-zeile .weg { flex: 0 0 auto; padding: 0 12px; }
+    .offener-tisch { display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left; padding: 10px 12px; }
+    .offener-tisch .oben { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; }
+    .offener-tisch .unten { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+    .marke { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(250, 204, 21, .16); color: #fde68a; }
+    .lobby-sitz.tausch { border-color: rgba(96, 165, 250, .8); box-shadow: 0 0 0 2px rgba(96, 165, 250, .35); }
+    .sichtbar { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; color: var(--muted); }
     .meldung { border-radius: 16px; padding: 12px 14px; background: rgba(239, 68, 68, .12); border: 1px solid rgba(239, 68, 68, .4); line-height: 1.45; }
     .bereit-liste { font-size: 13px; color: var(--muted); text-align: center; }
   </style>
@@ -66,8 +76,14 @@
           <button class="btn" type="button" id="beitretenBtn">Beitreten</button>
         </div>
       </div>
+      <div class="panel stack" id="offenPanel">
+        <h2>Offene Tische</h2>
+        <p class="muted klein">Öffentliche Tische, an denen noch ein Platz frei ist – einfach antippen und hinsetzen.</p>
+        <div class="meine-tische" id="offeneTische"><p class="muted">Suche …</p></div>
+      </div>
       <div class="panel stack" id="meineTischePanel" hidden>
         <h2>Zuletzt</h2>
+        <p class="muted klein">Tische, die du auf diesem Gerät eröffnet oder betreten hast. ✕ nimmt einen aus der Liste; deine eigenen kannst du dort auch für alle schliessen.</p>
         <div class="meine-tische" id="meineTische"></div>
       </div>
     </section>
@@ -84,6 +100,7 @@
         <p class="muted klein" id="neuZusammenfassung"></p>
         <div class="stack" id="neuRegeln" style="gap:10px"></div>
         <label class="schalter"><span class="text"><span>Tipps erlaubt</span><small>Der 💡-Knopf schlägt Karten und Ansagen vor – für Turniere ausschalten</small></span><input type="checkbox" id="neuTipps" checked></label>
+        <label class="schalter"><span class="text"><span>🌍 Öffentlich</span><small>Alle, die «Online spielen» öffnen, sehen den Tisch unter «Offene Tische» und können sich hinsetzen. Aus: nur mit Code oder Link.</small></span><input type="checkbox" id="neuOeffentlich" checked></label>
       </div>
       <div class="reihe">
         <button class="btn" type="button" id="eroeffnenBtn" style="flex:1">Tisch eröffnen</button>

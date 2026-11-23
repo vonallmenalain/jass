@@ -135,7 +135,62 @@ test('Tisch löschen: nur der Gastgeber', async () => {
   await assertSucceeds(remove(ref(db('papa'), pfad())));
 });
 
+test('Öffentlich: nur als Ja/Nein, nur vom Gastgeber', async () => {
+  await tischMitGast();
+  await assertSucceeds(update(ref(db('papa'), pfad('info')), { oeffentlich: false }));
+  await assertFails(update(ref(db('papa'), pfad('info')), { oeffentlich: 'ja' }));
+  await assertFails(update(ref(db('mia'), pfad('info')), { oeffentlich: true }));
+});
+
+const EINTRAG = { name: 'Familienjass', gastgeber: 'Papa', frei: 2, zeit: 1, regeln: '8 Runden · Trumpf, Obenabe, Undenufe' };
+
+test('Offene Tische: nur der Gastgeber trägt ein, alle Angemeldeten lesen', async () => {
+  await tischMitGast();
+  await assertSucceeds(set(ref(db('papa'), 'offen/' + CODE), EINTRAG));
+  await assertFails(set(ref(db('mia'), 'offen/' + CODE), EINTRAG), 'nicht Gastgeber');
+  await assertFails(set(ref(db('papa'), 'offen/ABCDEF'), EINTRAG), 'fremder Tisch');
+  await assertSucceeds(get(ref(db('tim'), 'offen')));
+  await assertFails(get(ref(db(null), 'offen')));
+  await assertFails(set(ref(db('papa'), 'offen/' + CODE), Object.assign({}, EINTRAG, { frei: 0 })), 'kein Platz frei');
+  await assertFails(set(ref(db('papa'), 'offen/' + CODE), Object.assign({}, EINTRAG, { muell: 'x' })), 'fremdes Feld');
+  await assertFails(set(ref(db('papa'), 'offen/' + CODE), { name: 'x' }), 'unvollständig');
+  await assertFails(remove(ref(db('mia'), 'offen/' + CODE)), 'Tisch wartet noch in der Lobby');
+  await assertSucceeds(remove(ref(db('papa'), 'offen/' + CODE)));
+});
+
+test('Offene Tische: verwaiste Einträge darf jeder wegräumen', async () => {
+  await tischMitGast();
+  await assertSucceeds(set(ref(db('papa'), 'offen/' + CODE), EINTRAG));
+  await assertSucceeds(update(ref(db('papa'), pfad('info')), { status: 'spiel' }));
+  await assertSucceeds(remove(ref(db('mia'), 'offen/' + CODE)), 'Spiel läuft schon');
+  await env.withSecurityRulesDisabled(async (c) => { await set(ref(c.database(), 'offen/ABCDEF'), EINTRAG); });
+  await assertSucceeds(remove(ref(db('tim'), 'offen/ABCDEF')), 'Tisch gibt es nicht');
+});
+
+test('Tisch schliessen: Tisch und Eintrag zusammen, nur der Gastgeber', async () => {
+  await tischMitGast();
+  await assertSucceeds(set(ref(db('papa'), 'offen/' + CODE), EINTRAG));
+  await assertFails(update(ref(db('mia')), { [pfad()]: null, ['offen/' + CODE]: null }));
+  await assertSucceeds(update(ref(db('papa')), { [pfad()]: null, ['offen/' + CODE]: null }));
+  const weg = await get(ref(db('papa'), 'offen/' + CODE));
+  if (weg.exists()) throw new Error('Eintrag noch da');
+});
+
+test('Plätze tauschen: der Gastgeber in einem Zug, die anderen nicht', async () => {
+  await tischMitGast();
+  const papa = { typ: 'mensch', uid: 'papa', name: 'Papa', online: true };
+  const mia = { typ: 'mensch', uid: 'mia', name: 'Mia', online: true };
+  await assertFails(update(ref(db('mia')), { [pfad('sitze/1')]: mia, [pfad('sitze/2')]: { typ: 'mittel', name: 'Anna' } }), 'Gast tauscht selbst');
+  await assertSucceeds(update(ref(db('papa')), { [pfad('sitze/0')]: mia, [pfad('sitze/2')]: papa, [pfad('info/hostSitz')]: '2' }));
+  const info = (await get(ref(db('papa'), pfad('info')))).val();
+  if (info.hostSitz !== '2') throw new Error('hostSitz nicht mitgezogen');
+  // Mia sitzt jetzt auf Platz 0 und darf dort ihren Status setzen, auf 2 nicht mehr.
+  await assertSucceeds(set(ref(db('mia'), pfad('sitze/0/online')), false));
+  await assertFails(set(ref(db('mia'), pfad('sitze/2/online')), false));
+});
+
 test('Andere Pfade bleiben zu', async () => {
   await assertFails(set(ref(db('papa'), 'turniere/x'), { a: 1 }));
   await assertFails(set(ref(db('papa'), pfad('geheim')), { a: 1 }));
+  await assertFails(set(ref(db('papa'), 'offen'), { a: 1 }));
 });

@@ -20,15 +20,15 @@ selben Stand.
 ```
 jass/<CODE>/                     CODE: 6 Zeichen, A–Z ohne I/L/O, 2–9
     info        name, host (uid), hostSitz, erstellt, status (lobby · spiel ·
-                fertig), spielNr, regeln, tipps
+                fertig), spielNr, regeln, tipps, oeffentlich
                 lesen: wer angemeldet ist und den Code kennt
                 schreiben: der Gastgeber – oder ein Mitspieler, wenn der
                 Gastgeber offline ist (Übernahme)
-    sitze/<0–3> typ (mensch · leicht · mittel · schwer), uid, name,
-                online, bereit
+    sitze/<0–3> typ (mensch · schwer; ältere Tische auch leicht · mittel –
+                alle Computer spielen heute schwer), uid, name, online, bereit
                 Platz nehmen: nur einen freien Menschenplatz, nur für sich
                 ändern: der Spieler selbst (online, bereit, Platz verlassen),
-                der Gastgeber alles
+                der Gastgeber alles – auch Plätze tauschen
     log/<n>     ein Spielzug, angehängt, nie überschrieben:
                 { t:'r', nr, a }           Runde nr, a sagt an (Gastgeber)
                 { t:'p', s }               Platz s schiebt
@@ -39,7 +39,20 @@ jass/<CODE>/                     CODE: 6 Zeichen, A–Z ohne I/L/O, 2–9
     haende/<s>  { nr, karten }   die Karten von Platz s in Runde nr
                 lesen: nur wer auf s sitzt – und der Gastgeber, der austeilt
                 schreiben: nur der Gastgeber
+    (ganzer Tisch) löschen: nur der Gastgeber («Tisch für alle schliessen»)
+
+offen/<CODE>                     Verzeichnis der öffentlichen Tische
+                { name, gastgeber, frei, zeit, regeln }
+                lesen: wer angemeldet ist (die Liste «Offene Tische»)
+                schreiben: der Gastgeber des Tisches – solange er öffentlich
+                ist, in der Lobby wartet und Plätze frei hat. Geht er
+                offline, löscht der Server den Eintrag (onDisconnect).
+                löschen: auch jeder andere, wenn der Tisch nicht mehr in der
+                Lobby ist oder es ihn nicht mehr gibt (Aufräumen)
 ```
+
+Wer einen Tisch öffentlich macht, zeigt seinen Namen und den des Tisches
+allen, die «Online spielen» öffnen.
 
 Was die Regeln **nicht** verhindern: Der Gastgeber teilt aus und kennt darum
 alle Karten. Und ein Gerät könnte einen ungültigen Zug in die Liste
@@ -131,6 +144,7 @@ cd werkzeuge
 npm ci
 npm run test:regeln    # die Regeln im Emulator, wie in der Action
 npm run test:online    # ein ganzes Online-Spiel mit drei Browsern (Playwright)
+npm run test:lobby     # offene Tische, privat/öffentlich, Plätze tauschen, Tisch schliessen
 ```
 
 `test:online` startet einen kleinen Webserver, lädt die Regeln in den

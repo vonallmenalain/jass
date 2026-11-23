@@ -19,6 +19,7 @@
           "status": { ".validate": "newData.isString() && newData.val().matches(/^(lobby|spiel|fertig)$/)" },
           "spielNr": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 100000" },
           "tipps": { ".validate": "newData.isBoolean()" },
+          "oeffentlich": { ".validate": "newData.isBoolean()" },
           "regeln": {
             "modi": {
               "$m": { ".validate": "$m.matches(/^(T|OBE|UNE|SLO|SLU|MIS)$/) && newData.isBoolean()" }
@@ -96,6 +97,20 @@
           }
         },
 
+        "$anderes": { ".validate": false }
+      }
+    },
+
+    "offen": {
+      ".read": "auth != null",
+      "$code": {
+        ".write": "auth != null && $code.matches(/^[A-Z2-9]{6}$/) && (root.child('jass').child($code).child('info/host').val() === auth.uid || (!newData.exists() && root.child('jass').child($code).child('info/status').val() !== 'lobby'))",
+        ".validate": "newData.hasChildren(['name', 'gastgeber', 'frei', 'zeit'])",
+        "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+        "gastgeber": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+        "frei": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 3" },
+        "zeit": { ".validate": "newData.isNumber()" },
+        "regeln": { ".validate": "newData.isString() && newData.val().length <= 160" },
         "$anderes": { ".validate": false }
       }
     }
