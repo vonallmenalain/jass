@@ -36,13 +36,19 @@
     .grund .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
     .notiz { background: rgba(239, 68, 68, .12); border: 1px solid rgba(239, 68, 68, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
     .ansage-liste { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+    .marke { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(250, 204, 21, .16); color: #fde68a; margin-right: 4px; }
+    .trainer-werte { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+    .trainer-werte div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 8px; background: rgba(0,0,0,.18); }
+    .trainer-werte .beste { box-shadow: inset 0 0 0 1px rgba(52, 211, 153, .55); }
+    .trainer-werte .gewaehlt b::after { content: ' ← deine Wahl'; color: #fde68a; font-weight: 700; font-size: 12px; }
+    .trainer-werte .gespielt { background: rgba(250, 204, 21, .14); }
   </style>
 </head>
 <body>
   <div class="app" style="--max: 760px">
     <div class="topbar">
-      <a class="icon-btn" href="jass-spiel.html" aria-label="Zurück">←</a>
-      <div class="topbar-titel"><span class="eyebrow">Gegen Computer</span><h1 id="titel">Gespielte Partien</h1></div>
+      <a class="icon-btn" href="jass-spiel.html" aria-label="Zurück" id="zurueckLink">←</a>
+      <div class="topbar-titel"><span class="eyebrow" id="eyebrow">Gegen Computer &amp; Trumpf-Trainer</span><h1 id="titel">Gespielte Partien</h1></div>
     </div>
     <section class="stack" id="liste"></section>
     <section class="stack" id="ansicht" hidden></section>
@@ -69,6 +75,14 @@
     let gespeichert = true;   // false: aus einer Datei geöffnet, nicht in der Liste
     let rundeIndex = 0;
 
+    // Woher man kam: der Pfeil oben führt dorthin zurück. Vom Trumpf-Trainer
+    // aus geht es zur Hand, die gerade ausgespielt wurde.
+    const PARAMS = new URLSearchParams(location.search);
+    const ZURUECK = { trainer: 'trumpf-trainer.html?zurueck=1', trainerstart: 'trumpf-trainer.html', helfer: 'trumpf-helfer.html', training: 'training.html' };
+    const vomHelfer = (p) => !!(p && p.trainer && p.trainer.art === 'helfer');
+    if (ZURUECK[PARAMS.get('von')]) $('zurueckLink').href = ZURUECK[PARAMS.get('von')];
+    let filter = ['spiel', 'trainer'].includes(PARAMS.get('quelle')) ? PARAMS.get('quelle') : 'alle';
+
     function esc(s) {
       return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
@@ -82,23 +96,37 @@
     function zeigeListe() {
       partie = null;
       $('titel').textContent = 'Gespielte Partien';
+      $('eyebrow').textContent = 'Gegen Computer & Trumpf-Trainer';
       $('ansicht').hidden = true;
       $('liste').hidden = false;
-      const alle = V.alle();
+      const alle = V.alle().filter((p) => filter === 'alle' || V.quelleVon(p) === filter);
+      const knopf = (w, t) => `<button type="button" data-filter="${w}" class="${filter === w ? 'aktiv' : ''}">${t}</button>`;
       $('liste').innerHTML = `
         <div class="panel stack">
-          <p class="muted klein">Jede Partie gegen den Computer wird hier gespeichert – mit allen Karten, Ansagen und Zügen, bei den Computern mit Begründung. Siehst du etwas Komisches, markiere die Stelle und exportiere die Partie als Datei.</p>
+          <p class="muted klein">Jede Partie gegen den Computer und jede im Trumpf-Trainer ausgespielte Hand wird hier gespeichert – mit allen Karten, Ansagen und Zügen, bei den Computern mit Begründung und den durchgerechneten Werten. Siehst du etwas Komisches, markiere die Stelle und exportiere die Partie als Datei.</p>
+          <div class="segmente" id="filter">${knopf('alle', 'Alle')}${knopf('spiel', 'Gegen Computer')}${knopf('trainer', '🎯 Training')}</div>
           <label class="btn-ghost btn-klein" style="cursor:pointer;align-self:flex-start">📂 Datei öffnen<input type="file" accept=".json,application/json" id="dateiOeffnen" hidden></label>
         </div>
         ${alle.length ? alle.map((p) => {
           const n = p.notizen ? p.notizen.length : 0;
           const stand = p.ende ? `${p.summe[0]} : ${p.summe[1]}` : 'läuft';
+          const trainer = V.quelleVon(p) === 'trainer';
+          const r0 = p.runden[0];
+          const was = trainer
+            ? `<span class="marke">${vomHelfer(p) ? '🃏 Helfer' : '🎯 Trainer'}</span>` + (r0 && r0.code && J.MODI[r0.code] ? esc(J.MODI[r0.code].lang) + ' · ' : '') + (p.trainer && p.trainer.wahl ? 'deine Wahl ' + esc(modusName(p.trainer.wahl)) : 'eine Runde')
+            : `${esc(teamName(p, 0))} gegen ${esc(teamName(p, 1))} · ${p.runden.length} ${p.runden.length === 1 ? 'Runde' : 'Runden'}`;
           return `<button class="btn-ghost partie-zeile" type="button" data-id="${esc(p.id)}">
             <span class="oben"><span>${esc(datum(p.start))}</span><span>${esc(stand)}</span></span>
-            <span class="unten">${esc(teamName(p, 0))} gegen ${esc(teamName(p, 1))} · ${p.runden.length} ${p.runden.length === 1 ? 'Runde' : 'Runden'}${n ? ' · 🚩 ' + n : ''}</span>
+            <span class="unten">${was}${n ? ' · 🚩 ' + n : ''}</span>
           </button>`;
-        }).join('') : '<div class="panel"><p class="muted">Noch keine Partie gespielt.</p></div>'}`;
+        }).join('') : `<div class="panel"><p class="muted">${filter === 'trainer' ? 'Noch keine Hand im Trumpf-Trainer oder Trumpf-Helfer ausgespielt.' : 'Noch keine Partie gespielt.'}</p></div>`}`;
       $('liste').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', () => oeffne(V.lade(b.dataset.id), true)));
+      $('filter').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-filter]');
+        if (!b) return;
+        filter = b.dataset.filter;
+        zeigeListe();
+      });
       $('dateiOeffnen').addEventListener('change', (e) => {
         const f = e.target.files[0];
         if (!f) return;
@@ -120,6 +148,7 @@
       $('liste').hidden = true;
       $('ansicht').hidden = false;
       $('titel').textContent = datum(p.start);
+      $('eyebrow').textContent = V.quelleVon(p) === 'trainer' ? (vomHelfer(p) ? 'Trumpf-Helfer' : 'Trumpf-Trainer') : 'Gegen Computer';
       zeichneAnsicht();
       window.scrollTo(0, 0);
     }
@@ -131,7 +160,7 @@
         <div class="reihe" style="justify-content:space-between">
           <span><b>${esc(teamName(p, 0))}</b> ${p.ende ? p.summe[0] + ' : ' + p.summe[1] : '(läuft)'} <b>${esc(teamName(p, 1))}</b></span>
         </div>
-        <p class="muted klein">${esc(E.zusammenfassung(J.regelnMitStandard(p.regeln)))} · Rechentiefe ${esc(p.rechnen || 'normal')} · ${p.spieler.map((x) => esc(x.name) + ' ' + (STUFE[x.typ] || '')).join(', ')}</p>
+        <p class="muted klein">${esc(E.zusammenfassung(J.regelnMitStandard(p.regeln)))} · Rechentiefe ${esc(p.rechnen || 'normal')}${p.welten ? ' (' + Number(p.welten) + ' Verteilungen pro Zug)' : ''} · ${p.spieler.map((x) => esc(x.name) + ' ' + (STUFE[x.typ] || '')).join(', ')}</p>
         <div class="reihe">
           <button class="btn btn-klein" type="button" id="herunterladen">⬇︎ Als Datei</button>
           ${navigator.share ? '<button class="btn-ghost btn-klein" type="button" id="teilen">Teilen</button>' : ''}
@@ -140,10 +169,37 @@
           <button class="btn-ghost btn-klein" type="button" id="zurListe">Alle Partien</button>
         </div>
         ${p.notizen && p.notizen.length ? `<div class="stack" style="gap:6px">${p.notizen.map((n) => `<div class="notiz">🚩 Runde ${n.runde + 1}${n.stich != null ? ', Stich ' + (n.stich + 1) : ', Ansage'}: ${esc(n.text)}</div>`).join('')}</div>` : ''}
-        <div class="runden-tabs segmente">${p.runden.map((x, i) => `<button type="button" data-runde="${i}" class="${i === rundeIndex ? 'aktiv' : ''}">Runde ${x.nr + 1}</button>`).join('')}</div>
+        ${p.runden.length > 1 || V.quelleVon(p) !== 'trainer' ? `<div class="runden-tabs segmente">${p.runden.map((x, i) => `<button type="button" data-runde="${i}" class="${i === rundeIndex ? 'aktiv' : ''}">Runde ${x.nr + 1}</button>`).join('')}</div>` : ''}
       </div>`;
-      $('ansicht').innerHTML = kopf + (r ? rundeHtml(p, r) : '<div class="panel"><p class="muted">Noch keine Runde.</p></div>');
+      $('ansicht').innerHTML = kopf + trainerHtml(p) + (r ? rundeHtml(p, r) : '<div class="panel"><p class="muted">Noch keine Runde.</p></div>');
       verbinde();
+    }
+
+    // Im Trumpf-Trainer ausgespielt: was der Trainer für jede Ansage
+    // errechnet hatte, neben dem, was dann herauskam.
+    function trainerHtml(p) {
+      if (V.quelleVon(p) !== 'trainer') return '';
+      const t = p.trainer || {};
+      const r = p.runden[0];
+      const lage = t.geschoben ? 'Dein Partner hatte geschoben' : 'Du warst Vorhand';
+      const ichSchob = r && r.ansagen.length && r.ansagen[0].s === 0 && r.ansagen[0].wahl === 'SCHIEBEN';
+      const gespielt = r && r.code ? (ichSchob ? 'SCHIEBEN' : r.code) : null;
+      const werte = t.werte || [];
+      const beste = werte.length ? werte.reduce((a, b) => (b.p > a.p ? b : a)) : null;
+      const zeile = (w) => `<div class="${w === beste ? 'beste' : ''} ${w.c === t.wahl ? 'gewaehlt' : ''} ${w.c === gespielt ? 'gespielt' : ''}"><b>${esc(modusName(w.c))}</b><span>Ø ${Math.round(w.p)}</span></div>`;
+      const eintrag = werte.find((w) => w.c === gespielt);
+      let ergebnis = '';
+      if (p.ende && r && r.code) {
+        const diff = eintrag ? p.summe[0] - eintrag.p : null;
+        const wie = ichSchob ? `Du hast geschoben, angesagt wurde <b>${esc(modusName(r.code))}</b>` : `Angesagt: <b>${esc(modusName(r.code))}</b>`;
+        ergebnis = `<p>${wie}. Ihr habt <b>${p.summe[0]}</b> Punkte gemacht${eintrag ? `, im Schnitt wären es ${Math.round(eintrag.p)} gewesen (${diff >= 0 ? '+' : '−'}${Math.round(Math.abs(diff))})` : ''}.</p>`;
+      } else if (!p.ende) ergebnis = '<p class="muted">Die Hand wurde nicht fertig gespielt.</p>';
+      return `<div class="panel stack">
+        <h2>${vomHelfer(p) ? '🃏 Trumpf-Helfer' : '🎯 Trumpf-Trainer'}</h2>
+        <p class="muted klein">${t.nr ? 'Hand ' + t.nr + (t.laenge ? ' von ' + t.laenge : '') + ' · ' : ''}${lage}${t.wahl ? ' · deine Wahl im Trainer: <b>' + esc(modusName(t.wahl)) + '</b>' : ''}</p>
+        ${werte.length ? `<p class="muted klein">So viele Punkte macht euer Team im Schnitt mit jeder Ansage${t.n ? ' – aus ' + t.n + ' durchgespielten Verteilungen' : ''}:</p><div class="trainer-werte">${werte.map(zeile).join('')}</div>` : ''}
+        ${ergebnis}
+      </div>`;
     }
 
     function rundeHtml(p, r) {
@@ -268,7 +324,7 @@
     }
     $('dialog').addEventListener('click', (e) => { if (e.target === $('dialog')) $('dialog').classList.remove('offen'); });
 
-    const id = new URLSearchParams(location.search).get('p');
+    const id = PARAMS.get('p');
     if (id && V.lade(id)) oeffne(V.lade(id), true);
     else zeigeListe();
   })();

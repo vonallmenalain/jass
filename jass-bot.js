@@ -1,12 +1,13 @@
 /*
  * jass-bot.js – Die Computerspieler und der Tipp-Geber.
  * ---------------------------------------------------------------------------
- * Drei Stufen:
+ * In der App spielen alle Computer «schwer». «mittel» bleibt als Baustein:
  *
- *   leicht   Spielt oft irgendeine erlaubte Karte, sagt nach Gefühl an.
  *   mittel   Spielt nach Faustregeln wie ein guter Hobbyspieler: Bock
  *            ausspielen, dem Partner schmieren, Trumpf ziehen, billig
  *            verwerfen. Jede Entscheidung kommt mit einem Satz, warum.
+ *            «schwer» lässt in seinen durchgespielten Welten alle so
+ *            spielen und nimmt bei Gleichstand die Karte der Faustregel.
  *   schwer   Merkt sich alle Karten und wer welche Farbe nicht mehr hat,
  *            verteilt die unbekannten Karten viele Male neu und spielt
  *            jede mögliche Karte in all diesen Welten zu Ende (die
@@ -221,8 +222,12 @@
       }
     }
     const pool = verlierer.length ? verlierer : legal;
-    return { karte: minNach(pool, (k) => abwurfKosten(k, v, eff)), grund: 'Du kannst den Stich nicht billig machen – gib eine Karte, die wenig wert ist (verwerfen).' };
+    const k = minNach(pool, (x) => abwurfKosten(x, v, eff));
+    return { karte: k, grund: farbeVon(k) === farbeVon(v.stich[0]) ? GRUND_ZUGEBEN : GRUND_VERWERFEN };
   }
+
+  const GRUND_ZUGEBEN = 'Du kannst den Stich nicht billig machen – gib die Karte, die am wenigsten wert ist.';
+  const GRUND_VERWERFEN = 'Du hast die Farbe nicht und kannst den Stich nicht billig machen – verwirf eine Karte, die wenig wert ist.';
 
   function misereZug(v, eff, legal) {
     if (!v.stich.length) {
@@ -497,10 +502,55 @@
     let wahl = werte[0];
     const m = werte.find((x) => x.karte === mittel.karte);
     if (m && wahl.wert - m.wert < 0.5) wahl = m;
+    // Verwerfen: Sieht die Rechnung kaum einen Unterschied, kommt die Karte
+    // aus der schwächsten Farbe – so kann der Partner daraus lesen, wo man
+    // nichts hat. Gemessen kostet das nichts (werkzeuge/verwerfen.js).
+    const schwelle = o.verwerfSchwelle != null ? o.verwerfSchwelle : VERWERF_SCHWELLE;
+    const vk = schwelle > 0 ? verwerfKarte(ansicht, effModus(runde.code, runde.stichNr), legal) : null;
+    if (vk != null) {
+      const x = werte.find((y) => y.karte === vk);
+      if (x && werte[0].wert - x.wert <= schwelle) return { karte: vk, grund: GRUND_VERWERFEN_SCHWACH, werte };
+    }
     const grund = wahl.karte === mittel.karte
       ? mittel.grund
       : 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
     return { karte: wahl.karte, grund, werte };
+  }
+
+  // Bis zu diesem Unterschied (eigene minus fremde Punkte, also rund die
+  // Hälfte in eigenen Punkten) gelten zwei Karten beim Verwerfen als gleich
+  // gut – kleiner als das, was das Durchspielen sicher unterscheiden kann.
+  const VERWERF_SCHWELLE = 2;
+  const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
+
+  // Verwerfen heisst: Die ausgespielte Farbe fehlt, ein Gegner liegt vorne,
+  // und man gibt eine Karte einer anderen Farbe (keinen Trumpf). Dann die
+  // tiefste Karte aus der schwächsten Farbe – dort, wo die eigene beste
+  // Karte am meisten noch nicht gespielte Karten über sich hat. Gibt es
+  // nur eine Farbe zur Wahl, ist es kein Verwerfen: null.
+  function verwerfKarte(v, eff, legal) {
+    if (!v.stich.length) return null;
+    const T = trumpfVon(eff);
+    const led = farbeVon(v.stich[0]);
+    if (v.hand.some((k) => farbeVon(k) === led)) return null;
+    const gi = gewinnerIndex(v.stich, eff);
+    if (team(v.stichSitze[gi]) === team(v.sitz)) return null;
+    const kandidaten = legal.filter((k) => farbeVon(k) !== T && farbeVon(k) !== led);
+    const farben = Array.from(new Set(kandidaten.map(farbeVon)));
+    if (farben.length < 2) return null;
+    const billig = (k) => PUNKTE[eff][k] * 2 + (STAERKE[eff][k] % 100) * 0.4;
+    const tiefste = (f) => minNach(kandidaten.filter((k) => farbeVon(k) === f), billig);
+    const schwaeche = (f) => {
+      const top = maxNach(v.hand.filter((k) => farbeVon(k) === f), (k) => STAERKE[eff][k]);
+      return hoehereDraussen(top, eff, v.gespielt, v.hand);
+    };
+    // Die schwächste Farbe; bei Gleichstand die mit der billigeren Karte.
+    const f = farben.reduce((a, b) => {
+      const d = schwaeche(b) - schwaeche(a);
+      if (d !== 0) return d > 0 ? b : a;
+      return billig(tiefste(b)) < billig(tiefste(a)) ? b : a;
+    });
+    return tiefste(f);
   }
 
   // Mit allen Karten offen: Wie viel bringt jede erlaubte Karte, wenn danach
@@ -859,7 +909,9 @@
     'Mit deinem Bock übernimmst du den Stich – höher geht es in dieser Farbe nicht mehr.',
     'Im Stich liegen genug Punkte – das lohnt sich zu stechen.',
     'Im Stich liegen viele Punkte – versuch ihn zu übernehmen.',
-    'Du kannst den Stich nicht billig machen – gib eine Karte, die wenig wert ist (verwerfen).',
+    GRUND_ZUGEBEN,
+    GRUND_VERWERFEN,
+    GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',
     'Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.',
@@ -898,41 +950,32 @@
 
   // --------------------------------------------------------------- API
 
-  function zufallsQuelle(o) { return (o && o.rng) || Math.random; }
-
-  // Wie gründlich «Schwer» und der Tipp rechnen (Einstellung Rechentiefe).
+  // Wie gründlich die Computer und der Tipp rechnen (Einstellung Rechentiefe).
   //   welten       so viele Kartenverteilungen werden durchgespielt
   //   weltenExakt  … wenn die letzten Stiche exakt gerechnet werden
   //   exaktAb      ab so vielen Karten auf dem Tisch wird exakt gerechnet
   //   ansage       so viele Verteilungen für die Wahl des Trumpfs
+  // Standard ist «normal» mit 300 Verteilungen pro Zug.
   const RECHENTIEFE = {
-    schnell: { welten: 40, weltenExakt: 16, exaktAb: 8, ansage: 40 },
-    normal: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80 },
-    gruendlich: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200 },
-    maximal: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400 },
+    schnell: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80 },
+    normal: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200 },
+    gruendlich: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400 },
+    maximal: { welten: 1000, weltenExakt: 200, exaktAb: 12, ansage: 600 },
   };
   function rechentiefe(name) { return RECHENTIEFE[name] || RECHENTIEFE.normal; }
 
+  // stufe: 'schwer' (alle Computer in der App) oder 'mittel' (nur die
+  // Faustregel – für Werkzeuge und Tests).
   function waehleKarte(spiel, sitz, stufe, optionen) {
-    const rng = zufallsQuelle(optionen);
-    if (stufe === 'schwer') return schwerZug(spiel, sitz, optionen);
-    const legal = J.erlaubteFuer(spiel, sitz);
-    if (stufe === 'leicht' && rng() < 0.55) {
-      return { karte: legal[Math.floor(rng() * legal.length)], grund: 'Zufällig gewählt.' };
-    }
-    return mittelZug(ansichtAus(spiel, sitz));
+    if (stufe === 'mittel') return mittelZug(ansichtAus(spiel, sitz));
+    return schwerZug(spiel, sitz, optionen);
   }
 
   function waehleAnsage(spiel, sitz, stufe, optionen) {
     const runde = spiel.runde;
     const hand = runde.haende[sitz];
     const darf = J.darfSchieben(runde, spiel.regeln) && sitz === runde.ansager;
-    const rng = zufallsQuelle(optionen);
-    if (stufe === 'leicht') {
-      const w = heuristikAnsage(hand, spiel.regeln, darf, rng, 40);
-      return { code: w.code, grund: 'Nach Gefühl.' };
-    }
-    if (stufe === 'schwer') {
+    if (stufe !== 'mittel') {
       const b = bewertung(hand, spiel.regeln, { geschoben: !darf, rng: (optionen && optionen.rng) || J.zufall(J.neuerSeed()) });
       b.schritt((optionen && (optionen.ansage || optionen.welten)) || 80);
       const liste = b.ergebnis();
@@ -946,7 +989,7 @@
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
-    simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE,
+    simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JassBot = api;

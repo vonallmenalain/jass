@@ -21,7 +21,6 @@
   const K = root.JassKarten;
   const B = root.JassBot;
 
-  const STUFEN = { leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer' };
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -157,7 +156,7 @@
         const rolle = [];
         if (s === r.ansager) rolle.push('Vorhand');
         if (r.code && s === r.angesagtVon) rolle.push('Ansage');
-        let typ = sp.typ && sp.typ !== 'mensch' ? ' · ' + STUFEN[sp.typ] : '';
+        let typ = sp.typ && sp.typ !== 'mensch' ? ' · 🤖' : '';
         if (sp.online === false) typ = ' · offline';
         p.className = 'platz team' + (s % 2) + (s === dran ? ' dran' : '') + (sp.online === false ? ' weg' : '');
         p.innerHTML = `<div class="avatar">${escapeHtml(name(s).charAt(0).toUpperCase())}</div>
@@ -612,5 +611,5 @@
     };
   }
 
-  root.JassTisch = { erstelle, escapeHtml, modusHtml, STUFEN };
+  root.JassTisch = { erstelle, escapeHtml, modusHtml };
 })(typeof self !== 'undefined' ? self : this);

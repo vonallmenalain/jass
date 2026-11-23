@@ -54,7 +54,10 @@ const KEY_TISCHE = 'jass-online-tische-v1';
 const ZEICHEN = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const COMPUTER = ['Anna', 'Ben', 'Clara', 'Dario'];
 const LAGE = ['Platz 1', 'Platz 2', 'Platz 3', 'Platz 4'];
-const TYPEN = [['mensch', '👤 Mitspieler'], ['leicht', '🤖 Leicht'], ['mittel', '🤖 Mittel'], ['schwer', '🤖 Schwer']];
+// Computer spielen immer so stark wie möglich («schwer»). Ältere Tische können
+// noch «leicht» oder «mittel» gespeichert haben – sie spielen ebenfalls schwer.
+const TYPEN = [['mensch', '👤 Mitspieler'], ['schwer', '🤖 Computer']];
+const passtTyp = (typ, w) => typ === w || (w === 'schwer' && typ != null && typ !== 'mensch');
 const TEMPO = { langsam: { denken: 1300, stich: 1700 }, normal: { denken: 850, stich: 1200 }, schnell: { denken: 400, stich: 700 } };
 // Im Emulator lassen sich die Wartezeiten für Tests verkürzen (?warte=ms).
 const TEST_WARTE = EMULATOR && params.has('warte') ? Number(params.get('warte')) : 0;
@@ -189,7 +192,7 @@ function zeichneNeuSitze() {
   const lage = ['', 'Rechts (Gegner)', 'Gegenüber (dein Partner)', 'Links (Gegner)'];
   $('neuSitze').innerHTML = `<div class="sitz-zeile"><b>Unten: ${esc(meinName())}</b> <span class="muted klein">(du, Gastgeber)</span></div>` +
     [2, 1, 3].map((s) => `<label class="reihe" style="justify-content:space-between"><span>${lage[s]}</span>
-      <select class="text-feld" style="width:auto" data-neu-sitz="${s}">${TYPEN.map(([w, t]) => `<option value="${w}" ${neuTypen[s] === w ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`).join('');
+      <select class="text-feld" style="width:auto" data-neu-sitz="${s}">${TYPEN.map(([w, t]) => `<option value="${w}" ${passtTyp(neuTypen[s], w) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`).join('');
 }
 $('neuSitze').addEventListener('change', (e) => {
   const el = e.target.closest('[data-neu-sitz]');
@@ -354,12 +357,12 @@ function zeigeLobby() {
     else wer = `<i class="punkt ${x.online ? 'an' : ''}"></i><span>${esc(x.name)}${ich ? ' (du)' : ''}${String(s) === String(info.hostSitz) ? ' · Gastgeber' : ''}</span>`;
     let unten = '';
     if (istHost && !ich) {
-      unten = `<select class="text-feld" data-lobby-typ="${s}">${TYPEN.map(([w, t]) => `<option value="${w}" ${x.typ === w ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+      unten = `<select class="text-feld" data-lobby-typ="${s}">${TYPEN.map(([w, t]) => `<option value="${w}" ${passtTyp(x.typ, w) ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
       if (x.typ === 'mensch' && x.uid) unten += `<button class="btn-ghost btn-klein" type="button" data-frei="${s}">Platz freigeben</button>`;
     } else if (frei && meinSitz < 0) {
       unten = `<button class="btn btn-klein" type="button" data-hinsetzen="${s}">Hier sitzen</button>`;
     } else if (x.typ !== 'mensch') {
-      unten = `<span class="lage">Computer · ${esc(T.STUFEN[x.typ])}</span>`;
+      unten = '<span class="lage">Computer</span>';
     }
     return `<div class="lobby-sitz ${ich ? 'ich' : ''}"><div class="lage">${LAGE[s]}</div><div class="wer">${wer}</div>${unten}</div>`;
   };
@@ -679,7 +682,7 @@ function planeHost() {
     warte = Math.max(warte, ERSATZ_NACH - (Date.now() - wegSeit[n.sitz]));
   }
   const stand = log.length;
-  hostTimer = setTimeout(() => computerZug(n, istComputer ? x.typ : 'mittel', stand), warte);
+  hostTimer = setTimeout(() => computerZug(n, 'schwer', stand), warte);
 }
 
 function computerZug(n, stufe, stand) {

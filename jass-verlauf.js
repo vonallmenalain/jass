@@ -6,7 +6,12 @@
  * Ansage und jeder Zug in der Reihenfolge, bei den Computern mit Stufe und
  * Begründung, bei «Schwer» dazu die durchgerechneten Werte der Karten.
  *
- *   p = JassVerlauf.neu(spiel, spieler, { rechnen })
+ * Auch die im Trumpf-Trainer ausgespielten Hände landen hier (quelle
+ * 'trainer'), zusammen mit dem, was der Trainer für jede Ansage errechnet
+ * hatte. Behalten werden die letzten 40 Partien und die letzten 60
+ * Trainer-Hände.
+ *
+ *   p = JassVerlauf.neu(spiel, spieler, { rechnen, quelle, trainer })
  *   JassVerlauf.ansage(p, runde, sitz, wahl, info)
  *   JassVerlauf.karte(p, runde, sitz, karte, info)
  *   JassVerlauf.rundeFertig(p, runde, abrechnung)
@@ -20,12 +25,13 @@
   'use strict';
 
   const KEY = 'jass-lernen-partien-v1';
-  const MAX = 40;
+  const MAX = { spiel: 40, trainer: 60 };
+  const quelleVon = (p) => (p && p.quelle === 'trainer' ? 'trainer' : 'spiel');
 
   function neu(spiel, spieler, optionen) {
     const o = optionen || {};
     const jetzt = Date.now();
-    return {
+    const p = {
       format: 'jass-partie',
       version: 1,
       id: 'p' + jetzt.toString(36) + Math.floor(Math.random() * 1e6).toString(36),
@@ -39,6 +45,12 @@
       sieger: null,
       notizen: [],
     };
+    if (o.welten) p.welten = o.welten;
+    if (o.quelle === 'trainer') {
+      p.quelle = 'trainer';
+      if (o.trainer) p.trainer = JSON.parse(JSON.stringify(o.trainer));
+    }
+    return p;
   }
 
   // Die Aufzeichnung der Runde – beim ersten Zugriff mit den Startkarten.
@@ -103,8 +115,9 @@
   }
 
   function schreibeAlle(liste) {
-    // Wird es zu gross, fallen die ältesten weg.
-    let l = liste.slice(0, MAX);
+    // Je Quelle nur die neusten; wird es zu gross, fallen die ältesten weg.
+    const zaehler = { spiel: 0, trainer: 0 };
+    let l = liste.filter((p) => ++zaehler[quelleVon(p)] <= MAX[quelleVon(p)]);
     while (l.length) {
       try { root.localStorage.setItem(KEY, JSON.stringify(l)); return true; } catch (e) { l = l.slice(0, -1); }
     }
@@ -125,7 +138,7 @@
   function dateiname(p) {
     const d = new Date(p.start);
     const zwei = (n) => String(n).padStart(2, '0');
-    return `jass-partie-${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}-${zwei(d.getHours())}${zwei(d.getMinutes())}.json`;
+    return `jass-${quelleVon(p) === 'trainer' ? 'trainer' : 'partie'}-${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}-${zwei(d.getHours())}${zwei(d.getMinutes())}.json`;
   }
 
   // Prüft, ob ein eingelesenes Objekt eine Partie ist.
@@ -133,7 +146,7 @@
     return !!x && x.format === 'jass-partie' && Array.isArray(x.runden) && Array.isArray(x.spieler);
   }
 
-  const api = { neu, runde, ansage, karte, rundeFertig, spielFertig, notiz, alle, speichere, lade, loesche, dateiname, istPartie, KEY };
+  const api = { neu, runde, ansage, karte, rundeFertig, spielFertig, notiz, alle, speichere, lade, loesche, dateiname, istPartie, quelleVon, KEY };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JassVerlauf = api;
 })(typeof self !== 'undefined' ? self : this);
