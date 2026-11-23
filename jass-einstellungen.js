@@ -15,7 +15,7 @@
     tempo: 'normal',      // langsam | normal | schnell
     hilfen: true,         // erlaubte Karten hervorheben
     tipps: true,          // Tipp-Knopf
-    erklaeren: true,      // Computer sagen, warum sie so spielen
+    gedanken: false,      // alle Gedanken und Stiche anzeigen (im Training immer an)
     farben: 'klassisch',  // klassisch | vier
     einTipp: false,       // Karte mit einem Tipp spielen (sonst: antippen, dann nochmals)
     rechnen: 'normal',    // Rechentiefe der Computer und Tipps, «normal» = 300 Verteilungen (JassBot.RECHENTIEFE)
@@ -228,7 +228,7 @@
         ${o.tipps !== false ? schalter('tipps', 'Tipp-Knopf', 'Der Computer schlägt dir eine Karte oder Ansage vor und sagt warum', a.tipps) : ''}
         ${schalter('austeilen', 'Austeilen zeigen', 'Zu Beginn jeder Runde fliegen die Karten aus der Mitte zu den Plätzen', a.austeilen)}
         ${o.stichWarten !== false ? schalter('stichWarten', 'Stich liegen lassen, bis ich tippe', 'Die vier Karten bleiben liegen, bis du aufs Feld tippst – so kannst du den Stich in Ruhe anschauen', a.stichWarten) : ''}
-        ${schalter('erklaeren', 'Computer erklären ihre Züge', 'Unter dem Tisch steht, warum der Computer so gespielt hat', a.erklaeren)}
+        ${schalter('gedanken', 'Alle Gedanken und Stiche anzeigen', 'Mit «📜 Stiche & Gedanken» liest du während des Spiels jederzeit alle Stiche nach – mit den Gedanken jedes Spielers, auch aus früheren Runden. Aus: Die Computer spielen ohne Kommentar, wie am echten Tisch. Beim Ausspielen im Training ist es immer an.', a.gedanken)}
         ${schalter('einTipp', 'Mit einem Tipp spielen', 'Aus: Karte antippen hebt sie an, nochmals tippen spielt sie', a.einTipp)}` : ''}`;
     }
     container.addEventListener('click', (e) => {

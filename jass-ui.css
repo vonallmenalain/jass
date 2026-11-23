@@ -491,6 +491,21 @@ details.abschnitt .inhalt { padding-bottom: 12px; display: flex; flex-direction:
 .letzter-stich figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
 .letzter-stich .karte { --kw: 64px; }
 .letzter-stich figure.sieger figcaption { color: #fde68a; font-weight: 800; }
+/* «Stiche & Gedanken»: die ganze Partie im Dialog */
+.hist-runde { border-radius: 14px; background: rgba(0,0,0,.18); margin-bottom: 10px; }
+.hist-runde > summary { cursor: pointer; padding: 10px 12px; font-weight: 800; list-style: none; }
+.hist-runde > summary::before { content: '▸ '; color: var(--muted); }
+.hist-runde[open] > summary::before { content: '▾ '; }
+.hist-ansage, .hist-stich { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid rgba(255,255,255,.08); }
+.hist-kopf { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.hist-kopf span { color: var(--muted); }
+.hist-karten { display: flex; gap: 6px; flex-wrap: wrap; }
+.hist-karten figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; }
+.hist-karten .karte { --kw: 46px; }
+.hist-karten figure.sieger figcaption { color: #fde68a; font-weight: 800; }
+.gedanke { background: rgba(0,0,0,.2); border-radius: 10px; padding: 6px 9px; font-size: 13.5px; line-height: 1.4; }
+.gedanke .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
+[data-jetzt] { scroll-margin: 12px; }
 
 
 @media (max-height: 620px) {
