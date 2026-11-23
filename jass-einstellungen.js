@@ -18,7 +18,7 @@
     gedanken: false,      // alle Gedanken und Stiche anzeigen (im Training immer an)
     farben: 'klassisch',  // klassisch | vier
     einTipp: false,       // Karte mit einem Tipp spielen (sonst: antippen, dann nochmals)
-    rechnen: 'normal',    // Rechentiefe der Computer und Tipps, «normal» = 300 Verteilungen (JassBot.RECHENTIEFE)
+    rechnen: 'maximal',   // Rechentiefe der Computer, Tipps und Trainer: «maximal» = 1000 Verteilungen (JassBot.RECHENTIEFE)
     kartenbild: 'foto',   // foto (unsere Karten) | eigen | klassisch (SVG-cards) – karten/README.md
     stichWarten: true,    // gegen den Computer: der volle Stich bleibt liegen, bis man tippt
     austeilen: true,      // das Austeilen zeigen (Karten fliegen zu den Plätzen)
@@ -26,6 +26,7 @@
     ruecken: 'alae',      // Kartenrücken: alae (schwarz mit Logo) | rot
     klang: 'papier',      // Töne am Tisch: aus | papier | holz | weich (jass-toene.js)
     lautstaerke: 45,      // 0..100
+    stand: 2,             // Version der gespeicherten Anzeige (für Umstellungen)
   };
 
   // Kartenbild, Rücken und Töne gleich anwenden.
@@ -60,7 +61,15 @@
   function ladeRegeln() { return J.regelnMitStandard(lese(KEY_REGELN) || {}); }
   function speichereRegeln(r) { schreibe(KEY_REGELN, r); }
   function ladeAnzeige() {
-    const a = Object.assign({}, STANDARD_ANZEIGE, lese(KEY_ANZEIGE) || {});
+    const gespeichert = lese(KEY_ANZEIGE) || {};
+    const a = Object.assign({}, STANDARD_ANZEIGE, gespeichert);
+    // Stand 2: «Maximal» ist neu Standard – auch für alle, die noch den
+    // alten Standard («Normal») gespeichert haben.
+    if ((gespeichert.stand || 1) < 2) {
+      if (!gespeichert.rechnen || gespeichert.rechnen === 'normal') a.rechnen = 'maximal';
+      a.stand = 2;
+      if (Object.keys(gespeichert).length) speichereAnzeige(a);
+    }
     wende(a);
     return a;
   }

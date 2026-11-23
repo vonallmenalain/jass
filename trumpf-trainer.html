@@ -164,7 +164,7 @@
     const KEY_TRAINER = 'jass-lernen-trainer-v1';
     const KEY_SERIE = 'jass-trainer-serie';        // die Serie, während eine Hand ausgespielt wird
     const KEY_ERGEBNIS = 'jass-trainer-ergebnis';  // was beim Ausspielen herauskam (jass-spiel.html)
-    const STANDARD = { serie: 10, geschoben: 'gemischt', genauigkeit: 300, rekord: null };
+    const STANDARD = { serie: 10, geschoben: 'gemischt', rekord: null };
     let einst = Object.assign({}, STANDARD, E.lese(KEY_TRAINER) || {});
     let regeln = E.ladeRegeln();
     let anzeige = E.ladeAnzeige();
@@ -277,7 +277,8 @@
       $('balken').style.width = '0%';
       const id = ++laeuft;
       const b = B.bewertung(h.hand, regeln, { geschoben: h.geschoben });
-      const ziel = einst.genauigkeit;
+      // Gleich genau wie der Trumpf-Helfer: Rechentiefe aus «Anzeige & Hilfen».
+      const ziel = Math.max(200, B.rechentiefe(anzeige.rechnen).ansage * 4);
       const schritt = () => {
         if (id !== laeuft) return;
         const t0 = performance.now();
@@ -423,25 +424,17 @@
       $('dialogInhalt').innerHTML = `<h2>Einstellungen</h2>
         <div class="stack" style="gap:8px"><span>Situation</span>
           <div class="segmente" id="setGeschoben">${[['nie', 'Immer Vorhand'], ['gemischt', 'Gemischt'], ['immer', 'Immer geschoben']].map(([w, t]) => `<button type="button" data-w="${w}" class="${einst.geschoben === w ? 'aktiv' : ''}">${t}</button>`).join('')}</div>
-          <small class="muted klein">«Geschoben»: Dein Partner hat geschoben, du musst ansagen.</small></div>
-        <div class="stack" style="gap:8px"><span>Genauigkeit</span>
-          <div class="segmente" id="setGenau">${[[150, 'Schnell'], [300, 'Genau'], [800, 'Sehr genau']].map(([w, t]) => `<button type="button" data-w="${w}" class="${einst.genauigkeit === w ? 'aktiv' : ''}">${t}</button>`).join('')}</div>
-          <small class="muted klein">Wie viele Kartenverteilungen durchgespielt werden.</small></div>
+</div>
         <div class="stack" style="gap:10px" id="setRegeln"></div>
         <div id="setAnzeige"></div>
         <button class="btn btn-voll" type="button" id="dialogOk">Fertig</button>`;
       $('dialog').classList.add('offen');
       E.regelFormular($('setRegeln'), regeln, (r) => { E.speichereRegeln(r); }, { laenge: false, offen: ['modi'] });
-      E.anzeigeFormular($('setAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { spiel: false, tempo: false, rechnen: false });
+      E.anzeigeFormular($('setAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { spiel: false, tempo: false });
       $('setGeschoben').addEventListener('click', (e) => {
         const b = e.target.closest('[data-w]'); if (!b) return;
         einst.geschoben = b.dataset.w; speichereEinst();
         $('setGeschoben').querySelectorAll('button').forEach((x) => x.classList.toggle('aktiv', x === b));
-      });
-      $('setGenau').addEventListener('click', (e) => {
-        const b = e.target.closest('[data-w]'); if (!b) return;
-        einst.genauigkeit = Number(b.dataset.w); speichereEinst();
-        $('setGenau').querySelectorAll('button').forEach((x) => x.classList.toggle('aktiv', x === b));
       });
       $('dialogOk').addEventListener('click', () => {
         $('dialog').classList.remove('offen');
