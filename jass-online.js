@@ -82,6 +82,10 @@ let haende = {};
 let abos = [];
 let handAbos = {};
 let praesenzFuer = '';
+let praesenzPfad = '';       // wo onDisconnect gerade «offline» setzen würde
+let offenGeschrieben = '';   // was zuletzt im Verzeichnis der offenen Tische steht ('' = nichts)
+let offenAbo = null;         // Startseite: Abo auf die offenen Tische
+let tauschVon = -1;          // Lobby: dieser Platz soll mit einem anderen tauschen
 let meinSitz = -1;
 let istHost = false;
 let spiel = null;
@@ -105,6 +109,7 @@ const tisch = T.erstelle($('tisch'), {
 
 function zeige(name) {
   for (const id of ['verbinden', 'start', 'neu', 'lobby', 'fehler']) $(id).hidden = id !== name;
+  if (name !== 'start' && offenAbo) { offenAbo(); offenAbo = null; }
   const amTisch = name === 'tisch';
   $('seite').hidden = amTisch;
   $('tisch').hidden = !amTisch;
@@ -131,7 +136,9 @@ onAuthStateChanged(auth, (nutzer) => {
     onValue(ref(db, '.info/connected'), (snap) => {
       verbunden = snap.val() === true;
       praesenzFuer = '';
+      offenGeschrieben = '?';
       setzePraesenz();
+      aktualisiere();
     });
     const c = (params.get('t') || '').toUpperCase();
     if (/^[A-Z2-9]{6}$/.test(c)) oeffneTisch(c);
@@ -150,15 +157,55 @@ signInAnonymously(auth).catch((e) => {
 
 function zeigeStart() {
   $('meinName').value = E.lese(KEY_NAME) || '';
-  const liste = (E.lese(KEY_TISCHE) || []).slice(0, 6);
-  $('meineTischePanel').hidden = !liste.length;
-  $('meineTische').innerHTML = liste.map((t) => `<button class="btn-ghost btn-voll" type="button" data-code="${esc(t.code)}"><span>${esc(t.name)}</span><span class="muted">${esc(t.code)}</span></button>`).join('');
+  zeichneZuletzt();
   history.replaceState(null, '', location.pathname + (EMULATOR ? '?emulator=1' : ''));
   zeige('start');
+  if (!offenAbo) {
+    offenAbo = onValue(ref(db, 'offen'), (snap) => zeichneOffene(snap.val() || {}), () => {
+      $('offeneTische').innerHTML = '<p class="muted">Die offenen Tische lassen sich gerade nicht laden.</p>';
+    });
+  }
+}
+
+function zeichneZuletzt() {
+  const liste = (E.lese(KEY_TISCHE) || []).slice(0, 8);
+  $('meineTischePanel').hidden = !liste.length;
+  $('meineTische').innerHTML = liste.map((t) => `<div class="tisch-zeile">
+    <button class="btn-ghost" type="button" data-code="${esc(t.code)}"><span>${esc(t.name)}${t.gastgeber ? ' <span class="marke">Gastgeber</span>' : ''}</span><span class="muted">${esc(t.code)}</span></button>
+    ${t.gastgeber ? `<button class="btn-ghost weg" type="button" data-schliessen-code="${esc(t.code)}" aria-label="Tisch ${esc(t.code)} für alle schliessen">Schliessen</button>` : ''}
+    <button class="btn-ghost weg" type="button" data-weg="${esc(t.code)}" aria-label="Tisch ${esc(t.code)} aus der Liste nehmen">✕</button>
+  </div>`).join('');
+}
+
+function vergissTisch(c) {
+  E.schreibe(KEY_TISCHE, (E.lese(KEY_TISCHE) || []).filter((t) => t.code !== c));
+}
+
+// Öffentliche Tische mit freien Plätzen. Der Gastgeber trägt seinen Tisch
+// ein, solange er in der Lobby ist (siehe pflegeOffen).
+function zeichneOffene(alle) {
+  const liste = Object.entries(alle)
+    .filter(([c, t]) => /^[A-Z2-9]{6}$/.test(c) && t && t.frei > 0)
+    .sort((a, b) => (b[1].zeit || 0) - (a[1].zeit || 0))
+    .slice(0, 20);
+  $('offeneTische').innerHTML = liste.length
+    ? liste.map(([c, t]) => `<button class="btn-ghost offener-tisch" type="button" data-code="${esc(c)}">
+        <span class="oben"><span>${esc(t.name)}</span><span>${t.frei === 1 ? '1 Platz frei' : esc(String(t.frei)) + ' Plätze frei'}</span></span>
+        <span class="unten">bei ${esc(t.gastgeber)}${t.regeln ? ' · ' + esc(t.regeln) : ''}</span>
+      </button>`).join('')
+    : '<p class="muted">Gerade ist kein öffentlicher Tisch offen. Eröffne doch selbst einen!</p>';
 }
 
 $('meinName').addEventListener('input', () => E.schreibe(KEY_NAME, $('meinName').value.trim().slice(0, 20)));
 $('meineTische').addEventListener('click', (e) => {
+  const weg = e.target.closest('[data-weg]');
+  if (weg) { vergissTisch(weg.dataset.weg); zeichneZuletzt(); return; }
+  const zu = e.target.closest('[data-schliessen-code]');
+  if (zu) { frageSchliessen(zu.dataset.schliessenCode); return; }
+  const b = e.target.closest('[data-code]');
+  if (b) oeffneTisch(b.dataset.code);
+});
+$('offeneTische').addEventListener('click', (e) => {
   const b = e.target.closest('[data-code]');
   if (b) oeffneTisch(b.dataset.code);
 });
@@ -169,10 +216,51 @@ $('beitretenBtn').addEventListener('click', () => {
 });
 $('codeFeld').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('beitretenBtn').click(); });
 
-function merkeTisch(c, name) {
-  const liste = (E.lese(KEY_TISCHE) || []).filter((t) => t.code !== c);
-  liste.unshift({ code: c, name: name || c });
+function merkeTisch(c, name, gastgeber) {
+  const alt = E.lese(KEY_TISCHE) || [];
+  const vorher = alt.find((t) => t.code === c);
+  if (vorher && vorher.name === (name || c) && !!vorher.gastgeber === !!gastgeber && alt[0] === vorher) return;
+  const liste = alt.filter((t) => t.code !== c);
+  liste.unshift({ code: c, name: name || c, gastgeber: !!gastgeber });
   E.schreibe(KEY_TISCHE, liste.slice(0, 10));
+}
+
+// --------------------------------------------------------- Tisch schliessen
+
+// Löscht den Tisch für alle (nur der Gastgeber darf das, so die Regeln).
+async function schliesseTisch(c) {
+  if (c === code) {
+    // Eigene onDisconnect-Aufträge zuerst zurücknehmen.
+    if (praesenzPfad) await onDisconnect(ref(db, praesenzPfad)).cancel().catch(() => {});
+    await onDisconnect(ref(db, 'offen/' + c)).cancel().catch(() => {});
+  }
+  const daten = {};
+  daten['jass/' + c] = null;
+  daten['offen/' + c] = null;
+  await update(ref(db), daten);
+}
+
+function frageSchliessen(c) {
+  const box = tisch.oeffneDialog(`<h2>Tisch ${esc(c)} schliessen?</h2>
+    <p class="muted">Der Tisch wird für alle gelöscht – auch ein laufendes Spiel. Das lässt sich nicht rückgängig machen.</p>
+    <button class="btn btn-voll" type="button" id="schliessenJa">Ja, für alle schliessen</button>
+    <button class="btn-ghost btn-voll" type="button" data-schliessen>Abbrechen</button>`);
+  box.querySelector('#schliessenJa').addEventListener('click', async () => {
+    try {
+      await schliesseTisch(c);
+      vergissTisch(c);
+      tisch.schliesseDialog();
+      if (c === code) verlasseTisch();
+      tisch.toast('Tisch ' + c + ' geschlossen');
+      zeigeStart();
+    } catch (e) {
+      // Nicht (mehr) Gastgeber oder schon weg: wenigstens aus der Liste nehmen.
+      vergissTisch(c);
+      tisch.schliesseDialog();
+      tisch.toast('Nur aus der Liste genommen – schliessen kann ihn nur der Gastgeber.');
+      if (c !== code) zeichneZuletzt();
+    }
+  });
 }
 
 // ---------------------------------------------------------- Neuer Tisch
@@ -217,7 +305,7 @@ $('eroeffnenBtn').addEventListener('click', async () => {
     daten[`jass/${c}/info`] = {
       name: ($('tischName').value.trim() || 'Jass von ' + name).slice(0, 40),
       host: uid, hostSitz: '0', erstellt: Date.now(), status: 'lobby', spielNr: 0,
-      regeln, tipps: $('neuTipps').checked,
+      regeln, tipps: $('neuTipps').checked, oeffentlich: $('neuOeffentlich').checked,
     };
     daten[`jass/${c}/sitze/0`] = { typ: 'mensch', uid, name, online: true };
     for (const s of [1, 2, 3]) {
@@ -245,6 +333,15 @@ function verlasseTisch() {
     onDisconnect(r).cancel().catch(() => {});
     set(r, false).catch(() => {});
   }
+  if (praesenzPfad) { onDisconnect(ref(db, praesenzPfad)).cancel().catch(() => {}); praesenzPfad = ''; }
+  // Wer als Gastgeber geht, nimmt seinen Tisch aus dem Verzeichnis.
+  if (code && offenGeschrieben && offenGeschrieben !== '?') {
+    const r = ref(db, 'offen/' + code);
+    onDisconnect(r).cancel().catch(() => {});
+    set(r, null).catch(() => {});
+  }
+  offenGeschrieben = '';
+  tauschVon = -1;
   abos.forEach((f) => f());
   abos = [];
   Object.values(handAbos).forEach((f) => f());
@@ -266,7 +363,7 @@ function oeffneTisch(c) {
   abos.push(onValue(ref(db, basis + '/info'), (snap) => {
     info = snap.val();
     infoGeladen = true;
-    if (info) merkeTisch(c, info.name);
+    if (info) merkeTisch(c, info.name, info.host === uid);
     aktualisiere();
   }, (e) => fehler('<b>Der Tisch lässt sich nicht lesen.</b><br>' + esc(e.message))));
   abos.push(onValue(ref(db, basis + '/sitze'), (snap) => {
@@ -302,8 +399,48 @@ function setzePraesenz() {
   const schluessel = code + ':' + meinSitz;
   if (praesenzFuer === schluessel && sitze[meinSitz] && sitze[meinSitz].online === true) return;
   praesenzFuer = schluessel;
-  const r = ref(db, `jass/${code}/sitze/${meinSitz}/online`);
+  const pfad = `jass/${code}/sitze/${meinSitz}/online`;
+  // Hat der Gastgeber mich auf einen anderen Platz gesetzt: den alten
+  // Auftrag zurücknehmen, sonst setzt er beim Abmelden den neuen Inhaber
+  // dieses Platzes auf «offline».
+  if (praesenzPfad && praesenzPfad !== pfad) onDisconnect(ref(db, praesenzPfad)).cancel().catch(() => {});
+  praesenzPfad = pfad;
+  const r = ref(db, pfad);
   onDisconnect(r).set(false).then(() => set(r, true)).catch(() => { praesenzFuer = ''; });
+}
+
+// Das Verzeichnis der offenen Tische (offen/<code>): Der Gastgeber trägt
+// seinen Tisch ein, solange er öffentlich ist, in der Lobby wartet und noch
+// Plätze frei hat. Geht der Gastgeber offline, löscht der Server den
+// Eintrag selbst (onDisconnect) – kommt er zurück, steht er wieder drin.
+function freiePlaetze() {
+  return [0, 1, 2, 3].filter((s) => { const x = sitze[s]; return !x || (x.typ === 'mensch' && !x.uid); }).length;
+}
+
+function pflegeOffen() {
+  if (!code || !istHost || !info || !verbunden) return;
+  const frei = freiePlaetze();
+  const gast = sitze[Number(info.hostSitz)];
+  const soll = info.status === 'lobby' && info.oeffentlich !== false && frei > 0
+    ? {
+      name: String(info.name || code).slice(0, 40),
+      gastgeber: String((gast && gast.name) || 'Gastgeber').slice(0, 20),
+      frei,
+      zeit: info.erstellt || Date.now(),
+      regeln: E.zusammenfassung(J.regelnMitStandard(info.regeln)).slice(0, 160),
+    }
+    : null;
+  const json = soll ? JSON.stringify(soll) : '';
+  if (json === offenGeschrieben) return;
+  const vorher = offenGeschrieben;
+  offenGeschrieben = json;
+  const r = ref(db, 'offen/' + code);
+  if (soll) {
+    onDisconnect(r).remove().then(() => set(r, soll)).catch(() => { offenGeschrieben = '?'; });
+  } else if (vorher) {
+    onDisconnect(r).cancel().catch(() => {});
+    set(r, null).catch(() => {});
+  }
 }
 
 let aktualisierungGeplant = false;
@@ -316,12 +453,17 @@ function aktualisiere() {
 function aktualisiereJetzt() {
   if (!code) return;
   if (!infoGeladen) return;
-  if (!info) { fehler('<b>Diesen Tisch gibt es nicht (mehr).</b><br>Code: ' + esc(code)); return; }
+  if (!info) {
+    vergissTisch(code);
+    fehler('<b>Diesen Tisch gibt es nicht (mehr).</b><br>Vielleicht hat ihn der Gastgeber geschlossen. Code: ' + esc(code));
+    return;
+  }
   meinSitz = sitze.findIndex((x) => x && x.uid === uid);
   istHost = info.host === uid;
   abonniereHaende();
   setzePraesenz();
   planeUebernahme();
+  pflegeOffen();
   if (info.status === 'lobby') {
     praesentiert = -1;
     tisch.schliesseDialog();
@@ -356,7 +498,11 @@ function zeigeLobby() {
     else if (frei) wer = '<span class="muted">Frei</span>';
     else wer = `<i class="punkt ${x.online ? 'an' : ''}"></i><span>${esc(x.name)}${ich ? ' (du)' : ''}${String(s) === String(info.hostSitz) ? ' · Gastgeber' : ''}</span>`;
     let unten = '';
-    if (istHost && !ich) {
+    if (istHost && tauschVon >= 0) {
+      unten = s === tauschVon
+        ? '<button class="btn-ghost btn-klein" type="button" data-tausch-ab>Abbrechen</button>'
+        : `<button class="btn btn-klein" type="button" data-tausch-mit="${s}">⇄ Hierhin</button>`;
+    } else if (istHost && !ich) {
       unten = `<select class="text-feld" data-lobby-typ="${s}">${TYPEN.map(([w, t]) => `<option value="${w}" ${passtTyp(x.typ, w) ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
       if (x.typ === 'mensch' && x.uid) unten += `<button class="btn-ghost btn-klein" type="button" data-frei="${s}">Platz freigeben</button>`;
     } else if (frei && meinSitz < 0) {
@@ -364,8 +510,10 @@ function zeigeLobby() {
     } else if (x.typ !== 'mensch') {
       unten = '<span class="lage">Computer</span>';
     }
-    return `<div class="lobby-sitz ${ich ? 'ich' : ''}"><div class="lage">${LAGE[s]}</div><div class="wer">${wer}</div>${unten}</div>`;
+    if (istHost && tauschVon < 0) unten += `<button class="btn-ghost btn-klein" type="button" data-tausch="${s}" aria-label="${LAGE[s]} mit einem anderen Platz tauschen">⇄ Platz tauschen</button>`;
+    return `<div class="lobby-sitz ${ich ? 'ich' : ''} ${s === tauschVon ? 'tausch' : ''}"><div class="lage">${LAGE[s]}</div><div class="wer">${wer}</div>${unten}</div>`;
   };
+  const oeffentlich = info.oeffentlich !== false;
   const r = J.regelnMitStandard(info.regeln);
   $('lobby').innerHTML = `
     <div class="panel stack" style="text-align:center">
@@ -376,9 +524,13 @@ function zeigeLobby() {
         <button class="btn-ghost btn-klein" type="button" id="kopierenBtn">Link kopieren</button>
       </div>
       <span class="muted klein" style="word-break:break-all">${esc(link)}</span>
+      ${istHost
+        ? `<label class="schalter"><span class="text"><span>🌍 Öffentlich</span><small>${oeffentlich ? 'Steht unter «Offene Tische», solange Plätze frei sind.' : 'Nur mit Code oder Link zu finden.'}</small></span><input type="checkbox" id="oeffentlichSchalter" ${oeffentlich ? 'checked' : ''}></label>`
+        : `<span class="sichtbar">${oeffentlich ? '🌍 Öffentlicher Tisch' : '🔒 Privater Tisch – nur mit Code oder Link'}</span>`}
     </div>
     <div class="panel stack">
       <h2>Plätze</h2>
+      ${istHost ? `<p class="muted klein">${tauschVon >= 0 ? 'Mit welchem Platz soll ' + esc(LAGE[tauschVon]) + ' tauschen? So bestimmst du, wer mit wem spielt.' : 'Wer mit wem spielt, bestimmst du mit «⇄ Platz tauschen». Platz 1 und 3 sind ein Team, Platz 2 und 4 das andere.'}</p>` : ''}
       <div class="lobby-sitze">
         <div class="lobby-team"><h3 class="team-a">Team A</h3>${karte(0)}${karte(2)}</div>
         <div class="lobby-team"><h3 class="team-b">Team B</h3>${karte(1)}${karte(3)}</div>
@@ -395,7 +547,8 @@ function zeigeLobby() {
       ? `<button class="btn btn-voll" type="button" id="losBtn" ${menschenFrei ? 'disabled' : ''}>${menschenFrei ? 'Warte auf Mitspieler …' : 'Spiel starten'}</button>
          ${menschenFrei ? '<p class="muted klein" style="text-align:center">Oder freie Plätze auf Computer stellen.</p>' : ''}`
       : `<p class="muted" style="text-align:center">${meinSitz >= 0 ? 'Warte, bis ' + esc(hostName) + ' das Spiel startet …' : ''}</p>`}
-    <button class="btn-ghost btn-voll" type="button" id="verlassenBtn">Tisch verlassen</button>`;
+    <button class="btn-ghost btn-voll" type="button" id="verlassenBtn">Tisch verlassen</button>
+    ${istHost ? '<button class="btn-ghost btn-voll" type="button" id="schliessenBtn">🗑 Tisch für alle schliessen</button>' : ''}`;
 
   $('teilenBtn').addEventListener('click', () => {
     if (navigator.share) navigator.share({ title: 'Jass', text: 'Komm an meinen Jass-Tisch: Code ' + code, url: link }).catch(() => {});
@@ -413,6 +566,25 @@ function zeigeLobby() {
   });
   const regelnBtn = $('regelnBtn');
   if (regelnBtn) regelnBtn.addEventListener('click', zeigeRegelDialog);
+  const schliessenBtn = $('schliessenBtn');
+  if (schliessenBtn) schliessenBtn.addEventListener('click', () => frageSchliessen(code));
+  const oeffentlichSchalter = $('oeffentlichSchalter');
+  if (oeffentlichSchalter) oeffentlichSchalter.addEventListener('change', (e) => {
+    update(ref(db, `jass/${code}/info`), { oeffentlich: e.target.checked }).catch((x) => tisch.toast(x.message));
+  });
+  $('lobby').querySelectorAll('[data-tausch]').forEach((b) => b.addEventListener('click', () => {
+    tauschVon = Number(b.dataset.tausch);
+    zeigeLobby();
+  }));
+  $('lobby').querySelectorAll('[data-tausch-ab]').forEach((b) => b.addEventListener('click', () => {
+    tauschVon = -1;
+    zeigeLobby();
+  }));
+  $('lobby').querySelectorAll('[data-tausch-mit]').forEach((b) => b.addEventListener('click', () => {
+    const a = tauschVon;
+    tauschVon = -1;
+    tauschePlaetze(a, Number(b.dataset.tauschMit));
+  }));
   const los = $('losBtn');
   if (los) los.addEventListener('click', () => {
     los.disabled = true;
@@ -434,6 +606,21 @@ function zeigeLobby() {
   $('lobby').querySelectorAll('[data-frei]').forEach((b) => b.addEventListener('click', () => {
     set(ref(db, `jass/${code}/sitze/${b.dataset.frei}`), { typ: 'mensch', name: 'Frei' });
   }));
+}
+
+// Zwei Plätze tauschen (nur der Gastgeber, nur in der Lobby). Wer sitzt,
+// wandert mit Namen und Online-Status; sitzt der Gastgeber selbst auf einem
+// der beiden Plätze, zieht hostSitz mit.
+function tauschePlaetze(a, b) {
+  if (a === b || a < 0 || b < 0 || !istHost || info.status !== 'lobby') { zeigeLobby(); return; }
+  const frei = { typ: 'mensch', name: 'Frei' };
+  const daten = {};
+  daten[`jass/${code}/sitze/${a}`] = sitze[b] || frei;
+  daten[`jass/${code}/sitze/${b}`] = sitze[a] || frei;
+  const hs = String(info.hostSitz);
+  if (hs === String(a)) daten[`jass/${code}/info/hostSitz`] = String(b);
+  else if (hs === String(b)) daten[`jass/${code}/info/hostSitz`] = String(a);
+  update(ref(db), daten).catch((e) => { tisch.toast('Tauschen ging nicht: ' + e.message); zeigeLobby(); });
 }
 
 function zeigeRegelDialog() {
@@ -640,7 +827,10 @@ function zeigeMenu() {
     <details class="abschnitt"><summary>Anzeige</summary><div class="inhalt" id="menuAnzeige"></div></details>
     <p class="muted klein" style="word-break:break-all">Link zum Tisch: ${esc(link)}</p>
     <button class="btn btn-voll" type="button" data-schliessen>Weiterspielen</button>
-    <button class="btn-ghost btn-voll" type="button" id="menuVerlassen">Tisch verlassen</button>`);
+    <button class="btn-ghost btn-voll" type="button" id="menuVerlassen">Tisch verlassen</button>
+    ${istHost ? '<button class="btn-ghost btn-voll" type="button" id="menuSchliessen">🗑 Tisch für alle schliessen</button>' : ''}`);
+  const zu = box.querySelector('#menuSchliessen');
+  if (zu) zu.addEventListener('click', () => frageSchliessen(code));
   E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); }, { stichWarten: false });
   box.querySelector('#menuVerlassen').addEventListener('click', () => { verlasseTisch(); zeigeStart(); });
 }

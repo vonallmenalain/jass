@@ -4,7 +4,8 @@
   "description": "Werkzeuge für die Regeln der Realtime Database und die Online-Tests. Nicht Teil der Website – darum nicht im Wurzelverzeichnis, wo Netlify es installieren würde.",
   "scripts": {
     "test:regeln": "firebase emulators:exec --config emulator.json --only database,auth --project demo-jass \"node --test test-regeln.mjs\"",
-    "test:online": "firebase emulators:exec --config emulator.json --only database,auth --project demo-jass \"node test-online.mjs\""
+    "test:online": "firebase emulators:exec --config emulator.json --only database,auth --project demo-jass \"node test-online.mjs\"",
+    "test:lobby": "firebase emulators:exec --config emulator.json --only database,auth --project demo-jass \"node test-lobby.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

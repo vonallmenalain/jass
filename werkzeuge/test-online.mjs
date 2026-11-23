@@ -30,6 +30,8 @@ const antwort = await fetch(`http://${dbHost}:${dbPort}/.settings/rules.json?ns=
   method: 'PUT', headers: { Authorization: 'Bearer owner' }, body: regeln,
 });
 if (!antwort.ok) throw new Error('Regeln nicht geladen: ' + antwort.status + ' ' + await antwort.text());
+// Direkt aus dem Emulator lesen (als Besitzer, an den Regeln vorbei).
+const lies = async (p) => (await fetch(`http://${dbHost}:${dbPort}/${p}.json?ns=jassen-bc258-default-rtdb`, { headers: { Authorization: 'Bearer owner' } })).json();
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -96,7 +98,6 @@ while (Date.now() - start < 240000) {
     if (await s.locator('#bereitBtn').isVisible()) {
       if (g === papa && runden === 0) await s.screenshot({ path: path.join(BILDER, '3-rundenende.png') });
       await s.click('#bereitBtn').catch(() => {});
-      if (g === mia) runden++;
       etwas = true;
       continue;
     }
@@ -121,6 +122,10 @@ while (Date.now() - start < 240000) {
       }
     }
   }
+  // Fertige Runden zählen wir am Verlauf in der Datenbank, nicht an den
+  // Klicks: Nach kurzer Zeit geht es auch ohne «Weiter» in die nächste Runde.
+  const verlauf = Object.values((await lies(`jass/${code}/log`)) || {});
+  runden = Math.max(runden, verlauf.filter((e) => e && e.t === 'r').length - 1);
   // Nach der ersten Runde verschwindet Tim.
   if (runden >= 1 && !timWeg) {
     timWeg = true;
@@ -143,7 +148,7 @@ while (Date.now() - start < 240000) {
 const stand = (await mia.seite.locator('#jass-dialog .dialog p.muted').first().textContent().catch(() => '?')).trim();
 await mia.seite.waitForTimeout(400);
 await mia.seite.screenshot({ path: path.join(BILDER, '5-ende-mia.png') });
-console.log('Karten von Menschen gespielt:', karten, '· Ansagen:', ansagen, '· Runden bestätigt:', runden);
+console.log('Karten von Menschen gespielt:', karten, '· Ansagen:', ansagen, '· Runden fertig:', runden);
 console.log('Endstand bei Mia', stand);
 
 let ok = fertig.has('Mia') && papaWeg && timWeg && /^\d+ : \d+$/.test(stand);
