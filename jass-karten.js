@@ -8,7 +8,10 @@
  *   JassKarten.rueckseite()             die Rückseite
  *   JassKarten.zeichen(farbe, gross)    nur das Farbzeichen (für Knöpfe)
  *   JassKarten.setzeFarben('klassisch' | 'vier')
- *   JassKarten.setzeBild('eigen' | 'klassisch')
+ *   JassKarten.setzeBild('foto' | 'eigen' | 'klassisch')
+ *
+ * «foto» sind unsere eigenen Karten (karten/foto/, aus Fotos des Kartensatzes
+ * von jasskarten.ch, ohne Schrift und Logo – siehe karten/README.md).
  *
  * «Klassisch» zeigt den freien Kartensatz SVG-cards (David Bellot, LGPL,
  * karten/README.md) – echte französische Karten mit Bildfiguren.
@@ -44,7 +47,24 @@
   const KLASSISCH_MASS = 140 / 253.67;
   const KLASSISCH_LAGE = `translate(${((100 - 166.58 * KLASSISCH_MASS) / 2).toFixed(2)} 0) scale(${KLASSISCH_MASS.toFixed(5)}) translate(-1.25 5.01)`;
 
-  function setzeBild(name) { bild = name === 'klassisch' ? 'klassisch' : 'eigen'; }
+  function setzeBild(name) { bild = name === 'klassisch' || name === 'foto' ? name : 'eigen'; }
+
+  // Unsere Karten: Fotos, 400 × 625 (Seitenverhältnis wie die echten Karten),
+  // im Feld 100 × 140 auf volle Höhe eingepasst.
+  const FOTO_FARBE = ['schaufel', 'herz', 'kreuz', 'ecke'];
+  const FOTO_WERT = ['6', '7', '8', '9', '10', 'bauer', 'dame', 'koenig', 'ass'];
+  const FOTO_B = 140 * 400 / 625;
+  const FOTO_X = (100 - FOTO_B) / 2;
+  const STERN = (x) => `<g transform="translate(${x} 6)"><circle cx="8" cy="8" r="8" fill="#f59e0b"/><path d="M8 2.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L8 10.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4Z" fill="#fff"/></g>`;
+
+  function svgFoto(k, o) {
+    const datei = 'karten/foto/' + FOTO_FARBE[J.farbeVon(k)] + '-' + FOTO_WERT[J.wertVon(k)] + '.webp';
+    const titel = J.kartenName(k, o.code);
+    const trumpf = o.trumpf
+      ? `<rect x="${(FOTO_X + 1.2).toFixed(2)}" y="1.2" width="${(FOTO_B - 2.4).toFixed(2)}" height="137.6" rx="4.5" fill="none" stroke="#f59e0b" stroke-width="3"/>${STERN(FOTO_X + FOTO_B - 21)}`
+      : '';
+    return `<svg class="karte-svg" viewBox="0 0 100 140" role="img" aria-label="${titel}"><title>${titel}</title><image href="${datei}" x="${FOTO_X.toFixed(2)}" y="0" width="${FOTO_B.toFixed(2)}" height="140" preserveAspectRatio="none"/>${trumpf}</svg>`;
+  }
 
   function setzeFarben(name) {
     farben = FARBSCHEMA[name] || FARBSCHEMA.klassisch;
@@ -88,6 +108,7 @@
   function svg(k, opt) {
     const o = opt || {};
     if (bild === 'klassisch') return svgKlassisch(k, o);
+    if (bild === 'foto') return svgFoto(k, o);
     const f = J.farbeVon(k);
     const w = J.wertVon(k);
     const farbe = farben[f];
@@ -124,13 +145,15 @@
     if (bild === 'klassisch') {
       return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true"><use href="${KLASSISCH_DATEI}#back" transform="${KLASSISCH_LAGE}" fill="#991b1b"/></svg>`;
     }
-    return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true">
+    // Bei unseren Karten so schmal wie die Fotos.
+    const schmal = bild === 'foto' ? `transform="translate(${FOTO_X.toFixed(2)} 0) scale(${(FOTO_B / 100).toFixed(4)} 1)"` : '';
+    return `<svg class="karte-svg" viewBox="0 0 100 140" aria-hidden="true"><g ${schmal}>
       <defs><pattern id="jr" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#7f1d1d"/><rect width="5" height="10" fill="#991b1b"/></pattern></defs>
       <rect x="1.5" y="1.5" width="97" height="137" rx="9" fill="#fffdf8" stroke="#d6d3d1" stroke-width="1.5"/>
       <rect x="7" y="7" width="86" height="126" rx="6" fill="url(#jr)"/>
       <circle cx="50" cy="70" r="17" fill="#fffdf8" fill-opacity="0.92"/>
       <path d="M50 58C55 66 64 68 64 75C64 80 58 82 54 78C55 82 56 84 58 86H42C44 84 45 82 46 78C42 82 36 80 36 75C36 68 45 66 50 58Z" fill="#7f1d1d"/>
-    </svg>`;
+    </g></svg>`;
   }
 
   root.JassKarten = { svg, rueckseite, zeichen, setzeFarben, setzeBild, farbeHex, FARBSCHEMA };
