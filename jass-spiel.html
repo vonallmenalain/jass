@@ -117,6 +117,8 @@
     let spieler = bereinige(E.lese(KEY_SPIELER));
     K.setzeFarben(anzeige.farben);
 
+    // Aus dem Trumpf-Trainer: genau eine Runde, danach zurück dorthin.
+    const trainerModus = new URLSearchParams(location.search).get('trainer') === '1';
     let spiel = null;
     let partie = null;        // die Aufzeichnung (jass-verlauf.js)
     let letzterTipp = null;   // welche Karte der Tipp zuletzt vorschlug
@@ -251,7 +253,7 @@
       const lebt = () => id === laufId;
       const tempo = () => TEMPO[anzeige.tempo] || TEMPO.normal;
       while (lebt()) {
-        if (spiel.fertig) { zeigeSpielende(); return; }
+        if (spiel.fertig) { if (trainerModus) zurueckZumTrainer(); else zeigeSpielende(); return; }
         const r = spiel.runde;
         zeichne(null);
         if (r.phase === 'ende') {
@@ -335,9 +337,22 @@
       const letzte = re.spielende === 'runden' ? spiel.runden.length + 1 >= re.runden : J.zielErreichtVon(spiel.summe, spiel.runde, ab, re) >= 0;
       const neu = [spiel.summe[0] + ab.total[0], spiel.summe[1] + ab.total[1]];
       return new Promise((res) => {
-        const box = tisch.oeffneDialog(tisch.rundenendeHtml(ab, neu) + `<button class="btn btn-voll" type="button" id="rundeWeiter">${letzte ? 'Zum Resultat' : 'Nächste Runde'}</button>`, false);
+        const box = tisch.oeffneDialog(tisch.rundenendeHtml(ab, neu) + `<button class="btn btn-voll" type="button" id="rundeWeiter">${trainerModus ? 'Zurück zum Trainer' : letzte ? 'Zum Resultat' : 'Nächste Runde'}</button>`, false);
         box.querySelector('#rundeWeiter').addEventListener('click', () => { tisch.schliesseDialog(); res(); });
       });
+    }
+
+    function zurueckZumTrainer() {
+      try { localStorage.removeItem(KEY_SPIEL); } catch (e) { /* egal */ }
+      if (partie) { V.spielFertig(partie, spiel); V.speichere(partie); }
+      const r = spiel.runde;
+      const ab = spiel.runden[0] || r.abrechnung;
+      const ergebnis = {
+        hand: r.startHaende[0].slice(), code: ab.code, geschoben: ab.geschoben, vorhand: ab.ansager,
+        angesagtVon: ab.angesagtVon, punkte: spiel.summe[0], gegner: spiel.summe[1], partieId: partie && partie.id,
+      };
+      E.schreibe('jass-trainer-ergebnis', ergebnis);
+      location.href = 'trumpf-trainer.html?ausgespielt=1';
     }
 
     function zeigeSpielende() {
@@ -370,7 +385,10 @@
         <button class="btn-ghost btn-voll" type="button" id="abbrechen">Spiel verlassen (wird gespeichert)</button>`);
       box.querySelector('#markieren').addEventListener('click', zeigeMarkieren);
       E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); });
-      box.querySelector('#abbrechen').addEventListener('click', zurEinrichtung);
+      box.querySelector('#abbrechen').addEventListener('click', () => {
+        if (trainerModus) { location.href = 'trumpf-trainer.html?zurueck=1'; return; }
+        zurEinrichtung();
+      });
     }
 
     // Eine Notiz zum aktuellen Moment – landet in der Aufzeichnung und lässt
@@ -405,13 +423,14 @@
         const geschoben = params.get('geschoben') === '1';
         const haende = [hand, rest.slice(0, 9), rest.slice(9, 18), rest.slice(18, 27)];
         const mitSchieben = geschoben && regeln.schieben;
-        spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: mitSchieben ? 2 : 0 });
+        const regelnRunde = trainerModus ? Object.assign({}, regeln, { spielende: 'runden', runden: 1 }) : regeln;
+        spiel = J.neuesSpiel(regelnRunde, { haende, ersterAnsager: mitSchieben ? 2 : 0 });
         partie = V.neu(spiel, spieler, { rechnen: anzeige.rechnen });
         if (mitSchieben) {
           V.ansage(partie, spiel.runde, 2, 'SCHIEBEN', { stufe: spieler[2].typ, grund: 'Aus dem Trumpf-Trainer: geschoben' });
           J.schieben(spiel);
         }
-        history.replaceState(null, '', location.pathname);
+        history.replaceState(null, '', location.pathname + (trainerModus ? '?trainer=1' : ''));
         speichere();
         starteTisch();
       }
