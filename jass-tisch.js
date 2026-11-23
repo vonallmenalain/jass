@@ -85,6 +85,7 @@
     let neueKarte = -1;
     let anzeigeStich = null;
     let ueberspringen = null;
+    let wartetAufKlick = false;
 
     const anzeige = () => o.anzeige || {};
     const pos = (sitz) => (sitz - z.ansichtSitz + 4) % 4;
@@ -183,9 +184,10 @@
       }).join('');
       neueKarte = -1;
       const info = el('stichInfo');
+      info.classList.toggle('weiter', !!(anzeigeStich && wartetAufKlick));
       if (anzeigeStich) {
         info.hidden = false;
-        info.textContent = tut(anzeigeStich.sieger, 'macht', 'machst') + ' den Stich · ' + anzeigeStich.punkte + ' Punkte';
+        info.textContent = tut(anzeigeStich.sieger, 'macht', 'machst') + ' den Stich · ' + anzeigeStich.punkte + ' Punkte' + (wartetAufKlick ? ' · Weiter ▶' : '');
       } else if (r.phase === 'spiel') {
         info.hidden = false;
         let t = 'Stich ' + (r.stichNr + 1) + ' von 9';
@@ -256,6 +258,7 @@
     // ------------------------------------------------------------ Eingaben
 
     el('hand').addEventListener('click', (e) => {
+      if (anzeigeStich && ueberspringen) { ueberspringen(); return; }
       const b = e.target.closest('[data-karte]');
       if (!b || !meinKartenZug()) return;
       const k = Number(b.dataset.karte);
@@ -284,6 +287,7 @@
     }
 
     el('ansage').addEventListener('click', (e) => {
+      if (e.target.closest('.lautsprecher')) { if (ansageSprache) root.JassStimme.sage(ansageSprache); return; }
       const b = e.target.closest('[data-ansage]');
       if (b && z.eingabe === 'ansage') {
         z.eingabe = null;
@@ -294,6 +298,7 @@
       if (e.target.closest('[data-tipp-ansage]')) tippAnsage();
     });
 
+    let ansageSprache = null;
     function tippAnsage() {
       const r = z.spiel.runde;
       const s = J.ansageAmZug(r);
@@ -310,7 +315,9 @@
         const best = b.ergebnis()[0];
         wurzel.querySelectorAll('[data-ansage]').forEach((x) => x.classList.toggle('empfohlen', x.dataset.ansage === best.code));
         const titel = best.code === 'SCHIEBEN' ? 'Schieben' : J.MODI[best.code].lang;
-        box.innerHTML = '<b>' + titel + '</b> – im Schnitt etwa ' + Math.round(best.punkte) + ' Punkte für euch' + (z.spiel.regeln.multiplikatoren ? ' (mit Multiplikator)' : '') + '. ' + escapeHtml(B.faustregel(hand, best.code));
+        box.innerHTML = '<b>' + titel + '</b> – im Schnitt etwa ' + Math.round(best.punkte) + ' Punkte für euch' + (z.spiel.regeln.multiplikatoren ? ' (mit Multiplikator)' : '') + '. ' + escapeHtml(B.faustregel(hand, best.code))
+          + (root.JassStimme ? ' ' + root.JassStimme.knopf('Tipp vorlesen') : '');
+        ansageSprache = B.sprechAnsage(hand, best.code, best.punkte, z.spiel.regeln.multiplikatoren);
       };
       setTimeout(schritt, 30);
     }
@@ -324,7 +331,7 @@
       zeichneHand();
       const b = el('hand').querySelector(`[data-karte="${t.karte}"]`);
       if (b && anzeige().einTipp) b.classList.add('vorschlag');
-      kommentar('💡 <b>' + J.kartenName(t.karte, z.spiel.runde.code) + ':</b> ' + escapeHtml(t.grund));
+      kommentar('💡 <b>' + J.kartenName(t.karte, z.spiel.runde.code) + ':</b> ' + escapeHtml(t.grund), [B.sprechKarte(t.karte, z.spiel.runde.code), B.sprechGrund(t.grund)]);
     });
 
     el('letzter').addEventListener('click', () => {
@@ -338,6 +345,9 @@
     });
 
     el('menu').addEventListener('click', () => { if (o.beiMenu) o.beiMenu(); });
+    el('kommentar').addEventListener('click', (e) => {
+      if (e.target.closest('.lautsprecher') && sprache && root.JassStimme) root.JassStimme.sage(sprache);
+    });
 
     el('feld').addEventListener('click', (e) => {
       if (e.target.closest('.ansage')) return;
@@ -363,11 +373,17 @@
     }
 
     // Zeigt einen fertigen Stich, lässt ihn liegen und räumt ihn zum
-    // Gewinner weg.
-    async function stichZeigen(eintrag, ms) {
+    // Gewinner weg – nach ms, oder mit aufKlick erst, wenn man tippt.
+    async function stichZeigen(eintrag, ms, aufKlick) {
       anzeigeStich = eintrag;
+      wartetAufKlick = !!aufKlick;
       zeichne();
-      await warte(ms, true);
+      if (aufKlick) await new Promise((weiter) => { ueberspringen = () => { ueberspringen = null; weiter(); }; });
+      else await warte(ms, true);
+      wartetAufKlick = false;
+      const info = el('stichInfo');
+      info.classList.remove('weiter');
+      info.textContent = info.textContent.replace(' · Weiter ▶', '');
       const stichEl = el('stich');
       stichEl.dataset.ziel = pos(eintrag.sieger);
       stichEl.classList.add('weg');
@@ -376,7 +392,12 @@
       zeichne();
     }
 
-    function kommentar(html) { el('kommentar').innerHTML = html || ''; }
+    // Mit sprache (Liste fester Sätze) gibt es daneben einen 🔊-Knopf.
+    let sprache = null;
+    function kommentar(html, satzliste) {
+      sprache = satzliste || null;
+      el('kommentar').innerHTML = (html || '') + (sprache && root.JassStimme ? ' ' + root.JassStimme.knopf('Tipp vorlesen') : '');
+    }
     function hinweis(html) {
       const h = el('hinweis');
       h.hidden = !html;
@@ -419,7 +440,10 @@
     dialog.addEventListener('click', (e) => {
       if (e.target.closest('[data-schliessen]') || (e.target === dialog && dialogSchliessbar)) schliesseDialog();
     });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dialogSchliessbar) schliesseDialog(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dialogSchliessbar) schliesseDialog();
+      if ((e.key === 'Enter' || e.key === ' ') && anzeigeStich && ueberspringen && !dialogOffen()) { e.preventDefault(); ueberspringen(); }
+    });
 
     // ------------------------------------------------------------ Tabellen
 

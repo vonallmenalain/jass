@@ -122,3 +122,41 @@ test('Faustregel erklärt jede Ansage in Worten', () => {
     assert.ok(satz.length > 10, code);
   }
 });
+
+test('Vorlesen: Jeder Satz, den Tipp und Computer sagen können, ist vertonbar', () => {
+  const alle = new Set(B.alleSprechTeile());
+  const fehlt = new Set();
+  const pruefe = (satz) => { if (!alle.has(satz)) fehlt.add(satz); };
+  const rng = J.zufall(77);
+  const varianten = [{}, { modi: { T: true, OBE: true, UNE: true, SLO: true, SLU: true, MIS: true } }];
+  let i = 0;
+  for (const regeln of varianten) {
+    for (const stufe of ['mittel', 'schwer', 'leicht']) {
+      for (let n = 0; n < 6; n++) {
+        const spiel = J.neuesSpiel(Object.assign({ runden: 1 }, regeln), { seed: 900 + i++ });
+        const r = spiel.runde;
+        while (r.phase === 'ansage') {
+          const s = J.ansageAmZug(r);
+          const w = B.waehleAnsage(spiel, s, 'mittel', { rng });
+          B.sprechAnsage(r.haende[s], w.code, 100, false).forEach(pruefe);
+          if (w.code === 'SCHIEBEN') J.schieben(spiel); else J.ansagen(spiel, w.code);
+        }
+        while (r.phase === 'spiel') {
+          const s = r.amZug;
+          const z = B.waehleKarte(spiel, s, stufe, { rng, welten: 6, weltenExakt: 4 });
+          pruefe(B.sprechKarte(z.karte, r.code));
+          pruefe(B.sprechGrund(z.grund));
+          J.spiele(spiel, s, z.karte);
+        }
+      }
+    }
+  }
+  for (let n = 0; n < 300; n++) {
+    const hand = J.verteile(J.zufall(5000 + n))[0];
+    for (const code of J.MODUS_REIHENFOLGE.concat('SCHIEBEN')) B.faustregelTeile(hand, code).forEach(pruefe);
+  }
+  for (const p of [-5, 0, 77, 160, 161, 300]) pruefe(B.sprechSchnitt(p, false));
+  // «Zufällig gewählt.» und «Nach Gefühl.» sagt nur «Leicht» über sich selbst – nie als Tipp.
+  fehlt.delete('Zufällig gewählt.');
+  assert.deepEqual([...fehlt], []);
+});

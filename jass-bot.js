@@ -714,51 +714,180 @@
     return p;
   }
 
-  // Erklärt in einem Satz, was für oder gegen eine Ansage spricht.
-  function faustregel(hand, code) {
-    const T = code !== 'SCHIEBEN' ? MODI[code].trumpf : -1;
-    if (code === 'SCHIEBEN') return 'Schieben lohnt sich, wenn keine Ansage richtig stark ist – dann wählt dein Partner mit seinen Karten.';
+  // ------------------------------------------------------ Faustregeln
+  // Erklärt, was für oder gegen eine Ansage spricht – als Liste fester Sätze,
+  // damit jeder Satz einmal vorab vertont werden kann (jass-stimme.js).
+
+  const ZAHL = ['Kein', 'Ein', 'Zwei', 'Drei', 'Vier', 'Fünf', 'Sechs', 'Sieben', 'Acht', 'Neun'];
+  const ZAHL_KLEIN = ['keins', 'eins', 'zwei', 'drei', 'vier'];          // das Ass
+  const ZAHL_KLEIN_SECHSER = ['keiner', 'einer', 'zwei', 'drei', 'vier']; // der Sechser
+  const TRUMPF_URTEIL = {
+    sehrStark: 'Das ist ein sehr starker Trumpf.',
+    stark: 'Puur und viele Trümpfe – stark.',
+    gut: 'Mit dem Puur und drei Trümpfen kann man gut ansagen.',
+    viele: 'Viele Trümpfe – auch ohne Puur ordentlich.',
+    wenige: 'Zu wenige Trümpfe.',
+    gefaehrlich: 'Ohne Puur und Nell ist ein Trumpf gefährlich – die Gegner stechen dich.',
+    nell: 'Ohne den Puur kann dir der Gegner das Nell wegstechen.',
+  };
+  const SATZ_SCHIEBEN = 'Schieben lohnt sich, wenn keine Ansage richtig stark ist – dann wählt dein Partner mit seinen Karten.';
+  const SATZ_MISERE = 'Für Misère braucht man viele tiefe Karten und wenige Asse.';
+  const SATZ_SLALOM = 'Slalom wechselt jeden Stich zwischen Obenabe und Undenufe – gut mit hohen und tiefen Karten in derselben Farbe.';
+
+  function trumpfSatz(n, puur, nell, ass) {
+    let satz = n === 0 ? 'Kein Trumpf' : n === 1 ? 'Ein Trumpf' : ZAHL[n] + ' Trümpfe';
+    const mit = [];
+    if (puur) mit.push('Puur');
+    if (nell) mit.push('Nell');
+    if (ass) mit.push('Trumpf-Ass');
+    if (mit.length) satz += ' mit ' + (mit.length === 1 ? mit[0] : mit.slice(0, -1).join(', ') + ' und ' + mit[mit.length - 1]);
+    return satz + '.';
+  }
+  function seitenAssSatz(n) {
+    if (n <= 0) return null;
+    return n === 1 ? 'Dazu ein Ass in einer anderen Farbe.' : 'Dazu ' + ZAHL[n].toLowerCase() + ' Asse in anderen Farben.';
+  }
+  function obeKopf(unten, ass, mitZweiter) {
+    const name = unten ? 'Undenufe' : 'Obenabe';
+    if (!ass) return (unten ? 'Keine Sechs' : 'Kein Ass') + ' – bei ' + name + ' machst du so kaum einen sicheren Stich.';
+    const zweite = unten ? 'der Sieben' : 'dem König';
+    let satz = ass === 1 ? (unten ? 'Eine Sechs' : 'Ein Ass') : ZAHL[ass] + (unten ? ' Sechser' : ' Asse');
+    const zahlKlein = unten ? ZAHL_KLEIN_SECHSER : ZAHL_KLEIN;
+    if (mitZweiter >= 1) satz += ass === 1 ? ' mit ' + zweite : (mitZweiter === ass ? (ass === 2 ? ', beide mit ' : ', alle mit ') + zweite : ', ' + zahlKlein[mitZweiter] + ' davon mit ' + zweite);
+    return satz + '.';
+  }
+  function obeUrteil(unten, ass) {
+    if (ass >= 3) return unten ? 'Viele Sechser – gut für Undenufe.' : 'Viele Asse – gut für Obenabe.';
+    if (ass === 2) return 'Zwei sichere Stiche – das ist ein Anfang.';
+    if (ass === 1) return unten ? 'Für Undenufe braucht man mehr Sechser, am besten mit Siebnern dahinter.' : 'Für Obenabe braucht man mehr Asse, am besten mit Königen dahinter.';
+    return null;
+  }
+
+  function faustregelTeile(hand, code) {
+    if (code === 'SCHIEBEN') return [SATZ_SCHIEBEN];
+    const T = MODI[code].trumpf;
     if (T >= 0) {
       const m = merkmaleTrumpf(hand, T);
       const n = hand.filter((k) => farbeVon(k) === T).length;
-      const teile = [];
-      if (m.puur) teile.push('Puur');
-      if (m.nell) teile.push('Nell');
-      if (m.ass) teile.push('Trumpf-Ass');
-      let satz = n === 0 ? 'Kein Trumpf' : n === 1 ? 'Ein Trumpf' : n + ' Trümpfe';
-      if (teile.length) satz += ' mit ' + teile.join(', ').replace(/, ([^,]*)$/, ' und $1');
-      if (m.seitenAss) satz += ', dazu ' + m.seitenAss + (m.seitenAss === 1 ? ' Ass' : ' Asse') + ' in anderen Farben';
-      satz += '.';
-      if (m.puur && m.nell && n >= 4) satz += ' Das ist ein sehr starker Trumpf.';
-      else if (m.puur && n >= 4) satz += ' Puur und viele Trümpfe – stark.';
-      else if (m.puur && n === 3) satz += ' Mit dem Puur und drei Trümpfen kann man gut ansagen.';
-      else if (n >= 5) satz += ' Viele Trümpfe – auch ohne Puur ordentlich.';
-      else if (n <= 2) satz += ' Zu wenige Trümpfe.';
-      else if (!m.puur && !m.nell) satz += ' Ohne Puur und Nell ist ein Trumpf gefährlich – die Gegner stechen dich.';
-      else satz += ' Ohne den Puur kann dir der Gegner den Nell wegstechen.';
-      return satz;
+      const teile = [trumpfSatz(n, m.puur, m.nell, m.ass)];
+      const seite = seitenAssSatz(m.seitenAss);
+      if (seite) teile.push(seite);
+      let u;
+      if (m.puur && m.nell && n >= 4) u = 'sehrStark';
+      else if (m.puur && n >= 4) u = 'stark';
+      else if (m.puur && n === 3) u = 'gut';
+      else if (n >= 5) u = 'viele';
+      else if (n <= 2) u = 'wenige';
+      else if (!m.puur && !m.nell) u = 'gefaehrlich';
+      else u = 'nell';
+      teile.push(TRUMPF_URTEIL[u]);
+      return teile;
     }
     if (code === 'OBE' || code === 'UNE') {
       const unten = code === 'UNE';
-      const m = merkmaleObe(hand, unten);
-      const viele = unten ? 'Sechser' : 'Asse';
-      const name = unten ? 'Undenufe' : 'Obenabe';
-      const mitZweiter = Math.floor(m.koenig);
-      let satz;
-      if (!m.ass) satz = (unten ? 'Keine Sechs' : 'Kein Ass') + ' – bei ' + name + ' machst du so kaum einen sicheren Stich.';
-      else {
-        satz = (m.ass === 1 ? (unten ? 'Eine Sechs' : 'Ein Ass') : m.ass + ' ' + viele);
-        if (mitZweiter === 1 && m.ass === 1) satz += ' mit ' + (unten ? 'der Sieben' : 'dem König');
-        else if (mitZweiter >= 1) satz += ', ' + mitZweiter + ' davon mit ' + (unten ? 'der Sieben' : 'dem König');
-        satz += '.';
-        if (m.ass >= 3) satz += unten ? ' Viele Sechser – gut für Undenufe.' : ' Viele Asse – gut für Obenabe.';
-        else if (m.ass === 2) satz += ' Zwei sichere Stiche – das ist ein Anfang.';
-        else if (m.ass === 1) satz += ' Für ' + name + ' braucht man mehr ' + viele + ', am besten mit ' + (unten ? 'Siebnern' : 'Königen') + ' dahinter.';
+      const hoch = unten ? [W6, W7] : [WA, WK];
+      let ass = 0, mitZweiter = 0;
+      for (let f = 0; f < 4; f++) {
+        const werte = hand.filter((k) => farbeVon(k) === f).map(wertVon);
+        if (werte.includes(hoch[0])) { ass++; if (werte.includes(hoch[1])) mitZweiter++; }
       }
-      return satz;
+      const teile = [obeKopf(unten, ass, mitZweiter)];
+      const u = obeUrteil(unten, ass);
+      if (u) teile.push(u);
+      return teile;
     }
-    if (code === 'MIS') return 'Für Misère braucht man viele tiefe Karten und wenige Asse.';
-    return 'Slalom wechselt jeden Stich zwischen Obenabe und Undenufe – gut mit hohen und tiefen Karten in derselben Farbe.';
+    if (code === 'MIS') return [SATZ_MISERE];
+    return [SATZ_SLALOM];
+  }
+
+  function faustregel(hand, code) { return faustregelTeile(hand, code).join(' '); }
+
+  // -------------------------------------------------------- Vorlesen
+  // Was die Stimme sagt, ist eine Liste fester Sätze. Wo der angezeigte Text
+  // eine Zahl hat, sagt die Stimme eine Fassung ohne Zahl.
+
+  const ARTIKEL = ['die', 'die', 'die', 'die', 'die', 'den', 'die', 'den', 'das'];
+  function sprechKarte(k, code) {
+    const T = code && MODI[code] ? MODI[code].trumpf : -1;
+    const f = farbeVon(k), w = wertVon(k);
+    if (f === T && w === WB) return 'Spiel den Puur.';
+    if (f === T && w === W9) return 'Spiel das Nell.';
+    return 'Spiel ' + ARTIKEL[w] + ' ' + J.FARBEN[f].name + ' ' + J.WERT_NAMEN[w] + '.';
+  }
+  function sprechGrund(grund) {
+    if (/^Du bist der Letzte: Mit einem Trumpf holst du dir \d+ Punkte\.$/.test(grund)) return 'Du bist der Letzte: Mit einem Trumpf holst du dir die Punkte im Stich.';
+    if (/^Im Stich liegen \d+ Punkte – das lohnt sich zu stechen\.$/.test(grund)) return 'Im Stich liegen genug Punkte – das lohnt sich zu stechen.';
+    if (/^Ich habe \d+ mögliche Kartenverteilungen durchgespielt:/.test(grund)) return 'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
+    return grund;
+  }
+  const MODUS_TIPP = {
+    T0: 'Mein Tipp: Schaufel Trumpf.', T1: 'Mein Tipp: Herz Trumpf.', T2: 'Mein Tipp: Kreuz Trumpf.', T3: 'Mein Tipp: Ecke Trumpf.',
+    OBE: 'Mein Tipp: Obenabe.', UNE: 'Mein Tipp: Undenufe.', SLO: 'Mein Tipp: Slalom, obenabe beginnt.', SLU: 'Mein Tipp: Slalom, undenufe beginnt.',
+    MIS: 'Mein Tipp: Misère.', SCHIEBEN: 'Mein Tipp: Schieben.',
+  };
+  const SCHNITT_MAX = 160;
+  function sprechSchnitt(punkte, mitMultiplikator) {
+    const n = Math.round(punkte);
+    if (mitMultiplikator || n < 0 || n > SCHNITT_MAX) return 'Im Schnitt die meisten Punkte für euch.';
+    return 'Im Schnitt etwa ' + n + ' Punkte für euch.';
+  }
+  function sprechAnsage(hand, code, punkte, mitMultiplikator) {
+    return [MODUS_TIPP[code], sprechSchnitt(punkte, mitMultiplikator)].concat(faustregelTeile(hand, code));
+  }
+
+  // Alle Sätze, die die Stimme je sagen kann – zum Vertonen
+  // (werkzeuge/stimme-google.mjs). Ein Test prüft, dass nichts fehlt.
+  const GRUENDE = [
+    'Nur diese Karte ist erlaubt.',
+    'Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.',
+    'Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.',
+    'Du hast nur noch Trümpfe – der höchste macht den Stich sicher.',
+    'Du hast nur noch Trümpfe – spiel den kleinsten.',
+    'Bock spielen: Diese Karte ist die höchste ihrer Farbe, die noch im Spiel ist – der Stich gehört euch.',
+    'Dein Partner hat diese Farbe nicht mehr und kann stechen – spiel sie ihm zu.',
+    'Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe an und schone deine hohen Karten.',
+    'Schmieren: Dein Partner macht diesen Stich sicher – gib ihm Punkte mit.',
+    'Dein Partner macht den Stich – du hast keine Punkte zum Schmieren, also gibst du eine tiefe Karte.',
+    'Dein Partner liegt vorne, aber nicht sicher – mit deinem Bock sicherst du den Stich ab.',
+    'Dein Partner liegt vorne – gib eine tiefe Karte und hoffe, dass der Stich hält.',
+    'Du bist der Letzte und kannst den Stich machen – nimm ihn.',
+    'Du bist der Letzte: Mit einem Trumpf holst du dir die Punkte im Stich.',
+    'Mit deinem Bock übernimmst du den Stich – höher geht es in dieser Farbe nicht mehr.',
+    'Im Stich liegen genug Punkte – das lohnt sich zu stechen.',
+    'Im Stich liegen viele Punkte – versuch ihn zu übernehmen.',
+    'Du kannst den Stich nicht billig machen – gib eine Karte, die wenig wert ist (verwerfen).',
+    'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
+    'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',
+    'Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.',
+    'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.',
+    'Misère: Du musst überstechen – mit der kleinstmöglichen Karte.',
+    'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.',
+  ];
+  function alleSprechTeile() {
+    const s = new Set(GRUENDE);
+    for (let k = 0; k < 36; k++) {
+      s.add(sprechKarte(k, null));
+      s.add(sprechKarte(k, 'T' + farbeVon(k)));
+    }
+    Object.values(MODUS_TIPP).forEach((x) => s.add(x));
+    for (let n = 0; n <= SCHNITT_MAX; n++) s.add(sprechSchnitt(n, false));
+    s.add(sprechSchnitt(0, true));
+    for (let n = 0; n <= 9; n++) {
+      for (const puur of [0, 1]) for (const nell of [0, 1]) for (const ass of [0, 1]) {
+        if (puur + nell + ass <= n) s.add(trumpfSatz(n, puur, nell, ass));
+      }
+    }
+    for (let n = 1; n <= 3; n++) s.add(seitenAssSatz(n));
+    Object.values(TRUMPF_URTEIL).forEach((x) => s.add(x));
+    for (const unten of [false, true]) {
+      for (let ass = 0; ass <= 4; ass++) {
+        for (let z = 0; z <= ass; z++) s.add(obeKopf(unten, ass, z));
+        const u = obeUrteil(unten, ass);
+        if (u) s.add(u);
+      }
+    }
+    [SATZ_SCHIEBEN, SATZ_MISERE, SATZ_SLALOM].forEach((x) => s.add(x));
+    return Array.from(s);
   }
 
   // --------------------------------------------------------------- API
@@ -809,7 +938,8 @@
 
   const api = {
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
-    bewertung, heuristikAnsage, schaetze, faustregel, merkmaleTrumpf, merkmaleObe,
+    bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
+    sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile,
     simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

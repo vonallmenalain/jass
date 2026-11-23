@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v6';
+const CACHE_NAME = 'jass-shell-v7';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,6 +15,8 @@ const APP_SHELL = [
   './trumpf-helfer.html',
   './verlauf.html',
   './jass-verlauf.js',
+  './jass-stimme.js',
+  './jass-stimme-dateien.js',
   './jass-engine.js',
   './jass-protokoll.js',
   './jass-tisch.js',
@@ -95,7 +97,7 @@ self.addEventListener('fetch', (event) => {
     if (cached) return cached;
     try {
       const networkResponse = await fetch(request);
-      if (networkResponse && networkResponse.ok && ['image', 'manifest', 'font'].includes(request.destination)) {
+      if (networkResponse && networkResponse.ok && ['image', 'manifest', 'font', 'audio'].includes(request.destination)) {
         const cache = await caches.open(CACHE_NAME);
         cache.put(request, networkResponse.clone());
       }

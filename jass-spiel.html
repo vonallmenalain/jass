@@ -43,6 +43,7 @@
       <h2>Spieler</h2>
       <p class="muted klein">Du spielst mit dem Computer gegenüber im Team. Jeder Computer hat seine eigene Stärke.</p>
       <div class="sitze" id="sitze"></div>
+      <label class="schalter"><span class="text"><span>💡 Tipps anbieten</span><small>Der Tipp-Knopf schlägt dir Karte und Ansage vor und sagt warum – mit 🔊 auch zum Anhören</small></span><input type="checkbox" id="tippsSchalter"></label>
     </div>
 
     <div class="panel stack">
@@ -68,6 +69,8 @@
   <script src="jass-bot.js"></script>
   <script src="jass-karten.js"></script>
   <script src="jass-einstellungen.js"></script>
+  <script src="jass-stimme-dateien.js"></script>
+  <script src="jass-stimme.js"></script>
   <script src="jass-tisch.js"></script>
   <script src="jass-verlauf.js"></script>
   <script>
@@ -162,7 +165,9 @@
 
     const zusammenfassung = () => { $('regelZusammenfassung').textContent = E.zusammenfassung(regeln); };
     E.regelFormular($('regelFormular'), regeln, (r) => { E.speichereRegeln(r); zusammenfassung(); });
-    E.anzeigeFormular($('anzeigeFormular'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); });
+    E.anzeigeFormular($('anzeigeFormular'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); }, { tipps: false });
+    $('tippsSchalter').checked = anzeige.tipps !== false;
+    $('tippsSchalter').addEventListener('change', (e) => { anzeige.tipps = e.target.checked; E.speichereAnzeige(anzeige); });
     zeichneSitze();
     zusammenfassung();
 
@@ -312,7 +317,7 @@
             tisch.toast(tisch.teamName(r.weis.siegerTeam) + ' schreiben ' + r.weis.punkte[r.weis.siegerTeam] + ' Weispunkte');
           }
           tisch.setze({ eingabe: null });
-          await tisch.stichZeigen(erg.stich, tempo().stich);
+          await tisch.stichZeigen(erg.stich, tempo().stich, anzeige.stichWarten !== false);
           if (!lebt()) return;
         }
       }
