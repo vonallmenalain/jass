@@ -193,7 +193,7 @@ function zeichneOffene(alle) {
         <span class="oben"><span>${esc(t.name)}</span><span>${t.frei === 1 ? '1 Platz frei' : esc(String(t.frei)) + ' Plätze frei'}</span></span>
         <span class="unten">bei ${esc(t.gastgeber)}${t.regeln ? ' · ' + esc(t.regeln) : ''}</span>
       </button>`).join('')
-    : '<p class="muted">Gerade ist kein öffentlicher Tisch offen. Eröffne doch selbst einen!</p>';
+    : '<p class="muted">Kein offener Tisch.</p>';
 }
 
 $('meinName').addEventListener('input', () => E.schreibe(KEY_NAME, $('meinName').value.trim().slice(0, 20)));
@@ -530,7 +530,7 @@ function zeigeLobby() {
     </div>
     <div class="panel stack">
       <h2>Plätze</h2>
-      ${istHost ? `<p class="muted klein">${tauschVon >= 0 ? 'Mit welchem Platz soll ' + esc(LAGE[tauschVon]) + ' tauschen? So bestimmst du, wer mit wem spielt.' : 'Wer mit wem spielt, bestimmst du mit «⇄ Platz tauschen». Platz 1 und 3 sind ein Team, Platz 2 und 4 das andere.'}</p>` : ''}
+      ${istHost && tauschVon >= 0 ? `<p class="muted klein">Mit welchem Platz tauschen?</p>` : ''}
       <div class="lobby-sitze">
         <div class="lobby-team"><h3 class="team-a">Team A</h3>${karte(0)}${karte(2)}</div>
         <div class="lobby-team"><h3 class="team-b">Team B</h3>${karte(1)}${karte(3)}</div>
@@ -545,7 +545,7 @@ function zeigeLobby() {
     </div>
     ${istHost
       ? `<button class="btn btn-voll" type="button" id="losBtn" ${menschenFrei ? 'disabled' : ''}>${menschenFrei ? 'Warte auf Mitspieler …' : 'Spiel starten'}</button>
-         ${menschenFrei ? '<p class="muted klein" style="text-align:center">Oder freie Plätze auf Computer stellen.</p>' : ''}`
+`
       : `<p class="muted" style="text-align:center">${meinSitz >= 0 ? 'Warte, bis ' + esc(hostName) + ' das Spiel startet …' : ''}</p>`}
     <button class="btn-ghost btn-voll" type="button" id="verlassenBtn">Tisch verlassen</button>
     ${istHost ? '<button class="btn-ghost btn-voll" type="button" id="schliessenBtn">🗑 Tisch für alle schliessen</button>' : ''}`;

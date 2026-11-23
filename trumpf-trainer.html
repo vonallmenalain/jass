@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Trumpf-Trainer</title>
   <link rel="stylesheet" href="jass-ui.css" />
   <style>
@@ -19,10 +22,10 @@
     .punkte-reihe i.s3 { background: #4ade80; }
     .punkte-reihe i.jetzt { outline: 2px solid #fff; outline-offset: 1px; }
     .lage { font-size: 15px; line-height: 1.4; }
-    .lage b { color: #fde68a; }
+    .lage b { color: #ff9d96; }
 
     .tisch-hand {
-      background: radial-gradient(ellipse at center, #1a6b3c 0%, var(--felt) 55%, var(--felt-2) 100%);
+      background: radial-gradient(ellipse at center, #252832 0%, #15171d 60%, #0c0d11 100%);
       border-radius: 22px; padding: 12px;
       border: 1px solid rgba(255,255,255,0.12);
       box-shadow: inset 0 0 30px rgba(0,0,0,.3);
@@ -75,9 +78,9 @@
     .vergleich { border-radius: 16px; padding: 12px 14px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .35); display: flex; flex-direction: column; gap: 6px; }
     .vergleich.unter { background: rgba(248, 113, 113, .08); border-color: rgba(248, 113, 113, .4); }
     .vergleich .gross { font-size: 18px; font-weight: 800; }
-    .vergleich .gross b { color: #fde68a; }
+    .vergleich .gross b { color: #ff9d96; }
 
-    .regel-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 16px; padding: 12px 14px; }
+    .regel-box { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; }
     .regel-box ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; font-size: 14px; color: var(--muted); }
     .regel-box ul b { color: var(--text); }
 
@@ -97,27 +100,23 @@
 
     <!-- Start -->
     <section class="panel stack" id="start">
-      <div class="stack" style="gap:6px" data-vorlesen>
-        <h2>Was ist Trumpf?</h2>
-        <p class="muted">Du bekommst 9 zufällige Karten und entscheidest, was du ansagst – oder ob du schiebst. Danach spielt der Computer deine Hand mit vielen möglichen Verteilungen der anderen Karten durch und zeigt dir, was im Schnitt am meisten Punkte bringt.</p>
-      </div>
       <div class="regel-box" data-vorlesen>
         <h3>Faustregeln</h3>
         <ul>
-          <li><b>Trumpf</b> mit dem Buur (Bauer) und mindestens drei Trümpfen – noch besser mit Nell (Neun) dazu.</li>
-          <li><b>Obenabe</b> mit drei oder mehr Assen, am besten mit Königen dahinter.</li>
-          <li><b>Undenufe</b> mit vielen Sechsern und Siebnern.</li>
-          <li><b>Schieben</b>, wenn nichts davon passt – dein Partner hat vielleicht die besseren Karten.</li>
+          <li><b>Trumpf:</b> Buur und drei Trümpfe.</li>
+          <li><b>Obenabe:</b> drei Asse.</li>
+          <li><b>Undenufe:</b> viele Sechser und Siebner.</li>
+          <li><b>Schieben:</b> wenn nichts passt.</li>
         </ul>
       </div>
-      <p class="muted klein" id="startRegeln"></p>
+      <p class="muted klein" id="startRegeln" hidden></p>
       <div class="reihe">
         <span>Serie:</span>
         <div class="segmente" id="serienLaenge"></div>
       </div>
       <button class="btn btn-voll" type="button" id="startBtn">Los geht's</button>
       <p class="muted klein" id="rekord"></p>
-      <a class="btn-ghost btn-voll" href="verlauf.html?quelle=trainer&amp;von=trainerstart">📜 Ausgespielte Hände ansehen</a>
+      <a class="btn-ghost btn-voll" href="verlauf.html?quelle=trainer&amp;von=trainerstart">📜 Ausgespielte Hände</a>
     </section>
 
     <!-- Runde -->
@@ -352,7 +351,7 @@
         <div class="urteil" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(S.trainerAuswertung(h.hand, h.wahl, liste, h.sterne, !!regeln.multiplikatoren)))}"><div class="sterne">${'⭐'.repeat(h.sterne)}<span class="aus">${'⭐'.repeat(3 - h.sterne)}</span></div><strong>${urteil}</strong>
           <span class="muted klein">${meine === beste ? 'Genau die beste Ansage.' : 'Im Schnitt ' + Math.round(verlust) + ' Punkte weniger als ' + namen(beste.code) + '.'}</span></div>
         <div>
-          <p class="muted klein" style="margin-bottom:6px">So viele Punkte macht euer Team im Schnitt${multi}, wenn ihr so ansagt – aus ${liste[0].n} durchgespielten Verteilungen:</p>
+          <p class="muted klein" style="margin-bottom:6px">Ø Punkte${multi}</p>
           <div class="ergebnis-liste">${liste.map((x) => `<div class="ergebnis-zeile ${x === beste ? 'beste' : ''} ${x.code === h.wahl ? 'gewaehlt' : ''}">
             <span class="name">${modusHtml(x.code)}</span>
             <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
@@ -362,8 +361,7 @@
         <div class="reihe">
           <button class="btn" type="button" id="weiterBtn" style="flex:1">${serie.nr + 1 >= serie.laenge ? 'Zum Ergebnis' : 'Nächste Hand'}</button>
           <button class="btn-ghost" type="button" id="ausspielenBtn">${h.ausgespielt ? 'Nochmals ausspielen' : 'Ausspielen'}</button>
-        </div>
-        <p class="muted klein" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(S.AUSSPIELEN_HINWEIS))}">«Ausspielen» spielt genau diese Hand eine Runde lang gegen den Computer – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt. Die Runde wird im Verlauf gespeichert (📜 auf der Startseite des Trainers).</p>`;
+        </div>`;
       zeigeKopf();
       // Vor dem Wechsel in den Verlauf die Serie merken – der Pfeil dort
       // führt zu dieser Hand zurück.
@@ -398,7 +396,7 @@
         speichereEinst();
       }
       const sprechen = S.trainerFertig(sterne, max, neuerRekord, perfekt, verlust, serie.haende.filter((h) => h.wahl === 'SCHIEBEN').length);
-      f.innerHTML = `<div class="urteil" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(sprechen))}"><div class="sterne">🏆</div><strong>${sterne} von ${max} Sternen</strong>${neuerRekord ? '<span style="color:#fde68a;font-weight:800">Neuer Rekord!</span>' : ''}</div>
+      f.innerHTML = `<div class="urteil" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(sprechen))}"><div class="sterne">🏆</div><strong>${sterne} von ${max} Sternen</strong>${neuerRekord ? '<span style="color:#ff9d96;font-weight:800">Neuer Rekord!</span>' : ''}</div>
         <div class="bilanz">
           <div><strong>${perfekt}</strong><span>beste Ansage</span></div>
           <div><strong>${Math.round(verlust)}</strong><span>Ø Punkte verschenkt</span></div>

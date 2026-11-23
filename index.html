@@ -3,370 +3,181 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Jass</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --bg-2: #111827;
-      --panel: rgba(255, 255, 255, 0.08);
-      --panel-strong: rgba(255, 255, 255, 0.12);
-      --border: rgba(255, 255, 255, 0.14);
-      --text: #f8fafc;
-      --muted: #cbd5e1;
-      --accent: #f59e0b;
-      --accent-2: #ef4444;
-      --radius-xl: 24px;
-      --radius-lg: 18px;
-      --radius-md: 14px;
-      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
-      --max: 760px;
+      --bg: #0c0e13;
+      --flaeche: #161a22;
+      --flaeche-2: #1c212b;
+      --text: #eceef3;
+      --muted: #8b93a7;
+      --accent: #fe7971;
+      --linie: rgba(255, 255, 255, 0.08);
+      --max: 640px;
     }
-
     * { box-sizing: border-box; }
-
     html, body {
-      margin: 0;
-      min-height: 100%;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; min-height: 100%;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       color: var(--text);
-      background:
-        radial-gradient(circle at top left, rgba(245, 158, 11, 0.22), transparent 34%),
-        radial-gradient(circle at top right, rgba(239, 68, 68, 0.16), transparent 28%),
-        linear-gradient(180deg, #0b1120 0%, #111827 100%);
+      background: radial-gradient(120% 50% at 0% 0%, rgba(254, 121, 113, 0.14), transparent 60%), var(--bg);
       -webkit-tap-highlight-color: transparent;
     }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background:
-        linear-gradient(120deg, rgba(255,255,255,0.04) 0%, transparent 42%),
-        linear-gradient(300deg, rgba(255,255,255,0.025) 0%, transparent 35%);
-    }
-
-    button, a {
-      font: inherit;
-    }
-
+    a, button { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    [hidden] { display: none !important; }
     .app {
-      width: min(100%, var(--max));
-      margin: 0 auto;
-      min-height: 100vh;
-      min-height: 100dvh;
-      padding: calc(16px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+      width: min(100%, var(--max)); margin: 0 auto;
+      min-height: 100vh; min-height: 100dvh;
+      padding: calc(18px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      display: flex; flex-direction: column; gap: 22px;
     }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      padding: 4px 0 6px;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+    .kopf { display: flex; align-items: center; gap: 10px; }
+    .kopf .logo { width: 44px; height: 25px; display: block; }
+    .kopf .wort { font-family: "Space Grotesk", "Inter", system-ui, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em; }
+    .rund {
+      margin-left: auto; width: 40px; height: 40px; border-radius: 50%;
+      display: grid; place-items: center; text-decoration: none; font-size: 17px;
+      background: var(--flaeche); border: 1px solid var(--linie);
     }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
+    .weiter {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 14px 14px 16px; border-radius: 20px;
+      background: linear-gradient(135deg, #1b1f29, #12151c); border: 1px solid var(--linie);
     }
-
-    .brand-badge {
-      width: 40px;
-      height: 40px;
-      border-radius: 14px;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: white;
-      font-size: 18px;
-      box-shadow: 0 10px 22px rgba(239, 68, 68, 0.28);
-      flex-shrink: 0;
+    .weiter .los { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-decoration: none; }
+    .weiter .los b { font-family: "Space Grotesk", "Inter", sans-serif; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+    .weiter .los b::before { content: ""; width: 0; height: 0; border-left: 11px solid var(--accent); border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+    .weiter .los span { color: var(--muted); font-size: 13.5px; }
+    .weiter .ende {
+      border: 1px solid var(--linie); background: transparent; color: var(--muted);
+      border-radius: 999px; padding: 8px 14px; font-size: 13.5px; font-weight: 600; white-space: nowrap;
     }
-
-    .eyebrow {
-      color: #fde68a;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .06em;
-      text-transform: uppercase;
+    .weiter .ende.sicher { border-color: var(--accent); color: var(--accent); }
+    .gruppe { display: flex; flex-direction: column; gap: 10px; }
+    .gruppe h2 { margin: 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .kacheln { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kachel {
+      display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
+      min-height: 104px; padding: 14px; border-radius: 18px;
+      background: var(--flaeche); border: 1px solid var(--linie);
+      text-decoration: none; text-align: left;
+      transition: transform .08s ease, border-color .15s ease, background .15s ease;
     }
-
-    h1, h2 {
-      margin: 0;
+    .kachel:hover, .kachel:focus-visible { border-color: rgba(254, 121, 113, 0.45); outline: none; }
+    .kachel:active { transform: scale(.98); }
+    .kachel.haupt { background: linear-gradient(160deg, rgba(254, 121, 113, 0.22), var(--flaeche) 62%); border-color: rgba(254, 121, 113, 0.35); }
+    .kachel svg { width: 28px; height: 28px; color: var(--accent); }
+    .kachel b { font-family: "Space Grotesk", "Inter", sans-serif; font-size: 17px; font-weight: 700; line-height: 1.15; }
+    .modal-hinten {
+      position: fixed; inset: 0; z-index: 80; display: none; align-items: flex-end; justify-content: center;
+      padding: 12px; background: rgba(5, 6, 9, 0.72);
     }
-
-    h1 {
-      font-size: 30px;
-      line-height: 1.02;
-      letter-spacing: -0.04em;
-    }
-
-    h2 {
-      font-size: 21px;
-      line-height: 1.08;
-      letter-spacing: -0.03em;
-    }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      box-shadow: var(--shadow);
-      border-radius: var(--radius-xl);
-      padding: 16px;
-    }
-
-    .hero {
-      padding-top: 8px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      right: -44px;
-      bottom: -70px;
-      width: 180px;
-      height: 180px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, transparent 66%);
-      pointer-events: none;
-    }
-
-    .stack {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .btn,
-    .btn-ghost,
-    .icon-btn,
-    .mode-link {
-      appearance: none;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      cursor: pointer;
-      transition: transform .05s ease, background .18s ease, border-color .18s ease, opacity .18s ease;
-      touch-action: manipulation;
-      text-decoration: none;
-    }
-
-    .btn:active,
-    .btn-ghost:active,
-    .icon-btn:active,
-    .mode-link:active {
-      transform: scale(.99);
-    }
-
-    .btn,
-    .btn-ghost {
-      min-height: 54px;
-      padding: 0 16px;
-      font-weight: 800;
-      font-size: 16px;
-      width: 100%;
-      display: grid;
-      place-items: center;
-      text-align: center;
-    }
-
-    .btn {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      border: none;
-      color: white;
-      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.25);
-    }
-
-    .btn-ghost {
-      background: rgba(255,255,255,0.06);
-    }
-
-    .icon-btn {
-      min-width: 44px;
-      min-height: 44px;
-      border-radius: 14px;
-      display: grid;
-      place-items: center;
-      font-size: 18px;
-    }
-
-    .footer-space {
-      height: 10px;
-    }
-
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 80;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      background: rgba(2, 6, 23, 0.78);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-
-    .modal-backdrop.show {
-      display: flex;
-    }
-
+    .modal-hinten.offen { display: flex; }
     .modal {
-      width: 100%;
-      max-width: 560px;
-      border-radius: 26px;
-      border: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(15, 23, 42, 0.99));
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      width: 100%; max-width: 480px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+      border-radius: 22px; background: var(--flaeche); border: 1px solid var(--linie);
+      display: flex; flex-direction: column; gap: 10px;
     }
-
-    .modal-header {
-      padding: 16px 16px 10px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .modal-body {
-      padding: 0 16px 16px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .mode-list {
-      display: grid;
-      gap: 10px;
-    }
-
-    .mode-link {
-      min-height: 60px;
-      padding: 14px 16px;
-      display: grid;
-      align-items: center;
-      border-radius: 18px;
-      background: rgba(255,255,255,0.05);
-      text-align: center;
-      font-size: 17px;
-      font-weight: 800;
-    }
-
-    .mode-link:hover {
-      border-color: rgba(245, 158, 11, 0.35);
-      background: rgba(255,255,255,0.08);
-    }
-
-    @media (min-width: 1040px) {
-      .app {
-        width: min(100%, 980px);
-        padding: 22px 22px calc(24px + env(safe-area-inset-bottom));
-      }
-    }
+    .modal-kopf { display: flex; align-items: center; justify-content: space-between; }
+    .modal-kopf h2 { margin: 0; font-family: "Space Grotesk", "Inter", sans-serif; font-size: 20px; }
+    .modal-kopf button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--linie); background: transparent; font-size: 18px; }
+    .modus { display: block; padding: 15px 16px; border-radius: 14px; background: var(--flaeche-2); border: 1px solid var(--linie); text-decoration: none; font-weight: 700; font-size: 16px; }
+    .modus:hover, .modus:focus-visible { border-color: rgba(254, 121, 113, 0.45); outline: none; }
+    @media (min-width: 560px) { .modal-hinten { align-items: center; } }
   </style>
 </head>
 <body>
   <div class="app">
-    <div class="topbar">
-      <div class="brand">
-        <div class="brand-badge">♣</div>
-        <div>
-          <div class="eyebrow">Jass</div>
-          <h1>Start</h1>
-        </div>
+    <header class="kopf">
+      <svg class="logo" viewBox="0 0 1120 631.81" role="img" aria-label="alae.app"><path fill="#ECEDF2" d="M65.03 509.42L294.2 82.33A42.36 42.36 0 0 1 368.85 82.33L483.44 295.87A42.36 42.36 0 0 1 466.14 353.23A42.36 42.36 0 0 1 408.78 335.93L331.53 191.95L139.69 549.47A42.36 42.36 0 0 1 82.33 566.77A42.36 42.36 0 0 1 65.03 509.42Z"/><path fill="#FE7971" d="M521.98 509.42L751.15 82.33A42.36 42.36 0 0 1 825.8 82.33L1054.97 509.42A42.36 42.36 0 0 1 1037.67 566.77A42.36 42.36 0 0 1 980.31 549.47L788.47 191.95L596.63 549.47A42.36 42.36 0 0 1 539.28 566.77A42.36 42.36 0 0 1 521.98 509.42Z"/></svg>
+      <span class="wort">Jass</span>
+      <a class="rund" href="verlauf.html" aria-label="Gespielte Partien">📜</a>
+    </header>
+
+    <div class="weiter" id="weiter" hidden>
+      <a class="los" href="jass-spiel.html?weiter=1"><b>Weiterspielen</b><span id="weiterText"></span></a>
+      <button class="ende" type="button" id="beenden">Beenden</button>
+    </div>
+
+    <section class="gruppe">
+      <h2>Spielecke</h2>
+      <div class="kacheln">
+        <a class="kachel haupt" href="jass-spiel.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16h5"/></svg><b>Gegen Computer</b></a>
+        <a class="kachel" href="jass-online.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg><b>Online spielen</b></a>
       </div>
-    </div>
+    </section>
 
-    <div class="panel hero">
-      <h2>Willkommen</h2>
-    </div>
+    <section class="gruppe">
+      <h2>Turnier</h2>
+      <div class="kacheln">
+        <a class="kachel" href="turnier-allgemein.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 13v4M8.5 20h7M10 17h4"/></svg><b>Turnier</b></a>
+        <a class="kachel" href="turnier.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 9.5l3 5 3-5"/></svg><b>von Allmen Jass</b></a>
+      </div>
+    </section>
 
-    <div class="panel stack">
-      <a class="btn" href="turnier-allgemein.html">Turnier</a>
-      <button class="btn" id="openCounterModesBtn" type="button">Zähler auswählen</button>
-      <a class="btn" href="turnier.html">von Allmen Jass</a>
-    </div>
-
-    <div class="panel stack">
-      <div class="eyebrow">Spielen &amp; Lernen</div>
-      <a class="btn" href="training.html">Training</a>
-      <a class="btn" href="jass-spiel.html">Gegen Computer</a>
-      <a class="btn" href="jass-online.html">Online spielen</a>
-    </div>
-
-    <div class="footer-space"></div>
+    <section class="gruppe">
+      <h2>Zählen &amp; Lernen</h2>
+      <div class="kacheln">
+        <button class="kachel" type="button" id="zaehlerBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/></svg><b>Zähler</b></button>
+        <a class="kachel" href="training.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c3 2 7 2 10 0v-4"/></svg><b>Jass lernen</b></a>
+      </div>
+    </section>
   </div>
 
-  <div class="modal-backdrop" id="counterModesModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="counterModesTitle">
-      <div class="modal-header">
-        <div></div>
-        <button class="icon-btn" id="closeCounterModesBtn" type="button" aria-label="Schliessen">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="mode-list">
-          <a class="mode-link" href="schieber-zähler.html">Schieber</a>
-          <a class="mode-link" href="sidi-zähler.html">Sidi</a>
-          <a class="mode-link" href="coiffeur-zähler.html">Coiffeur</a>
-        </div>
-      </div>
+  <div class="modal-hinten" id="zaehlerWahl" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="zaehlerTitel">
+      <div class="modal-kopf"><h2 id="zaehlerTitel">Zähler</h2><button type="button" id="zaehlerZu" aria-label="Schliessen">×</button></div>
+      <a class="modus" href="schieber-zähler.html">Schieber</a>
+      <a class="modus" href="sidi-zähler.html">Sidi</a>
+      <a class="modus" href="coiffeur-zähler.html">Coiffeur</a>
     </div>
   </div>
 
   <script>
-    const counterModesModal = document.getElementById('counterModesModal');
-    const openCounterModesBtn = document.getElementById('openCounterModesBtn');
-    const closeCounterModesBtn = document.getElementById('closeCounterModesBtn');
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      // Zähler wählen
+      const wahl = $('zaehlerWahl');
+      const zu = () => { wahl.classList.remove('offen'); wahl.setAttribute('aria-hidden', 'true'); };
+      $('zaehlerBtn').addEventListener('click', () => { wahl.classList.add('offen'); wahl.setAttribute('aria-hidden', 'false'); });
+      $('zaehlerZu').addEventListener('click', zu);
+      wahl.addEventListener('click', (e) => { if (e.target === wahl) zu(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') zu(); });
 
-    function openCounterModes() {
-      counterModesModal.classList.add('show');
-      counterModesModal.setAttribute('aria-hidden', 'false');
-    }
-
-    function closeCounterModes() {
-      counterModesModal.classList.remove('show');
-      counterModesModal.setAttribute('aria-hidden', 'true');
-    }
-
-    openCounterModesBtn.addEventListener('click', openCounterModes);
-    closeCounterModesBtn.addEventListener('click', closeCounterModes);
-
-    counterModesModal.addEventListener('click', (event) => {
-      if (event.target === counterModesModal) {
-        closeCounterModes();
+      // Laufendes Spiel gegen den Computer: weiterspielen oder beenden
+      const KEY = 'jass-lernen-spiel-v1';
+      function laufend() {
+        try {
+          const g = JSON.parse(localStorage.getItem(KEY) || 'null');
+          if (!g || !g.spiel || g.spiel.fertig || g.spiel.version !== 1) return null;
+          return g.spiel;
+        } catch (e) { return null; }
       }
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && counterModesModal.classList.contains('show')) {
-        closeCounterModes();
+      const s = laufend();
+      if (s) {
+        const re = s.regeln || {};
+        $('weiterText').textContent = re.spielende === 'punkte'
+          ? 'Runde ' + (s.rundeNr + 1) + ' läuft · bis ' + re.zielPunkte
+          : 'Runde ' + Math.min(s.rundeNr + 1, re.runden) + ' von ' + re.runden + ' läuft';
+        $('weiter').hidden = false;
       }
-    });
+      let sicher = false;
+      $('beenden').addEventListener('click', () => {
+        const b = $('beenden');
+        if (!sicher) { sicher = true; b.textContent = 'Wirklich?'; b.classList.add('sicher'); setTimeout(() => { sicher = false; b.textContent = 'Beenden'; b.classList.remove('sicher'); }, 3000); return; }
+        try { localStorage.removeItem(KEY); } catch (e) { /* egal */ }
+        $('weiter').hidden = true;
+      });
+    })();
   </script>
   <script>
     if ('serviceWorker' in navigator) {

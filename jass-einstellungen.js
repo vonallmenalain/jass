@@ -22,7 +22,7 @@
     kartenbild: 'foto',   // foto (unsere Karten) | eigen | klassisch (SVG-cards) – karten/README.md
     stichWarten: true,    // gegen den Computer: der volle Stich bleibt liegen, bis man tippt
     austeilen: true,      // das Austeilen zeigen (Karten fliegen zu den Plätzen)
-    teppich: 'gruen',     // Jassteppich: gruen | ecken | trumpf | alae | kreuz (jass-tisch.js TEPPICHE)
+    teppich: 'alae',      // Jassteppich: gruen | ecken | trumpf | alae | kreuz (jass-tisch.js TEPPICHE)
     ruecken: 'alae',      // Kartenrücken: alae (schwarz mit Logo) | rot
     klang: 'papier',      // Töne am Tisch: aus | papier | holz | weich (jass-toene.js)
     lautstaerke: 45,      // 0..100
@@ -72,12 +72,12 @@
   }
 
   const MODUS_TEXTE = [
-    ['T', 'Trumpf', 'Schaufel, Herz, Kreuz oder Ecke'],
-    ['OBE', 'Obenabe', 'Ohne Trumpf, das Ass ist am höchsten'],
-    ['UNE', 'Undenufe', 'Ohne Trumpf, die Sechs ist am höchsten'],
-    ['SLO', 'Slalom (obenabe beginnt)', 'Jeder Stich wechselt: obenabe, undenufe, obenabe …'],
-    ['SLU', 'Slalom (undenufe beginnt)', 'Jeder Stich wechselt: undenufe, obenabe, undenufe …'],
-    ['MIS', 'Misère', 'Wie Obenabe, aber man schreibt die Punkte der Gegner – wenig ist gut'],
+    ['T', 'Trumpf', ''],
+    ['OBE', 'Obenabe', ''],
+    ['UNE', 'Undenufe', ''],
+    ['SLO', 'Slalom (obenabe beginnt)', ''],
+    ['SLU', 'Slalom (undenufe beginnt)', ''],
+    ['MIS', 'Misère', 'Wenig Punkte ist gut'],
   ];
 
   function zusammenfassung(r) {
@@ -134,35 +134,33 @@
         html.push(`<details class="abschnitt" data-abschnitt="laenge" ${offen.has('laenge') ? 'open' : ''}><summary>Spiellänge <small>${r.spielende === 'punkte' ? 'bis ' + r.zielPunkte + ' Punkte' : r.runden + ' Runden'}</small></summary><div class="inhalt">
           ${segmente('spielende', [['runden', 'Anzahl Runden'], ['punkte', 'Zielpunkte']], r.spielende)}
           ${r.spielende === 'punkte'
-            ? `<div class="reihe" style="padding-top:8px">${zahl('zielPunkte', r.zielPunkte, 1, 110)}<div class="segmente">${[1000, 1500, 2500, 3000].map((p) => `<button type="button" data-r="zielPunkte" data-wert="${p}" class="${r.zielPunkte === p ? 'aktiv' : ''}">${p}</button>`).join('')}</div></div>
-               <p class="muted klein">Gewonnen hat, wer die Punkte zuerst erreicht – gezählt wird Stöck, dann Weis, dann Stich.</p>`
-            : `<div class="reihe" style="padding-top:8px">${zahl('runden', r.runden, 1)}<div class="segmente">${[4, 8, 12, 16].map((n) => `<button type="button" data-r="runden" data-wert="${n}" class="${r.runden === n ? 'aktiv' : ''}">${n}</button>`).join('')}</div></div>
-               <p class="muted klein">Beliebig viele Runden. Mit 4, 8, 12 … sagt jeder gleich oft an.</p>`}
+            ? `<div class="reihe" style="padding-top:8px">${zahl('zielPunkte', r.zielPunkte, 1, 110)}<div class="segmente">${[1000, 1500, 2500, 3000].map((p) => `<button type="button" data-r="zielPunkte" data-wert="${p}" class="${r.zielPunkte === p ? 'aktiv' : ''}">${p}</button>`).join('')}</div></div>`
+            : `<div class="reihe" style="padding-top:8px">${zahl('runden', r.runden, 1)}<div class="segmente">${[4, 8, 12, 16].map((n) => `<button type="button" data-r="runden" data-wert="${n}" class="${r.runden === n ? 'aktiv' : ''}">${n}</button>`).join('')}</div></div>`}
         </div></details>`);
       }
       const anzahlModi = MODUS_TEXTE.filter(([g]) => r.modi[g]).length;
       html.push(`<details class="abschnitt" data-abschnitt="modi" ${offen.has('modi') ? 'open' : ''}><summary>Ansagen <small>${anzahlModi} von ${MODUS_TEXTE.length}${r.schieben ? ', mit Schieben' : ''}</small></summary><div class="inhalt">
         ${MODUS_TEXTE.map(([g, t, text]) => schalter('modi.' + g, t, text, r.modi[g])).join('')}
-        ${schalter('schieben', 'Schieben erlaubt', 'Wer ansagt, darf dem Partner die Wahl überlassen', r.schieben)}
+        ${schalter('schieben', 'Schieben erlaubt', '', r.schieben)}
       </div></details>`);
       if (o.zaehlen !== false) {
         html.push(`<details class="abschnitt" data-abschnitt="zaehlen" ${offen.has('zaehlen') ? 'open' : ''}><summary>Punkte zählen <small>${[r.weisen && 'Weisen', r.stoeck && 'Stöck', r.matchBonus && 'Match', r.multiplikatoren && 'Multipl.'].filter(Boolean).join(', ') || 'nur Stiche'}</small></summary><div class="inhalt">
-          ${schalter('weisen', 'Weisen', 'Dreiblatt 20, Vierblatt 50, Fünfblatt 100 … · vier Bauern 200, vier Neuner 150, vier Asse/Könige/Damen/Zehner 100 · nur das Team mit dem höchsten Weis schreibt', r.weisen)}
-          ${schalter('stoeck', 'Stöck', 'König und Dame im Trumpf auf einer Hand', r.stoeck)}
+          ${schalter('weisen', 'Weisen', '', r.weisen)}
+          ${schalter('stoeck', 'Stöck', '', r.stoeck)}
           ${r.stoeck ? `<div class="reihe" style="padding:0 0 8px">Punkte für Stöck ${zahl('stoeckPunkte', r.stoeckPunkte, 0)}</div>` : ''}
-          ${schalter('matchBonus', 'Matchbonus', 'Zusatzpunkte, wenn ein Team alle 9 Stiche macht', r.matchBonus)}
-          ${r.matchBonus ? `<div class="reihe" style="padding:0 0 8px">Bonus ${zahl('matchPunkte', r.matchPunkte, 0)} <span class="muted klein">(Match = 157 + Bonus)</span></div>` : ''}
-          <div class="schalter"><span class="text"><span>Letzter Stich</span><small>Zusatzpunkte für den neunten Stich</small></span>${zahl('letzterStich', r.letzterStich, 0, 70)}</div>
-          ${schalter('multiplikatoren', 'Multiplikatoren', 'Je nach Ansage zählt die Runde mehrfach', r.multiplikatoren)}
+          ${schalter('matchBonus', 'Matchbonus', '', r.matchBonus)}
+          ${r.matchBonus ? `<div class="reihe" style="padding:0 0 8px">Bonus ${zahl('matchPunkte', r.matchPunkte, 0)}</div>` : ''}
+          <div class="schalter"><span class="text"><span>Letzter Stich</span></span>${zahl('letzterStich', r.letzterStich, 0, 70)}</div>
+          ${schalter('multiplikatoren', 'Multiplikatoren', '', r.multiplikatoren)}
           ${r.multiplikatoren ? `<div class="faktoren">${J.MODUS_REIHENFOLGE.filter((c) => r.modi[J.MODI[c].gruppe]).map((c) => `<label>${J.MODI[c].name} × ${zahl('faktoren.' + c, r.faktoren[c], 1)}</label>`).join('')}</div>` : ''}
         </div></details>`);
       }
       html.push(`<details class="abschnitt" data-abschnitt="regeln" ${offen.has('regeln') ? 'open' : ''}><summary>Spielregeln im Detail</summary><div class="inhalt">
-        ${schalter('untertrumpfen', 'Untertrumpfen erlaubt', 'Aus: Hat schon jemand gestochen, darf man keinen tieferen Trumpf geben – ausser man hat nur noch Trümpfe', r.untertrumpfen)}
-        ${schalter('puurFrei', 'Buur muss nicht angegeben werden', 'Wird Trumpf gespielt und man hat nur noch den Bauer, darf man ihn behalten', r.puurFrei)}
-        <div class="schalter" style="cursor:default"><span class="text"><span>Erste Ansage</span><small>Wer in der ersten Runde Trumpf macht. Danach geht es reihum.</small></span></div>
+        ${schalter('untertrumpfen', 'Untertrumpfen erlaubt', '', r.untertrumpfen)}
+        ${schalter('puurFrei', 'Buur muss nicht angegeben werden', '', r.puurFrei)}
+        <div class="schalter" style="cursor:default"><span class="text"><span>Erste Ansage</span></span></div>
         ${auswahl('ersterAnsager', [['ecke7', 'Wer die Ecken-7 hat'], ['zufall', 'Zufällig'], ['sitz0', 'Der Spieler unten (Du)']], r.ersterAnsager)}
-        <div class="schalter" style="cursor:default"><span class="text"><span>Ausspielen nach dem Schieben</span><small>Wer den ersten Stich anspielt, wenn geschoben wurde</small></span></div>
+        <div class="schalter" style="cursor:default"><span class="text"><span>Ausspielen nach dem Schieben</span></span></div>
         ${auswahl('ausspiel', [['vorhand', 'Wer geschoben hat (Vorhand)'], ['ansager', 'Wer Trumpf gemacht hat']], r.ausspiel)}
       </div></details>`);
       container.innerHTML = html.join('');
@@ -231,22 +229,21 @@
       const a = anzeige;
       container.innerHTML = `
         ${o.tempo !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Tempo der Computer</span>${segmente('tempo', [['langsam', 'Langsam'], ['normal', 'Normal'], ['schnell', 'Schnell']], a.tempo)}</div>` : ''}
-        ${o.rechnen !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Rechentiefe</span>${segmente('rechnen', [['schnell', 'Schnell'], ['normal', 'Normal'], ['gruendlich', 'Gründlich'], ['maximal', 'Maximal']], a.rechnen)}<small class="muted klein">Wie viele mögliche Kartenverteilungen die Computer und der Tipp vor jedem Zug durchspielen: 120, 300 (Standard), 600 oder 1000. Mehr rechnet länger (auf dem Handy bis zu ein paar Sekunden), wird aber nur wenig stärker.</small></div>` : ''}
-        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenbild</span>${segmente('kartenbild', [['foto', 'Unsere Karten'], ['eigen', 'Jass-App'], ['klassisch', 'Klassisch']], a.kartenbild)}<small class="muted klein">Unsere Karten: der Kartensatz, mit dem wir spielen, fotografiert. Klassisch: französische Karten von SVG-cards (David Bellot, frei unter LGPL). Die Kartenfarben unten gelten nur für «Jass-App».</small></div>
-        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenrücken</span>${segmente('ruecken', [['alae', 'alae.app (schwarz)'], ['rot', 'Rot']], a.ruecken)}</div>
-        ${o.spiel !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Jassteppich</span>${segmente('teppich', [['gruen', 'Grün'], ['ecken', 'Vier Farben'], ['trumpf', 'Trumpf'], ['alae', 'alae.app'], ['kreuz', 'Schweiz']], a.teppich)}<small class="muted klein">Auch am Tisch mit dem ✏️ in der Ecke des Teppichs.</small></div>
+        ${o.rechnen !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Rechentiefe</span>${segmente('rechnen', [['schnell', 'Schnell'], ['normal', 'Normal'], ['gruendlich', 'Gründlich'], ['maximal', 'Maximal']], a.rechnen)}<small class="muted klein">120 · 300 · 600 · 1000 durchgespielte Verteilungen</small></div>` : ''}
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenbild</span>${segmente('kartenbild', [['foto', 'Unsere Karten'], ['eigen', 'Jass-App'], ['klassisch', 'Klassisch']], a.kartenbild)}</div>
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenrücken</span>${segmente('ruecken', [['alae', 'alae.app'], ['rot', 'Rot']], a.ruecken)}</div>
+        ${o.spiel !== false ? `<div class="stack" style="gap:8px;padding:6px 0 10px"><span>Jassteppich</span>${segmente('teppich', [['gruen', 'Grün'], ['ecken', 'Vier Farben'], ['trumpf', 'Trumpf'], ['alae', 'alae.app'], ['kreuz', 'Schweiz']], a.teppich)}</div>
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Töne am Tisch</span>${segmente('klang', (root.JassToene ? root.JassToene.KLAENGE : [['aus', 'Aus']]), a.klang)}
           <div class="reihe" style="gap:10px;align-items:center"><span class="muted klein">Leise</span><input type="range" min="0" max="100" step="5" value="${Number(a.lautstaerke) || 0}" data-r="lautstaerke" aria-label="Lautstärke" style="flex:1"><span class="muted klein">Laut</span>
-          <button class="btn-ghost btn-klein" type="button" data-probe>▶ Probe</button></div>
-          <small class="muted klein">Ein leises Geräusch beim Austeilen, bei jeder gespielten Karte (von der Seite des Spielers) und beim Abräumen des Stichs. Schnell aus: 🔊 oben am Tisch.</small></div>` : ''}
-        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}<small class="muted klein">Vier Farben: Kreuz grün, Ecke blau – leichter zu unterscheiden.</small></div>
+          <button class="btn-ghost btn-klein" type="button" data-probe>▶ Probe</button></div></div>` : ''}
+        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}</div>
         ${o.spiel !== false ? `
-        ${schalter('hilfen', 'Erlaubte Karten hervorheben', 'Karten, die du nicht spielen darfst, werden abgedunkelt', a.hilfen)}
-        ${o.tipps !== false ? schalter('tipps', 'Tipp-Knopf', 'Der Computer schlägt dir eine Karte oder Ansage vor und sagt warum', a.tipps) : ''}
-        ${schalter('austeilen', 'Austeilen zeigen', 'Zu Beginn jeder Runde fliegen die Karten aus der Mitte zu den Plätzen', a.austeilen)}
-        ${o.stichWarten !== false ? schalter('stichWarten', 'Stich liegen lassen, bis ich tippe', 'Die vier Karten bleiben liegen, bis du aufs Feld tippst – so kannst du den Stich in Ruhe anschauen', a.stichWarten) : ''}
-        ${schalter('gedanken', 'Alle Gedanken und Stiche anzeigen', 'Mit «📜 Stiche & Gedanken» liest du während des Spiels jederzeit alle Stiche nach – mit den Gedanken jedes Spielers, auch aus früheren Runden. Aus: Die Computer spielen ohne Kommentar, wie am echten Tisch. Beim Ausspielen im Training ist es immer an.', a.gedanken)}
-        ${schalter('einTipp', 'Mit einem Tipp spielen', 'Aus: Karte antippen hebt sie an, nochmals tippen spielt sie', a.einTipp)}` : ''}`;
+        ${schalter('hilfen', 'Erlaubte Karten hervorheben', '', a.hilfen)}
+        ${o.tipps !== false ? schalter('tipps', 'Tipp-Knopf', '', a.tipps) : ''}
+        ${schalter('austeilen', 'Austeilen zeigen', '', a.austeilen)}
+        ${o.stichWarten !== false ? schalter('stichWarten', 'Stich liegen lassen, bis ich tippe', '', a.stichWarten) : ''}
+        ${schalter('gedanken', 'Alle Gedanken und Stiche anzeigen', 'Im Training immer an', a.gedanken)}
+        ${schalter('einTipp', 'Karte mit einem Tipp spielen', '', a.einTipp)}` : ''}`;
     }
     container.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-r]');

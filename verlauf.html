@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0c0e13" />
   <link rel="manifest" href="app.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <title>Gespielte Partien</title>
   <link rel="stylesheet" href="jass-ui.css" />
   <style>
@@ -28,19 +31,19 @@
     .stich-kopf b { font-size: 14px; }
     .stich-karten { display: flex; gap: 8px; flex-wrap: wrap; }
     .stich-karten figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--muted); }
-    .stich-karten figure.sieger figcaption { color: #fde68a; font-weight: 800; }
+    .stich-karten figure.sieger figcaption { color: #ff9d96; font-weight: 800; }
     .stich-karten .mini { width: 46px; }
     .gruende { display: none; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.4; }
     .stich-zeile.offen .gruende { display: flex; }
     .grund { background: rgba(0,0,0,.2); border-radius: 10px; padding: 6px 8px; }
     .grund .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
-    .notiz { background: rgba(239, 68, 68, .12); border: 1px solid rgba(239, 68, 68, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
+    .notiz { background: rgba(254, 121, 113, .1); border: 1px solid rgba(254, 121, 113, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
     .ansage-liste { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
-    .marke { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(250, 204, 21, .16); color: #fde68a; margin-right: 4px; }
+    .marke { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(250, 204, 21, .16); color: #ff9d96; margin-right: 4px; }
     .trainer-werte { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
     .trainer-werte div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 8px; background: rgba(0,0,0,.18); }
     .trainer-werte .beste { box-shadow: inset 0 0 0 1px rgba(52, 211, 153, .55); }
-    .trainer-werte .gewaehlt b::after { content: ' ← deine Wahl'; color: #fde68a; font-weight: 700; font-size: 12px; }
+    .trainer-werte .gewaehlt b::after { content: ' ← deine Wahl'; color: #ff9d96; font-weight: 700; font-size: 12px; }
     .trainer-werte .gespielt { background: rgba(250, 204, 21, .14); }
   </style>
 </head>
@@ -101,9 +104,16 @@
       $('liste').hidden = false;
       const alle = V.alle().filter((p) => filter === 'alle' || V.quelleVon(p) === filter);
       const knopf = (w, t) => `<button type="button" data-filter="${w}" class="${filter === w ? 'aktiv' : ''}">${t}</button>`;
+      const offen = V.markierungenOffen();
       $('liste').innerHTML = `
+        ${offen ? `<div class="panel stack markierungen">
+          <div class="reihe" style="justify-content:space-between"><b>🚩 ${offen} ${offen === 1 ? 'Markierung' : 'Markierungen'} zur Analyse</b></div>
+          <div class="reihe">
+            <button class="btn btn-klein" type="button" id="markierungenLaden">⬇︎ Herunterladen</button>
+            ${navigator.share ? '<button class="btn-ghost btn-klein" type="button" id="markierungenTeilen">Teilen</button>' : ''}
+          </div>
+        </div>` : ''}
         <div class="panel stack">
-          <p class="muted klein">Jede Partie gegen den Computer und jede im Trumpf-Trainer ausgespielte Hand wird hier gespeichert – mit allen Karten, Ansagen und Zügen, bei den Computern mit Begründung und den durchgerechneten Werten. Siehst du etwas Komisches, markiere die Stelle und exportiere die Partie als Datei.</p>
           <div class="segmente" id="filter">${knopf('alle', 'Alle')}${knopf('spiel', 'Gegen Computer')}${knopf('trainer', '🎯 Training')}</div>
           <label class="btn-ghost btn-klein" style="cursor:pointer;align-self:flex-start">📂 Datei öffnen<input type="file" accept=".json,application/json" id="dateiOeffnen" hidden></label>
         </div>
@@ -121,6 +131,27 @@
           </button>`;
         }).join('') : `<div class="panel"><p class="muted">${filter === 'trainer' ? 'Noch keine Hand im Trumpf-Trainer oder Trumpf-Helfer ausgespielt.' : 'Noch keine Partie gespielt.'}</p></div>`}`;
       $('liste').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', () => oeffne(V.lade(b.dataset.id), true)));
+      // Alle offenen Markierungen in eine Datei – danach abgehakt, die
+      // nächste Datei beginnt neu.
+      const markierungsFile = () => {
+        const d = V.markierungsDatei();
+        return { d, f: new File([JSON.stringify(d, null, 1)], V.markierungsDateiname(), { type: 'application/json' }) };
+      };
+      const fertig = (d) => {
+        V.markiereHeruntergeladen(d);
+        toast(d.anzahl + (d.anzahl === 1 ? ' Markierung' : ' Markierungen') + ' heruntergeladen');
+        zeigeListe();
+      };
+      if ($('markierungenLaden')) $('markierungenLaden').addEventListener('click', () => {
+        const { d, f } = markierungsFile();
+        speichereDatei(f);
+        fertig(d);
+      });
+      if ($('markierungenTeilen')) $('markierungenTeilen').addEventListener('click', () => {
+        const { d, f } = markierungsFile();
+        const daten = navigator.canShare && navigator.canShare({ files: [f] }) ? { files: [f], title: f.name } : { title: f.name, text: JSON.stringify(d) };
+        navigator.share(daten).then(() => fertig(d), () => {});
+      });
       $('filter').addEventListener('click', (e) => {
         const b = e.target.closest('[data-filter]');
         if (!b) return;
@@ -197,7 +228,7 @@
       return `<div class="panel stack">
         <h2>${vomHelfer(p) ? '🃏 Trumpf-Helfer' : '🎯 Trumpf-Trainer'}</h2>
         <p class="muted klein">${t.nr ? 'Hand ' + t.nr + (t.laenge ? ' von ' + t.laenge : '') + ' · ' : ''}${lage}${t.wahl ? ' · deine Wahl im Trainer: <b>' + esc(modusName(t.wahl)) + '</b>' : ''}</p>
-        ${werte.length ? `<p class="muted klein">So viele Punkte macht euer Team im Schnitt mit jeder Ansage${t.n ? ' – aus ' + t.n + ' durchgespielten Verteilungen' : ''}:</p><div class="trainer-werte">${werte.map(zeile).join('')}</div>` : ''}
+        ${werte.length ? `<p class="muted klein">Ø Punkte je Ansage</p><div class="trainer-werte">${werte.map(zeile).join('')}</div>` : ''}
         ${ergebnis}
       </div>`;
     }
@@ -236,7 +267,7 @@
         return `<div class="stich-zeile ${markiert.length ? 'markiert offen' : ''}" data-stich="${i}">
           <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${fertig ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : 'nicht fertig'}</span></div>
           <div class="stich-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}">${mini(z.k, code)}<figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
-          ${markiert.map((n) => `<div class="notiz">🚩 ${esc(n.text)}</div>`).join('')}
+          ${markiert.map((n) => `<div class="notiz">🚩 ${esc(n.text)}${n.exportiert ? ' <span class="muted klein">· heruntergeladen</span>' : ''}</div>`).join('')}
           <div class="gruende">${gruende}
             <button class="btn-ghost btn-klein" type="button" data-markieren="${i}" style="align-self:flex-start">🚩 Markieren</button></div>
         </div>`;
@@ -250,7 +281,7 @@
           ${notizen.filter((n) => n.stich == null).map((n) => `<div class="notiz">🚩 ${esc(n.text)}</div>`).join('')}
         </div>
         <div class="panel stack"><h3>Karten zu Beginn</h3>${haende}</div>
-        <div class="panel stack"><h3>Stiche</h3><p class="muted klein">Antippen zeigt, warum jeder so gespielt hat.</p>${sticheHtml || '<span class="muted">–</span>'}</div>`;
+        <div class="panel stack"><h3>Stiche</h3>${sticheHtml || '<span class="muted">–</span>'}</div>`;
     }
 
     function verbinde() {
@@ -298,8 +329,8 @@
     function datei() {
       return new File([JSON.stringify(partie, null, 1)], V.dateiname(partie), { type: 'application/json' });
     }
-    function herunterladen() {
-      const f = datei();
+    function herunterladen() { speichereDatei(datei()); }
+    function speichereDatei(f) {
       const url = URL.createObjectURL(f);
       const a = document.createElement('a');
       a.href = url;

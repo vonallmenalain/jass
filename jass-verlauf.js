@@ -18,6 +18,12 @@
  *   JassVerlauf.spielFertig(p, spiel)
  *   JassVerlauf.speichere(p)     → im Browser (localStorage), die letzten 40
  *
+ * Markierungen (🚩, Notiz zu einem Stich) sammeln sich als Fragen zur
+ * Analyse: markierungenOffen() zählt die noch nicht heruntergeladenen,
+ * markierungsDatei() packt alle Runden mit offenen Markierungen in eine
+ * Datei, markiereHeruntergeladen(datei) hakt sie ab – die nächste Datei
+ * beginnt wieder neu. Partien mit offenen Markierungen fallen nicht weg.
+ *
  * Exportiert wird dasselbe Objekt als JSON-Datei; werkzeuge/analyse.js liest
  * sie und rechnet einzelne Züge nach.
  */
@@ -114,10 +120,13 @@
     } catch (e) { return []; }
   }
 
+  const hatOffene = (p) => (p.notizen || []).some((n) => !n.exportiert);
+
   function schreibeAlle(liste) {
-    // Je Quelle nur die neusten; wird es zu gross, fallen die ältesten weg.
+    // Je Quelle nur die neusten; wird es zu gross, fallen die ältesten weg –
+    // ausser sie haben noch nicht heruntergeladene Markierungen.
     const zaehler = { spiel: 0, trainer: 0 };
-    let l = liste.filter((p) => ++zaehler[quelleVon(p)] <= MAX[quelleVon(p)]);
+    let l = liste.filter((p) => ++zaehler[quelleVon(p)] <= MAX[quelleVon(p)] || hatOffene(p));
     while (l.length) {
       try { root.localStorage.setItem(KEY, JSON.stringify(l)); return true; } catch (e) { l = l.slice(0, -1); }
     }
@@ -141,12 +150,55 @@
     return `jass-${quelleVon(p) === 'trainer' ? 'trainer' : 'partie'}-${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}-${zwei(d.getHours())}${zwei(d.getMinutes())}.json`;
   }
 
+  // ------------------------------------------------------ Markierungen
+
+  function markierungenOffen() {
+    return alle().reduce((n, p) => n + (p.notizen || []).filter((x) => !x.exportiert).length, 0);
+  }
+
+  // Eine Datei mit allen Runden, die offene Markierungen haben – je Partie
+  // Regeln, Spieler, Rechentiefe und nur diese Runden mit allen Zügen.
+  function markierungsDatei() {
+    const partien = [];
+    for (const p of alle()) {
+      const offen = (p.notizen || []).filter((x) => !x.exportiert);
+      if (!offen.length) continue;
+      const runden = new Set(offen.map((x) => x.runde));
+      const kopie = JSON.parse(JSON.stringify(p));
+      kopie.runden = kopie.runden.filter((r) => runden.has(r.nr));
+      kopie.notizen = offen.map((x) => Object.assign({}, x));
+      partien.push(kopie);
+    }
+    const anzahl = partien.reduce((n, p) => n + p.notizen.length, 0);
+    return { format: 'jass-markierungen', version: 1, erstellt: Date.now(), anzahl, partien };
+  }
+
+  // Die Markierungen dieser Datei als heruntergeladen abhaken.
+  function markiereHeruntergeladen(datei) {
+    const jetzt = Date.now();
+    const schluessel = (id, n) => id + '|' + n.zeit + '|' + n.runde + '|' + n.stich;
+    const erledigt = new Set();
+    for (const p of datei.partien) for (const n of p.notizen) erledigt.add(schluessel(p.id, n));
+    const liste = alle();
+    for (const p of liste) for (const n of p.notizen || []) if (erledigt.has(schluessel(p.id, n))) n.exportiert = jetzt;
+    return schreibeAlle(liste);
+  }
+
+  function markierungsDateiname() {
+    const d = new Date();
+    const zwei = (n) => String(n).padStart(2, '0');
+    return `jass-markierungen-${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}-${zwei(d.getHours())}${zwei(d.getMinutes())}.json`;
+  }
+
   // Prüft, ob ein eingelesenes Objekt eine Partie ist.
   function istPartie(x) {
     return !!x && x.format === 'jass-partie' && Array.isArray(x.runden) && Array.isArray(x.spieler);
   }
 
-  const api = { neu, runde, ansage, karte, rundeFertig, spielFertig, notiz, alle, speichere, lade, loesche, dateiname, istPartie, quelleVon, KEY };
+  const api = {
+    neu, runde, ansage, karte, rundeFertig, spielFertig, notiz, alle, speichere, lade, loesche, dateiname, istPartie, quelleVon, KEY,
+    markierungenOffen, markierungsDatei, markiereHeruntergeladen, markierungsDateiname,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JassVerlauf = api;
-})(typeof self !== 'undefined' ? self : this);
+})(typeof self !== 'undefined' ? self : globalThis);
