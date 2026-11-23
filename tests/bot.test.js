@@ -230,3 +230,20 @@ test('Anzeigen: tief angespielt heisst stark in der Farbe – der Partner spielt
   assert.equal(z.karte, 6);
   assert.match(z.grund, /angezeigt/);
 });
+
+test('Gleichwertige Karten: die höchste zuerst (Buur vor Nell, im Undenufe Sechs vor Sieben)', () => {
+  const regeln = J.regelnMitStandard();
+  // Undenufe: Ben hat Kreuz Sechs und Sieben – die Sechs kommt zuerst.
+  const une = [[22, 25, 27, 11, 35, 1, 29, 6, 9], [23, 15, 13, 8, 34, 20, 16, 31, 7], [14, 18, 10, 19, 3, 21, 4, 26, 17], [24, 0, 5, 30, 32, 2, 12, 33, 28]];
+  for (let i = 0; i < 6; i++) {
+    const spiel = J.neuesSpiel(regeln, { haende: une.map((h) => h.slice()), ersterAnsager: 2 });
+    J.schieben(spiel);
+    J.ansagen(spiel, 'UNE');
+    assert.notEqual(B.schwerZug(spiel, 2, { rng: J.zufall(100 + i), welten: 120 }).karte, 19, 'nicht die Kreuz Sieben vor der Sechs');
+  }
+  // Kreuz Trumpf mit Buur und Nell: die Faustregel zieht mit dem Buur.
+  const t = [[23, 21, 26, 19, 0, 9, 27, 1, 10], [2, 3, 4, 5, 6, 7, 8, 11, 12], [13, 14, 15, 16, 17, 18, 20, 22, 24], [25, 28, 29, 30, 31, 32, 33, 34, 35]];
+  const spiel = J.neuesSpiel(regeln, { haende: t, ersterAnsager: 0 });
+  J.ansagen(spiel, 'T2');
+  assert.equal(B.mittelZug(B.ansichtAus(spiel, 0)).karte, 23);
+});

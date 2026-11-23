@@ -67,6 +67,26 @@
     return hoeher.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]).slice(0, 2);
   }
 
+  // Die stärkste Karte einer Liste (oder null).
+  const hoechste = (liste, eff) => (liste.length ? maxNach(liste, (k) => STAERKE[eff][k]) : null);
+
+  // Gleichwertige Karten: Halte ich mehrere Karten einer Farbe, zwischen
+  // denen keine fremde mehr im Spiel ist (Buur und Nell; im Undenufe Sechs
+  // und Sieben), ist es für die Punkte gleich, welche zuerst kommt. Gibt die
+  // höchste Karte dieser Reihe zurück.
+  function hoechsteGleichwertige(k, hand, eff, gespielt) {
+    const farbe = [];
+    for (let w = 0; w < 9; w++) farbe.push(farbeVon(k) * 9 + w);
+    farbe.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]);
+    let beste = k;
+    for (let j = farbe.indexOf(k) - 1; j >= 0; j--) {
+      const x = farbe[j];
+      if (hand.includes(x)) beste = x;
+      else if (!gespielt[x]) break;
+    }
+    return beste;
+  }
+
   function trumpfKosten(k, eff) {
     return 10 + (STAERKE[eff][k] - 100) * 3 + PUNKTE[eff][k];
   }
@@ -126,14 +146,14 @@
       const draussen = draussenVonFarbe(T, v.gespielt, v.hand);
       const gegnerHabenNoch = draussen > 0 && [1, 3].some((i) => !(v.leer[(v.sitz + i) % 4] & bit(T)));
       if (truempfe.length && gegnerHabenNoch && v.angesagtVon >= 0 && team(v.angesagtVon) === meinTeam) {
-        const boss = truempfe.find((k) => hoehereDraussen(k, eff, v.gespielt, v.hand) === 0);
+        const boss = hoechste(truempfe.filter((k) => hoehereDraussen(k, eff, v.gespielt, v.hand) === 0), eff);
         if (boss != null) return { karte: boss, grund: 'Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.' };
         if (truempfe.length >= 3) {
           return { karte: minNach(truempfe, (k) => STAERKE[eff][k]), grund: 'Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.' };
         }
       }
       if (truempfe.length === legal.length) {
-        const boss = truempfe.find((k) => hoehereDraussen(k, eff, v.gespielt, v.hand) === 0);
+        const boss = hoechste(truempfe.filter((k) => hoehereDraussen(k, eff, v.gespielt, v.hand) === 0), eff);
         if (boss != null) return { karte: boss, grund: 'Du hast nur noch Trümpfe – der höchste macht den Stich sicher.' };
         return { karte: minNach(truempfe, (k) => STAERKE[eff][k]), grund: 'Du hast nur noch Trümpfe – spiel den kleinsten.' };
       }
@@ -646,6 +666,18 @@
         if (x && werte[0].wert - x.wert <= schwelleZ) return { karte: kand, grund: GRUND_ZURUECK, werte };
       }
     }
+    // Gleichwertige Karten anspielen: die höchste zuerst (Buur vor Nell,
+    // im Undenufe die Sechs vor der Sieben). Für die Punkte ist es gleich –
+    // die Unterschiede in der Rechnung sind Zufall –, aber so weiss der
+    // Partner sofort, dass der Stich sicher ist, und kann schmieren.
+    if (!runde.stich.length) {
+      const effG = effModus(runde.code, runde.stichNr);
+      const hoch = hoechsteGleichwertige(wahl.karte, runde.haende[sitz], effG, w.gespielt);
+      const x = hoch !== wahl.karte ? werte.find((y) => y.karte === hoch) : null;
+      if (x && wahl.wert - x.wert <= GLEICH_SCHWELLE) {
+        return { karte: hoch, grund: hoch === mittel.karte ? mittel.grund : GRUND_GLEICHWERTIG, werte };
+      }
+    }
     // Verwerfen: Sieht die Rechnung kaum einen Unterschied, kommt die Karte
     // aus der schwächsten Farbe – so kann der Partner daraus lesen, wo man
     // nichts hat. Gemessen kostet das nichts (werkzeuge/verwerfen.js).
@@ -669,6 +701,8 @@
   // gut – kleiner als das, was das Durchspielen sicher unterscheiden kann.
   const VERWERF_SCHWELLE = 2;
   const ZURUECK_SCHWELLE = 2;
+  const GLEICH_SCHWELLE = 4;
+  const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
   const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
 
   // Verwerfen heisst: Die ausgespielte Farbe fehlt, ein Gegner liegt vorne,
@@ -1062,6 +1096,7 @@
     GRUND_VERWERFEN,
     GRUND_ZURUECK,
     GRUND_ANZEIGEN,
+    GRUND_GLEICHWERTIG,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',

@@ -508,6 +508,7 @@ window.JassStimmeDateien = {
   "Gespielt wird genau eine Runde.": "stimme/38eba7c7ff57.mp3",
   "Gespielt wird Obenabe.": "stimme/d1aa0df0d7b6.mp3",
   "Gespielt wird Undenufe.": "stimme/5bcb653f62c9.mp3",
+  "Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.": "stimme/bf1082656214.mp3",
   "Gut!": "stimme/46d474ef1997.mp3",
   "Herz Acht.": "stimme/7f6688eb9213.mp3",
   "Herz Ass.": "stimme/999dfa7538c2.mp3",
