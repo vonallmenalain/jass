@@ -30,6 +30,9 @@
   const W6 = 0, W7 = 1, W8 = 2, W9 = 3, W10 = 4, WB = 5, WD = 6, WK = 7, WA = 8;
 
   const karte = (farbe, wert) => farbe * 9 + wert;
+  // Platzhalter für eine Karte, die man nicht sieht.
+  const VERDECKT = -1;
+  const verdeckteHand = (n) => new Array(n).fill(VERDECKT);
   const farbeVon = (k) => (k / 9) | 0;
   const wertVon = (k) => k % 9;
   const team = (sitz) => sitz % 2;
@@ -202,7 +205,7 @@
     const weise = [];
     for (let f = 0; f < 4; f++) {
       const hat = new Array(9).fill(false);
-      for (const k of hand) if (farbeVon(k) === f) hat[wertVon(k)] = true;
+      for (const k of hand) if (k >= 0 && farbeVon(k) === f) hat[wertVon(k)] = true;
       let w = 0;
       while (w < 9) {
         if (!hat[w]) { w++; continue; }
@@ -262,7 +265,13 @@
   // alle Weisen beider Spieler dieses Teams. Bei Gleichstand gewinnt, wer
   // früher an der Reihe ist (vom Ausspieler aus).
   function werteWeiseAus(startHaende, eff, ausspieler) {
-    const proSitz = startHaende.map((h) => findeWeise(h));
+    return werteGemeldeteWeiseAus(startHaende.map((h) => findeWeise(h)), eff, ausspieler);
+  }
+
+  // Dasselbe für Weise, die gemeldet statt aus den Händen gelesen werden
+  // (online sieht niemand die Karten der anderen).
+  function werteGemeldeteWeiseAus(gemeldet, eff, ausspieler) {
+    const proSitz = [0, 1, 2, 3].map((s) => (gemeldet[s] || []).slice());
     let siegerSitz = -1;
     let siegerWeis = null;
     for (let i = 0; i < 4; i++) {
@@ -329,6 +338,7 @@
       fertig: false,
       sieger: -1,
     };
+    if (o.ersterAnsager != null && o.ersterAnsager >= 0) spiel.ersterAnsager = o.ersterAnsager;
     spiel.runde = neueRunde(spiel, o.haende);
     return spiel;
   }
@@ -415,14 +425,24 @@
 
   // Legt eine Karte. Ist der Stich voll, wird er sofort ausgewertet und
   // steht danach als letzter Eintrag in runde.stiche.
-  function spiele(spiel, sitz, k) {
+  // optionen.ungeprueft: Die Hand ist nicht (ganz) bekannt – die Karte wird
+  // ohne Prüfung gelegt und, falls sie nicht in der Hand steht, ein
+  // Platzhalter (VERDECKT) entfernt. So spielen die Geräte im Online-Spiel
+  // nach, was die anderen gelegt haben.
+  function spiele(spiel, sitz, k, optionen) {
     const runde = spiel.runde;
+    const ungeprueft = !!(optionen && optionen.ungeprueft);
     if (runde.phase !== 'spiel') throw new Error('Es wird gerade nicht gespielt.');
     if (runde.amZug !== sitz) throw new Error('Sitz ' + sitz + ' ist nicht am Zug.');
-    const erlaubt = erlaubteFuer(spiel, sitz);
-    if (!erlaubt.includes(k)) throw new Error('Diese Karte ist nicht erlaubt.');
+    if (!ungeprueft) {
+      const erlaubt = erlaubteFuer(spiel, sitz);
+      if (!erlaubt.includes(k)) throw new Error('Diese Karte ist nicht erlaubt.');
+    }
     const hand = runde.haende[sitz];
-    hand.splice(hand.indexOf(k), 1);
+    let i = hand.indexOf(k);
+    if (i < 0) i = hand.indexOf(VERDECKT);
+    if (i < 0) throw new Error('Sitz ' + sitz + ' hat keine Karte mehr.');
+    hand.splice(i, 1);
     runde.stich.push(k);
     runde.stichSitze.push(sitz);
     if (runde.stoeckSitz === sitz && !runde.stoeckGemeldet) {
@@ -498,7 +518,7 @@
 
   // Schliesst die beendete Runde ab und beginnt die nächste (oder beendet
   // das Spiel). Gibt die Abrechnung zurück.
-  function rundeAbschliessen(spiel) {
+  function rundeAbschliessen(spiel, optionen) {
     const runde = spiel.runde;
     if (runde.phase !== 'ende') throw new Error('Die Runde ist noch nicht fertig.');
     const ab = runde.abrechnung;
@@ -518,7 +538,7 @@
     }
     if (!spiel.fertig) {
       spiel.rundeNr += 1;
-      spiel.runde = neueRunde(spiel);
+      spiel.runde = neueRunde(spiel, optionen && optionen.haende);
     }
     return ab;
   }
@@ -564,10 +584,10 @@
 
   const api = {
     FARBEN, WERTE, WERT_NAMEN, MODI, MODUS_REIHENFOLGE, STANDARD_REGELN, STAERKE, PUNKTE,
-    W6, W7, W8, W9, W10, WB, WD, WK, WA, EFF_OBE, EFF_UNE,
-    karte, farbeVon, wertVon, team, partner,
+    W6, W7, W8, W9, W10, WB, WD, WK, WA, EFF_OBE, EFF_UNE, VERDECKT,
+    karte, verdeckteHand, farbeVon, wertVon, team, partner,
     regelnMitStandard, erlaubteModi, effModus, trumpfVon, schlaegt, gewinnerIndex, stichPunkte, erlaubteKarten,
-    findeWeise, weisName, vergleicheWeis, besterWeis, werteWeiseAus,
+    findeWeise, weisName, vergleicheWeis, besterWeis, werteWeiseAus, werteGemeldeteWeiseAus,
     zufall, mische, verteile, neuerSeed,
     neuesSpiel, neueRunde, ansageAmZug, darfSchieben, schieben, ansagen, aktuellerEff, erlaubteFuer, spiele,
     rundenAbrechnung, zielErreichtVon, rundeAbschliessen,
