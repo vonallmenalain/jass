@@ -72,6 +72,10 @@
     .ergebnis-zeile .wert { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
     .erklaerung { font-size: 14px; line-height: 1.45; color: var(--muted); }
     .erklaerung b { color: var(--text); }
+    .vergleich { border-radius: 16px; padding: 12px 14px; background: rgba(74, 222, 128, .08); border: 1px solid rgba(74, 222, 128, .35); display: flex; flex-direction: column; gap: 6px; }
+    .vergleich.unter { background: rgba(248, 113, 113, .08); border-color: rgba(248, 113, 113, .4); }
+    .vergleich .gross { font-size: 18px; font-weight: 800; }
+    .vergleich .gross b { color: #fde68a; }
 
     .regel-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 16px; padding: 12px 14px; }
     .regel-box ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; font-size: 14px; color: var(--muted); }
@@ -151,6 +155,8 @@
     const $ = (id) => document.getElementById(id);
 
     const KEY_TRAINER = 'jass-lernen-trainer-v1';
+    const KEY_SERIE = 'jass-trainer-serie';        // die Serie, während eine Hand ausgespielt wird
+    const KEY_ERGEBNIS = 'jass-trainer-ergebnis';  // was beim Ausspielen herauskam (jass-spiel.html)
     const STANDARD = { serie: 10, geschoben: 'gemischt', genauigkeit: 300, rekord: null };
     let einst = Object.assign({}, STANDARD, E.lese(KEY_TRAINER) || {});
     let regeln = E.ladeRegeln();
@@ -282,9 +288,40 @@
       const beste = liste[0];
       const meine = liste.find((x) => x.code === h.wahl);
       // Verlust in eigenen Punkten (diff = eigene − fremde, also halbieren).
-      const verlust = Math.max(0, (beste.diff - meine.diff) / 2);
-      h.verlust = verlust;
-      h.sterne = verlust <= 2.5 ? 3 : verlust <= 8 ? 2 : verlust <= 16 ? 1 : 0;
+      h.verlust = Math.max(0, (beste.diff - meine.diff) / 2);
+      h.sterne = h.verlust <= 2.5 ? 3 : h.verlust <= 8 ? 2 : h.verlust <= 16 ? 1 : 0;
+      zeigeAuswertung(h);
+    }
+
+    // Was beim Ausspielen herauskam, neben dem errechneten Schnitt.
+    function vergleichHtml(h) {
+      const e = h.ausgespielt;
+      if (!e) return '';
+      const namen = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
+      const ichSchob = e.geschoben && e.vorhand === 0;
+      const eintrag = h.liste.find((x) => x.code === (ichSchob ? 'SCHIEBEN' : e.code));
+      const erwartet = eintrag ? eintrag.punkte : null;
+      const diff = erwartet == null ? 0 : e.punkte - erwartet;
+      let satz;
+      if (erwartet == null) satz = '';
+      else if (diff >= 10) satz = Math.round(diff) + ' Punkte über dem Schnitt – stark gespielt, oder die anderen Karten lagen gut für euch.';
+      else if (diff <= -10) satz = Math.round(-diff) + ' Punkte unter dem Schnitt – die Karten der anderen lagen gegen euch, oder es gab bessere Züge.';
+      else satz = 'Ziemlich genau im Schnitt.';
+      const wie = ichSchob ? 'Du hast geschoben, angesagt wurde <b>' + namen(e.code) + '</b>' : 'Angesagt: <b>' + namen(e.code) + '</b>';
+      const anders = !ichSchob && e.code !== h.wahl ? ' (im Trainer hattest du ' + namen(h.wahl) + ' gewählt)' : '';
+      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}">
+        <h3>Ausgespielt</h3>
+        <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
+        <p class="muted">${wie}${anders}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
+        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}" style="align-self:flex-start">Partie im Verlauf ansehen</a>` : ''}
+      </div>`;
+    }
+
+    function zeigeAuswertung(h) {
+      const liste = h.liste;
+      const beste = liste[0];
+      const meine = liste.find((x) => x.code === h.wahl);
+      const verlust = h.verlust;
       const urteil = ['Da gab es Besseres', 'Geht so', 'Gut!', meine === beste ? 'Perfekt!' : 'Sehr gut!'][h.sterne];
       const max = Math.max(...liste.map((x) => x.punkte));
       const min = Math.min(0, ...liste.map((x) => x.punkte));
@@ -301,6 +338,7 @@
       const a = $('auswertung');
       a.hidden = false;
       a.innerHTML = `
+        ${vergleichHtml(h)}
         <div class="urteil"><div class="sterne">${'⭐'.repeat(h.sterne)}<span class="aus">${'⭐'.repeat(3 - h.sterne)}</span></div><strong>${urteil}</strong>
           <span class="muted klein">${meine === beste ? 'Genau die beste Ansage.' : 'Im Schnitt ' + Math.round(verlust) + ' Punkte weniger als ' + namen(beste.code) + '.'}</span></div>
         <div>
@@ -313,11 +351,15 @@
         ${erklaerung}
         <div class="reihe">
           <button class="btn" type="button" id="weiterBtn" style="flex:1">${serie.nr + 1 >= serie.laenge ? 'Zum Ergebnis' : 'Nächste Hand'}</button>
-          <a class="btn-ghost" href="jass-spiel.html?hand=${h.hand.join('.')}${h.geschoben ? '&geschoben=1' : ''}">Ausspielen</a>
+          <button class="btn-ghost" type="button" id="ausspielenBtn">${h.ausgespielt ? 'Nochmals ausspielen' : 'Ausspielen'}</button>
         </div>
-        <p class="muted klein">«Ausspielen» startet ein Spiel gegen den Computer mit genau dieser Hand.</p>`;
+        <p class="muted klein">«Ausspielen» spielt genau diese Hand eine Runde lang gegen den Computer – danach geht es hierher zurück, mit euren Punkten neben dem Schnitt.</p>`;
       zeigeKopf();
       $('weiterBtn').addEventListener('click', weiter);
+      $('ausspielenBtn').addEventListener('click', () => {
+        E.schreibe(KEY_SERIE, serie);
+        location.href = 'jass-spiel.html?hand=' + h.hand.join('.') + (h.geschoben ? '&geschoben=1' : '') + '&trainer=1';
+      });
       a.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -405,7 +447,32 @@
       return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
-    zeigeStart();
+    // Zurück vom Ausspielen: die Serie wieder herstellen, das Ergebnis dazu.
+    function zurueckVomAusspielen() {
+      const q = new URLSearchParams(location.search);
+      if (!q.has('ausgespielt') && !q.has('zurueck')) return false;
+      history.replaceState(null, '', location.pathname);
+      const gemerkt = E.lese(KEY_SERIE);
+      const ergebnis = E.lese(KEY_ERGEBNIS);
+      try { localStorage.removeItem(KEY_ERGEBNIS); } catch (e) { /* egal */ }
+      if (!gemerkt || !gemerkt.haende || !gemerkt.haende[gemerkt.nr] || !gemerkt.haende[gemerkt.nr].liste) return false;
+      serie = gemerkt;
+      const h = aktuelle();
+      const gleich = (a, b) => a && b && a.length === b.length && a.slice().sort().join() === b.slice().sort().join();
+      if (ergebnis && gleich(ergebnis.hand, h.hand)) h.ausgespielt = ergebnis;
+      $('start').hidden = true;
+      $('fertig').hidden = true;
+      $('runde').hidden = false;
+      zeigeKopf();
+      $('lage').innerHTML = h.geschoben ? 'Dein Partner hatte <b>geschoben</b>.' : 'Du warst <b>Vorhand</b>.';
+      zeichneKarten(h.wahl);
+      $('wahlPanel').hidden = true;
+      $('rechnen').hidden = true;
+      zeigeAuswertung(h);
+      return true;
+    }
+
+    if (!zurueckVomAusspielen()) zeigeStart();
   })();
   </script>
   <script>
