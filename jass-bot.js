@@ -482,7 +482,90 @@
 
   // Was der Spieler auf `sitz` über die Runde weiss: gespielte Karten,
   // wer welche Farbe nicht mehr hat, gezeigte Weise, angezeigte Farben.
-  function wissen(spiel, sitz) {
+  // ---------------------------------------------- Ausspiel des Schiebers
+  // Hat der Partner nach meinem Schieben angesagt und spiele ich aus, zeigt
+  // mein Ausspiel, was ich habe (so spielen es die meisten Jasser):
+  //   Trumpf               im ersten Stich meinen höchsten Trumpf – kommt
+  //                        die Sechs, habe ich keinen anderen; kommt kein
+  //                        Trumpf, habe ich keinen.
+  //   Obenabe / Undenufe   von Beginn weg alle obersten Karten (die Asse,
+  //                        im Undenufe die Sechsen) – kommt keine, habe ich
+  //                        keine (mehr).
+  // Gibt den Schieber zurück, wenn die Lage passt, sonst -1.
+  function schieberSitz(runde) {
+    if (!runde.code || !runde.geschoben || runde.angesagtVon !== partner(runde.ansager)) return -1;
+    return runde.ansager;
+  }
+  // Ist k die oberste Karte ihrer Farbe, die noch im Spiel ist?
+  function istOben(k, eff, gespielt) {
+    const f = farbeVon(k);
+    for (let w = 0; w < 9; w++) {
+      const x = f * 9 + w;
+      if (x !== k && !gespielt[x] && STAERKE[eff][x] > STAERKE[eff][k]) return false;
+    }
+    return true;
+  }
+  // Was die Ausspiele des Schiebers verraten: Karten, die er sicher nicht hat.
+  function schieberNicht(runde, nicht) {
+    const s = schieberSitz(runde);
+    if (s < 0) return;
+    const T0 = MODI[runde.code].trumpf;
+    const alle = runde.stiche.map((st) => st.karten.length ? { karten: st.karten, sitze: st.sitze } : null).filter(Boolean);
+    if (runde.stich.length) alle.push({ karten: runde.stich, sitze: runde.stichSitze });
+    if (!alle.length || alle[0].sitze[0] !== s) return;
+    if (T0 >= 0) {
+      const eff = effModus(runde.code, 0);
+      const k0 = alle[0].karten[0];
+      for (let x = 0; x < 36; x++) {
+        if (farbeVon(x) !== T0 || x === k0) continue;
+        if (farbeVon(k0) !== T0 || STAERKE[eff][x] > STAERKE[eff][k0]) nicht[s][x] = 1;
+      }
+      return;
+    }
+    // Obenabe / Undenufe: solange er nur oberste Karten anspielt, läuft die
+    // Reihe; die erste andere zeigt, dass er keine oberste mehr hat.
+    const g = new Uint8Array(36);
+    for (let i = 0; i < alle.length; i++) {
+      const st = alle[i];
+      const eff = effModus(runde.code, i);
+      if (st.sitze[0] === s) {
+        const k = st.karten[0];
+        if (!istOben(k, eff, g)) {
+          for (let x = 0; x < 36; x++) if (!g[x] && x !== k && istOben(x, eff, g)) nicht[s][x] = 1;
+          return;
+        }
+      } else if (i > 0) return;   // ein anderer spielt aus: die Reihe ist zu Ende
+      for (const k of st.karten) g[k] = 1;
+    }
+  }
+  // Welche Karte spielt der Schieber nach dieser Regel aus (oder null)?
+  function schieberAusspiel(spiel, sitz, legal) {
+    const r = spiel.runde;
+    if (r.stich.length || schieberSitz(r) !== sitz) return null;
+    const T0 = MODI[r.code].trumpf;
+    if (T0 >= 0) {
+      if (r.stichNr !== 0) return null;
+      const eff = effModus(r.code, 0);
+      const trumpf = legal.filter((k) => farbeVon(k) === T0);
+      return trumpf.length ? { karte: maxNach(trumpf, (k) => STAERKE[eff][k]), grund: GRUND_TRUMPF_NACH_SCHIEBEN } : null;
+    }
+    // Obenabe / Undenufe: nur solange alle meine Ausspiele oberste Karten waren.
+    const g = new Uint8Array(36);
+    for (let i = 0; i < r.stiche.length; i++) {
+      const st = r.stiche[i];
+      if (st.sitze[0] === sitz && !istOben(st.karten[0], effModus(r.code, i), g)) return null;
+      if (st.sitze[0] !== sitz && i > 0) return null;
+      for (const k of st.karten) g[k] = 1;
+    }
+    const eff = effModus(r.code, r.stichNr);
+    const oben = legal.filter((k) => istOben(k, eff, g));
+    if (!oben.length) return null;
+    const hand = r.haende[sitz];
+    const k = maxNach(oben, (x) => farbLaenge(hand, farbeVon(x)) * 20 + PUNKTE[eff][x]);
+    return { karte: k, grund: r.code === 'UNE' ? GRUND_SECHSEN_NACH_SCHIEBEN : GRUND_ASSE_NACH_SCHIEBEN };
+  }
+
+  function wissen(spiel, sitz, optionen) {
     const runde = spiel.runde;
     const gespielt = new Uint8Array(36);
     const leer = [0, 0, 0, 0];
@@ -531,7 +614,11 @@
         for (const w of runde.weis.proSitz[s]) for (const k of w.karten) if (!gespielt[k] && !bekannt[s].includes(k)) bekannt[s].push(k);
       }
     }
-    return { gespielt, leer, puurOffen, bekannt, trumpf: T0, angezeigt, anzeigen };
+    // Karten, die einer sicher nicht hat (Ausspiel des Schiebers).
+    const nicht = [new Uint8Array(36), new Uint8Array(36), new Uint8Array(36), new Uint8Array(36)];
+    if (!(optionen && optionen.zeichen === false)) schieberNicht(runde, nicht);
+    nicht[sitz].fill(0);
+    return { gespielt, leer, puurOffen, bekannt, trumpf: T0, angezeigt, anzeigen, nicht };
   }
 
   // Verteilt die unbekannten Karten passend zum Wissen auf die anderen.
@@ -545,6 +632,7 @@
     const puur = w.trumpf >= 0 ? J.karte(w.trumpf, WB) : -1;
     const darf = (s, k) => {
       const f = farbeVon(k);
+      if (w.nicht && w.nicht[s][k]) return false;
       if (!(w.leer[s] & bit(f))) return true;
       return k === puur && w.puurOffen[s];
     };
@@ -685,7 +773,7 @@
     const ansicht = ansichtAus(spiel, sitz);
     const mittel = mittelZug(ansicht);
     if (legal.length === 1) return { karte: legal[0], grund: mittel.grund, werte: null };
-    const w = wissen(spiel, sitz);
+    const w = wissen(spiel, sitz, { zeichen: o.schieberZeichen !== false });
     const rng = o.rng || J.zufall(J.neuerSeed());
     const restKarten = runde.haende.reduce((n, h) => n + h.length, 0);
     const exaktAb = o.exaktAb != null ? o.exaktAb : 12;
@@ -706,12 +794,14 @@
     }
     const werte = legal.map((k) => ({ karte: k, wert: summe.get(k) / welten }));
     werte.sort((a, b) => b.wert - a.wert);
-    // Trumpf ziehen nach dem Schieben: Hat der Partner nach meinem Schieben
-    // eine Farbe angesagt und spiele ich den ersten Stich aus, kommt Trumpf –
-    // der Buur, wenn ich ihn habe, sonst der kleinste. Die Rechnung mit den
-    // Verteilungen unterschätzt das; gemessen bringt es dem Team im Schnitt
-    // 2,6 ± 0,8 Punkte mehr (werkzeuge/trumpf-ziehen.js, 1200 Verteilungen).
-    if (o.trumpfZiehen !== false && runde.stichNr === 0 && !runde.stich.length && runde.geschoben && runde.angesagtVon === partner(sitz)) {
+    // Ausspiel des Schiebers (siehe schieberAusspiel): Trumpf ziehen hat
+    // gemessen +2,6 ± 0,8 Punkte gebracht (werkzeuge/trumpf-ziehen.js), die
+    // Wahl der Karte als Zeichen misst werkzeuge/schieber-zeichen.js.
+    if (o.schieberZeichen !== false) {
+      const z = schieberAusspiel(spiel, sitz, legal);
+      if (z) return { karte: z.karte, grund: z.grund, werte };
+    } else if (o.trumpfZiehen !== false && runde.stichNr === 0 && !runde.stich.length && runde.geschoben && runde.angesagtVon === partner(sitz)) {
+      // bisherige Regel (zum Vergleich): der Buur, sonst der kleinste Trumpf
       const effT = effModus(runde.code, 0);
       const T = trumpfVon(effT);
       const trumpf = T >= 0 ? legal.filter((k) => farbeVon(k) === T) : [];
@@ -795,7 +885,9 @@
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
   const GRUND_GLEICHWERTIG_STICH = 'Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.';
-  const GRUND_TRUMPF_NACH_SCHIEBEN = 'Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – im ersten Stich spielst du ihm Trumpf an, damit die Gegner ihre Trümpfe hergeben müssen.';
+  const GRUND_TRUMPF_NACH_SCHIEBEN = 'Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – spiel im ersten Stich deinen höchsten Trumpf. So weiss er, wie stark du im Trumpf bist: Kommt die Sechs, hast du keinen anderen.';
+  const GRUND_ASSE_NACH_SCHIEBEN = 'Dein Partner hat nach deinem Schieben Obenabe angesagt – spiel zuerst alle deine Asse. So weiss er genau, welche du hast: Kommt kein Ass, hast du keines.';
+  const GRUND_SECHSEN_NACH_SCHIEBEN = 'Dein Partner hat nach deinem Schieben Undenufe angesagt – spiel zuerst alle deine Sechsen. So weiss er genau, welche du hast: Kommt keine Sechs, hast du keine.';
   const GRUND_UEBERNEHMEN = 'Du musst deinen Partner übernehmen und machst den Stich selbst – nimm die tiefste Karte, die reicht, und behalte die hohen für später.';
   const GRUND_UEBERNEHMEN_GLEICH = 'Du musst deinen Partner übernehmen und machst den Stich selbst. Deine Karten sind gleichwertig – spiel die höchste zuerst.';
   const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
@@ -1197,6 +1289,8 @@
     GRUND_UEBERNEHMEN,
     GRUND_UEBERNEHMEN_GLEICH,
     GRUND_TRUMPF_NACH_SCHIEBEN,
+    GRUND_ASSE_NACH_SCHIEBEN,
+    GRUND_SECHSEN_NACH_SCHIEBEN,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',
