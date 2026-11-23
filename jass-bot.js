@@ -469,6 +469,75 @@
     return s;
   }
 
+  // ------------------------------------------------ Was die Ansage verrät
+  // Wer Trumpf ansagt, hat meistens Karten dafür – wer nach dem Schieben
+  // Kreuz sagt, fast immer den Buur. Wer schiebt, hat eine schwache Hand.
+  // «Schwer» spielt darum nur Kartenverteilungen durch, die dazu passen.
+  // Ob eine Hand passt, schätzt die Faustregel (schaetze) – mit etwas
+  // Spielraum, weil Menschen und Computer nicht genau gleich ansagen.
+
+  const GRUND_ZUR_ANSAGE = 'Ich habe viele Kartenverteilungen durchgespielt, die zur Ansage passen: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
+  const ANSAGE_TOLERANZ = 16;   // so viel schlechter (2 × geschätzte Punkte) darf die Ansage sein als die beste
+  const SCHIEBEN_TOLERANZ = 6;  // so knapp über der Schiebe-Schwelle darf eine Hand noch geschoben werden
+
+  function handWerte(hand, regeln) {
+    const werte = {};
+    let best = -Infinity, bestPunkte = 0;
+    for (const c of J.erlaubteModi(regeln)) {
+      const f = regeln.multiplikatoren ? Number(regeln.faktoren[c]) || 1 : 1;
+      const p = schaetze(hand, c).punkte;
+      werte[c] = (2 * p - 157) * f;
+      if (werte[c] > best) { best = werte[c]; bestPunkte = p; }
+    }
+    return { werte, best, bestPunkte };
+  }
+
+  // Hätte jemand mit dieser Hand so angesagt?
+  function passtZurAnsage(hand, regeln, code, darfSchieben) {
+    const h = handWerte(hand, regeln);
+    if (h.werte[code] == null || h.werte[code] < h.best - ANSAGE_TOLERANZ) return false;
+    if (darfSchieben && h.bestPunkte < SCHIEBEN_SCHWELLE - SCHIEBEN_TOLERANZ) return false;
+    return true;
+  }
+  // … oder geschoben?
+  function passtZumSchieben(hand, regeln) {
+    return handWerte(hand, regeln).bestPunkte < SCHIEBEN_SCHWELLE + SCHIEBEN_TOLERANZ;
+  }
+
+  // Was der Spieler auf `sitz` aus Ansage und Schieben weiss – oder null,
+  // wenn es nichts zu beachten gibt (er hat selbst angesagt, niemand schob).
+  function ansageWissen(spiel, sitz) {
+    const r = spiel.runde;
+    if (!r.code) return null;
+    const ansager = r.angesagtVon !== sitz ? r.angesagtVon : -1;
+    const schieber = r.geschoben && r.ansager !== sitz ? r.ansager : -1;
+    if (ansager < 0 && schieber < 0) return null;
+    const gespieltVon = [[], [], [], []];
+    for (const st of r.stiche) st.karten.forEach((k, i) => gespieltVon[st.sitze[i]].push(k));
+    r.stich.forEach((k, i) => gespieltVon[r.stichSitze[i]].push(k));
+    return {
+      ansager, schieber, code: r.code, gespieltVon,
+      darfSchieben: ansager >= 0 && ansager === r.ansager && !!spiel.regeln.schieben,
+    };
+  }
+
+  function passtZumWissen(haende, regeln, info) {
+    const ganz = (s) => haende[s].concat(info.gespieltVon[s]);
+    if (info.ansager >= 0 && !passtZurAnsage(ganz(info.ansager), regeln, info.code, info.darfSchieben)) return false;
+    if (info.schieber >= 0 && !passtZumSchieben(ganz(info.schieber), regeln)) return false;
+    return true;
+  }
+
+  // Eine Welt, die zu Ansage und Schieben passt. Findet sich nach vielen
+  // Versuchen keine (ungewöhnliche Ansage), dann eben irgendeine.
+  function weltPassend(spiel, sitz, w, rng, info) {
+    for (let versuch = 0; versuch < 80; versuch++) {
+      const haende = welt(spiel, sitz, w, rng);
+      if (passtZumWissen(haende, spiel.regeln, info)) return haende;
+    }
+    return welt(spiel, sitz, w, rng);
+  }
+
   // ------------------------------------------------------- Stufe schwer
 
   function schwerZug(spiel, sitz, optionen) {
@@ -485,8 +554,9 @@
     const welten = restKarten <= exaktAb ? (o.weltenExakt || 30) : (o.welten || 120);
     const summe = new Map(legal.map((k) => [k, 0]));
     const meinTeam = team(sitz);
+    const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz);
     for (let i = 0; i < welten; i++) {
-      const haende = welt(spiel, sitz, w, rng);
+      const haende = info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng);
       for (const k of legal) {
         const s = simAusSpiel(spiel, haende.map((h) => h.slice()), w);
         simSpiele(s, k);
@@ -511,9 +581,12 @@
       const x = werte.find((y) => y.karte === vk);
       if (x && werte[0].wert - x.wert <= schwelle) return { karte: vk, grund: GRUND_VERWERFEN_SCHWACH, werte };
     }
-    const grund = wahl.karte === mittel.karte
-      ? mittel.grund
-      : 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
+    let grund = mittel.grund;
+    if (wahl.karte !== mittel.karte) {
+      grund = info
+        ? 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt, die zur Ansage passen: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.'
+        : 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
+    }
     return { karte: wahl.karte, grund, werte };
   }
 
@@ -871,6 +944,7 @@
   function sprechGrund(grund) {
     if (/^Du bist der Letzte: Mit einem Trumpf holst du dir \d+ Punkte\.$/.test(grund)) return 'Du bist der Letzte: Mit einem Trumpf holst du dir die Punkte im Stich.';
     if (/^Im Stich liegen \d+ Punkte – das lohnt sich zu stechen\.$/.test(grund)) return 'Im Stich liegen genug Punkte – das lohnt sich zu stechen.';
+    if (/^Ich habe \d+ mögliche Kartenverteilungen durchgespielt, die zur Ansage passen:/.test(grund)) return GRUND_ZUR_ANSAGE;
     if (/^Ich habe \d+ mögliche Kartenverteilungen durchgespielt:/.test(grund)) return 'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
     return sprechform(grund);
   }
@@ -918,6 +992,7 @@
     'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.',
     'Misère: Du musst überstechen – mit der kleinstmöglichen Karte.',
     'Ich habe viele mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.',
+    GRUND_ZUR_ANSAGE,
   ];
   function alleSprechTeile() {
     const s = new Set(GRUENDE.map(sprechform));
@@ -990,6 +1065,7 @@
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
     simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
+    ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JassBot = api;
