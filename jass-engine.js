@@ -558,27 +558,16 @@
     return FARBEN[farbeVon(k)].symbol + WERTE[wertVon(k)];
   }
 
-  // Sortiert eine Hand für die Anzeige: Farben abwechselnd schwarz/rot,
-  // Trumpf zuerst, innerhalb der Farbe die stärkste Karte links.
-  function sortiereHand(hand, code) {
-    const eff = code ? effModus(code, 0) : EFF_OBE;
-    const T = code && MODI[code] ? MODI[code].trumpf : -1;
-    let reihenfolge = [0, 1, 2, 3];
-    if (T >= 0) {
-      // Trumpf vorne, danach weiter abwechselnd nach Farbe.
-      const rest = [0, 1, 2, 3].filter((f) => f !== T);
-      const rot = FARBEN[T].rot;
-      const andere = rest.filter((f) => FARBEN[f].rot !== rot);
-      const gleich = rest.filter((f) => FARBEN[f].rot === rot);
-      reihenfolge = [T, andere[0], gleich[0], andere[1]].filter((f) => f != null);
-    }
-    const pos = new Array(4);
-    reihenfolge.forEach((f, i) => { pos[f] = i; });
-    const staerke = code === 'UNE' || code === 'SLU' ? STAERKE[EFF_UNE] : STAERKE[eff];
+  // Sortiert eine Hand für die Anzeige – immer gleich, egal was Trumpf
+  // ist: zuerst nach Farbe (Schaufel, Herz, Kreuz, Ecke – abwechselnd
+  // schwarz und rot), in der Farbe die höchste Karte links (Ass, König,
+  // Dame, Bauer, 10 … 6). Der zweite Parameter ist nur noch aus
+  // Kompatibilität da und wird nicht beachtet.
+  function sortiereHand(hand) {
     return hand.slice().sort((a, b) => {
       const fa = farbeVon(a), fb = farbeVon(b);
-      if (fa !== fb) return pos[fa] - pos[fb];
-      return staerke[b] - staerke[a];
+      if (fa !== fb) return fa - fb;
+      return wertVon(b) - wertVon(a);
     });
   }
 

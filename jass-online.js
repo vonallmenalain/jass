@@ -638,7 +638,7 @@ function zeigeMenu() {
     <p class="muted klein" style="word-break:break-all">Link zum Tisch: ${esc(link)}</p>
     <button class="btn btn-voll" type="button" data-schliessen>Weiterspielen</button>
     <button class="btn-ghost btn-voll" type="button" id="menuVerlassen">Tisch verlassen</button>`);
-  E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); });
+  E.anzeigeFormular(box.querySelector('#menuAnzeige'), anzeige, (a) => { E.speichereAnzeige(a); K.setzeFarben(a.farben); tisch.zeichne(); }, { stichWarten: false });
   box.querySelector('#menuVerlassen').addEventListener('click', () => { verlasseTisch(); zeigeStart(); });
 }
 

@@ -20,6 +20,7 @@
     einTipp: false,       // Karte mit einem Tipp spielen (sonst: antippen, dann nochmals)
     rechnen: 'normal',    // Rechentiefe von «Schwer» und den Tipps (JassBot.RECHENTIEFE)
     kartenbild: 'eigen',  // eigen | klassisch (SVG-cards, karten/README.md)
+    stichWarten: true,    // gegen den Computer: der volle Stich bleibt liegen, bis man tippt
   };
 
   const VORLAGEN = [
@@ -223,7 +224,8 @@
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}<small class="muted klein">Vier Farben: Kreuz grün, Ecke blau – leichter zu unterscheiden.</small></div>
         ${o.spiel !== false ? `
         ${schalter('hilfen', 'Erlaubte Karten hervorheben', 'Karten, die du nicht spielen darfst, werden abgedunkelt', a.hilfen)}
-        ${schalter('tipps', 'Tipp-Knopf', 'Der Computer schlägt dir eine Karte oder Ansage vor und sagt warum', a.tipps)}
+        ${o.tipps !== false ? schalter('tipps', 'Tipp-Knopf', 'Der Computer schlägt dir eine Karte oder Ansage vor und sagt warum', a.tipps) : ''}
+        ${o.stichWarten !== false ? schalter('stichWarten', 'Stich liegen lassen, bis ich tippe', 'Die vier Karten bleiben liegen, bis du aufs Feld tippst – so kannst du den Stich in Ruhe anschauen', a.stichWarten) : ''}
         ${schalter('erklaeren', 'Computer erklären ihre Züge', 'Unter dem Tisch steht, warum der Computer so gespielt hat', a.erklaeren)}
         ${schalter('einTipp', 'Mit einem Tipp spielen', 'Aus: Karte antippen hebt sie an, nochmals tippen spielt sie', a.einTipp)}` : ''}`;
     }

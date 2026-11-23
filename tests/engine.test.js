@@ -268,10 +268,12 @@ test('Regeln: Runden ohne Obergrenze, mindestens eine Ansage', () => {
   assert.ok(J.erlaubteModi(r).length >= 1);
 });
 
-test('Hand sortieren: Trumpf zuerst, stärkste links', () => {
-  const hand = [karte(S, W6), karte(H, W9), karte(H, WB), karte(H, WA), karte(K, WA)];
-  const sortiert = J.sortiereHand(hand, 'T1');
-  assert.deepEqual(sortiert.slice(0, 3), [karte(H, WB), karte(H, W9), karte(H, WA)]);
+test('Hand sortieren: immer nach Farbe, dann hoch nach tief – auch mit Trumpf', () => {
+  const hand = [karte(S, W6), karte(H, W9), karte(H, WB), karte(H, WA), karte(K, WA), karte(E, W6), karte(E, WK)];
+  const erwartet = [karte(S, W6), karte(H, WA), karte(H, WB), karte(H, W9), karte(K, WA), karte(E, WK), karte(E, W6)];
+  assert.deepEqual(J.sortiereHand(hand), erwartet);
+  assert.deepEqual(J.sortiereHand(hand, 'T1'), erwartet, 'Trumpf ändert nichts');
+  assert.deepEqual(J.sortiereHand(hand, 'UNE'), erwartet, 'Undenufe ändert nichts');
 });
 
 test('Gleiche Saat, gleiche Karten', () => {
