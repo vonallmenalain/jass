@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0e13" />
+  <link rel="icon" href="icons/logo.svg" type="image/svg+xml" />
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta property="og:site_name" content="Jass" />
+  <meta property="og:title" content="Einstellungen" />
+  <meta property="og:image" content="https://jass.alae.app/icons/teilen.png" />
+  <meta property="og:image:width" content="600" />
+  <meta property="og:image:height" content="600" />
+  <meta property="og:type" content="website" />
+  <link rel="manifest" href="app.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="jass-design.css" />
+  <script src="jass-design.js"></script>
+  <title>Einstellungen</title>
+  <link rel="stylesheet" href="jass-ui.css" />
+  <style>
+    .designs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .design-wahl {
+      display: flex; flex-direction: column; gap: 8px; padding: 8px; text-align: left;
+      border-radius: 16px; border: 1.5px solid var(--border); background: transparent; color: var(--text);
+      cursor: pointer; font: inherit;
+    }
+    .design-wahl.aktiv { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+    .design-wahl .name { font-weight: 700; font-size: 14px; padding: 0 4px 2px; display: flex; justify-content: space-between; gap: 6px; }
+    .design-wahl .name i { font-style: normal; color: var(--accent); }
+    .muster { height: 86px; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+    .muster b { font-size: 17px; line-height: 1; }
+    .muster .zeile { display: flex; gap: 6px; }
+    .muster .zeile span { flex: 1; height: 22px; border-radius: 6px; }
+    .muster .zeile span:first-child { flex: 1.5; }
+    .muster[data-m="nacht"] { background: #0c0e13; color: #eceef3; }
+    .muster[data-m="nacht"] b { font-family: "Space Grotesk", sans-serif; }
+    .muster[data-m="nacht"] .zeile span { background: #1c212b; border: 1px solid rgba(255,255,255,.09); }
+    .muster[data-m="nacht"] .zeile span:first-child { background: #fe7971; border: 0; }
+    .muster[data-m="stube"] { background: #0f3b29; color: #fffdf8; }
+    .muster[data-m="stube"] b { font-family: "Zilla Slab", Georgia, serif; }
+    .muster[data-m="stube"] .zeile span { background: #fffdf8; }
+    .muster[data-m="stube"] .zeile span:first-child { background: #f2c14e; }
+    .muster[data-m="raster"] { background: #fff; color: #121212; border: 1px solid #d6d6d6; border-radius: 4px; }
+    .muster[data-m="raster"] b { font-family: "Archivo", sans-serif; font-weight: 800; }
+    .muster[data-m="raster"] .zeile span { background: #fff; border: 1.5px solid #121212; border-radius: 3px; }
+    .muster[data-m="raster"] .zeile span:first-child { background: #da291c; border-color: #da291c; }
+    .muster[data-m="gold"] { background: radial-gradient(100% 70% at 50% 0%, #1a2c5c, #0b1630 70%); color: #f3efe4; }
+    .muster[data-m="gold"] b { font-family: "Cormorant Garamond", Georgia, serif; font-size: 20px; }
+    .muster[data-m="gold"] .zeile span { background: #12224a; border: 1px solid rgba(216,180,90,.35); }
+    .muster[data-m="gold"] .zeile span:first-child { background: #d8b45a; border: 0; }
+    @media (min-width: 640px) { .designs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <div class="app" style="--max: 760px">
+    <div class="topbar">
+      <a class="icon-btn" href="index.html" aria-label="Zurück">←</a>
+      <div class="topbar-titel"><h1>Einstellungen</h1></div>
+    </div>
+
+    <div class="panel stack">
+      <h2>Design</h2>
+      <div class="designs" id="designs"></div>
+    </div>
+
+    <div class="panel stack">
+      <h2>Spielregeln</h2>
+      <div class="stack" id="regeln" style="gap:10px"></div>
+    </div>
+
+    <div class="panel stack">
+      <h2>Anzeige &amp; Hilfen</h2>
+      <div id="anzeige"></div>
+    </div>
+  </div>
+
+  <script src="jass-engine.js"></script>
+  <script src="jass-toene.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const E = window.JassEinstellungen;
+    const D = window.JassDesign;
+    const $ = (id) => document.getElementById(id);
+
+    const regeln = E.ladeRegeln();
+    const anzeige = E.ladeAnzeige();
+    for (const [id] of D.DESIGNS) D.ladeSchrift(id);
+
+    function zeichneDesigns() {
+      $('designs').innerHTML = D.DESIGNS.map(([id, name]) => `
+        <button type="button" class="design-wahl ${anzeige.design === id ? 'aktiv' : ''}" data-design="${id}" aria-pressed="${anzeige.design === id}">
+          <span class="muster" data-m="${id}"><b>Jass</b><span class="zeile"><span></span><span></span><span></span></span></span>
+          <span class="name">${name}${anzeige.design === id ? '<i>✓</i>' : ''}</span>
+        </button>`).join('');
+    }
+    $('designs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-design]');
+      if (!b || b.dataset.design === anzeige.design) return;
+      const d = D.DESIGNS.find((x) => x[0] === b.dataset.design);
+      anzeige.design = d[0];
+      anzeige.teppich = d[2];        // der passende Jassteppich – lässt sich unten ändern
+      E.speichereAnzeige(anzeige);
+      E.wende(anzeige);
+      zeichneDesigns();
+      formular.neuZeichnen();
+    });
+
+    E.regelFormular($('regeln'), regeln, (r) => E.speichereRegeln(r), { offen: [] });
+    const formular = { neuZeichnen() { $('anzeige').innerHTML = ''; zeichneAnzeige(); } };
+    let anzeigeBox = $('anzeige');
+    function zeichneAnzeige() {
+      // anzeigeFormular hängt Ereignisse an den Behälter – bei neuem Zeichnen
+      // einen frischen Behälter nehmen.
+      const neu = anzeigeBox.cloneNode(false);
+      anzeigeBox.replaceWith(neu);
+      anzeigeBox = neu;
+      E.anzeigeFormular(neu, anzeige, (a) => E.speichereAnzeige(a));
+    }
+    zeichneDesigns();
+    zeichneAnzeige();
+  })();
+  </script>
+</body>
+</html>

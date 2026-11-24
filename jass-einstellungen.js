@@ -26,14 +26,16 @@
     ruecken: 'alae',      // Kartenrücken: alae (schwarz mit Logo) | rot
     klang: 'papier',      // Töne am Tisch: aus | papier | holz | weich (jass-toene.js)
     lautstaerke: 45,      // 0..100
+    design: 'nacht',      // nacht | stube | raster | gold (jass-design.js)
     stand: 2,             // Version der gespeicherten Anzeige (für Umstellungen)
   };
 
-  // Kartenbild, Rücken und Töne gleich anwenden.
+  // Kartenbild, Rücken, Töne und Design gleich anwenden.
   function wende(a) {
     if (root.JassKarten && root.JassKarten.setzeBild) root.JassKarten.setzeBild(a.kartenbild);
     if (root.JassKarten && root.JassKarten.setzeRuecken) root.JassKarten.setzeRuecken(a.ruecken);
     if (root.JassToene) root.JassToene.setze({ klang: a.klang, lautstaerke: a.lautstaerke });
+    if (root.JassDesign && root.document) root.JassDesign.setze(a.design);
   }
 
   const VORLAGEN = [
