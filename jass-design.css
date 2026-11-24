@@ -5,6 +5,13 @@
  * dazu die Teile, die feste Farben haben.
  */
 
+/* ===================================================== für alle Seiten */
+/* Kein Text markieren, kein Bild-Menü: Langes Drücken führte Kinder aus
+   Versehen in die Google-Suche. In Eingabefeldern bleibt es möglich. */
+html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+img, svg { -webkit-user-drag: none; }
+
 /* ============================================================ Jassstube */
 html[data-design="stube"] {
   --bg: #0f3b29; --bg-2: #0b2f20;

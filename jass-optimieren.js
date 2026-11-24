@@ -11,7 +11,8 @@
  *   JassOptimieren.starte(partie, beiFortschritt)       → Promise: 8 Durchgänge
  *                                     in Workern, { punkte (Schnitt), min, max, zuege }
  *   JassOptimieren.werteHtml({ schnitt, gespielt, partie })
- *   JassOptimieren.verbinde(element, partie, speichern, beiFertig)
+ *   JassOptimieren.verbinde(element, partie, speichern, beiFertig, beiAnsehen)
+ *   JassOptimieren.alsPartie(partie)  → der typische Durchgang als Partie (Verlauf)
  *
  * Die Seite rechnet nicht selbst: Dieselbe Datei läuft als Web Worker, damit
  * die Seite während der 36 Züge nicht hängt.
@@ -42,13 +43,18 @@
     const zuege = [];
     while (spiel.runde.phase !== 'ende' && zuege.length < 36) {
       const s = spiel.runde.amZug;
-      const k = B.waehleKarte(spiel, s, 'schwer', tiefe).karte;
-      zuege.push({ s, k, stich: spiel.runde.stichNr });
+      const z = B.waehleKarte(spiel, s, 'schwer', tiefe);
+      const k = z.karte;
+      // Wie im Verlauf aufgezeichnet: mit Begründung und durchgerechneten Werten.
+      const e = { s, k, stich: spiel.runde.stichNr, stufe: 'schwer' };
+      if (z.grund) e.grund = z.grund;
+      if (z.werte && z.werte.length > 1) e.werte = z.werte.slice(0, 9).map((w) => ({ k: w.karte, w: Math.round(w.wert * 10) / 10 }));
+      zuege.push(e);
       J.spiele(spiel, s, k);
       if (beiZug) beiZug(zuege.length);
     }
     const ab = spiel.runde.abrechnung;
-    return { punkte: ab.total.slice(), code: spiel.runde.code, zuege, rechnen: rechnen || 'maximal' };
+    return { punkte: ab.total.slice(), code: spiel.runde.code, zuege, abrechnung: JSON.parse(JSON.stringify(ab)), rechnen: rechnen || 'maximal' };
   }
 
   if (imWorker) {
@@ -80,7 +86,7 @@
     const typisch = laeufe.reduce((a, l) => (Math.abs(l.punkte[0] - mittel[0]) < Math.abs(a.punkte[0] - mittel[0]) ? l : a));
     return {
       punkte: mittel.map((x) => Math.round(x)), laeufe: eigene, min: Math.min(...eigene), max: Math.max(...eigene),
-      zuege: typisch.zuege, beispiel: typisch.punkte[0], rechnen: typisch.rechnen,
+      zuege: typisch.zuege, abrechnung: typisch.abrechnung, beispiel: typisch.punkte[0], rechnen: typisch.rechnen,
     };
   }
 
@@ -147,6 +153,7 @@
     const opt = o.partie && o.partie.optimiert;
     const kannRechnen = !!(o.partie && o.partie.ende && aufzeichnungVon(o.partie) && aufzeichnungVon(o.partie).ansagen && aufzeichnungVon(o.partie).ansagen.length);
     let dritte;
+    const ansehen = !!(opt && opt.zuege && opt.zuege.length);
     if (opt) dritte = `<b>${opt.punkte[0]}</b>${opt.laeufe && opt.laeufe.length > 1 ? `<small>${opt.min}–${opt.max}</small>` : ''}`;
     else if (kannRechnen) dritte = '<button class="btn btn-klein" type="button" data-optimieren>Optimieren</button>';
     else dritte = '<b>–</b>';
@@ -160,13 +167,18 @@
     return `<div class="drei-werte" data-werte>
         <div><span>Ø deine Karten</span><b>${rund(o.schnitt)}</b></div>
         <div><span>Gespielt</span><b>${rund(o.gespielt)}</b></div>
-        <div class="optimiert"><span>Optimiert</span>${dritte}</div>
+        ${ansehen
+          ? `<button type="button" class="optimiert" data-optimiert-ansehen aria-label="So spielt der Computer"><span>Optimiert ›</span>${dritte}</button>`
+          : `<div class="optimiert"><span>Optimiert</span>${dritte}</div>`}
       </div>${satz ? `<p class="muted klein" data-optimiert-satz>${satz}</p>` : ''}`;
   }
 
   // Knopf «Optimieren» in `el` anschliessen. Nach dem Rechnen steht das
-  // Ergebnis in partie.optimiert; speichern(partie) legt es ab.
-  function verbinde(el, partie, speichern, beiFertig) {
+  // Ergebnis in partie.optimiert; speichern(partie) legt es ab. Ein Tipp auf
+  // den fertigen Wert ruft beiAnsehen(partie) auf (die gespielte Runde zeigen).
+  function verbinde(el, partie, speichern, beiFertig, beiAnsehen) {
+    const ansehen = el && el.querySelector('[data-optimiert-ansehen]');
+    if (ansehen && partie && beiAnsehen) ansehen.addEventListener('click', () => beiAnsehen(partie));
     const knopf = el && el.querySelector('[data-optimieren]');
     if (!knopf || !partie) return;
     knopf.addEventListener('click', () => {
@@ -183,6 +195,22 @@
     });
   }
 
-  root.JassOptimieren = { vorbereiten, nachspielen, zusammenfassen, starte, werteHtml, verbinde, DURCHGAENGE };
+  // Der typische Durchgang als Partie, wie der Verlauf sie zeigt: dieselben
+  // Karten und Ansagen, die Züge des Computers mit allen Gedanken.
+  function alsPartie(partie) {
+    const o = partie.optimiert;
+    const r = aufzeichnungVon(partie);
+    const ab = o.abrechnung || null;
+    return {
+      format: 'jass-partie', version: 1, id: partie.id + '-optimiert', start: partie.start, ende: o.zeit || partie.ende,
+      regeln: partie.regeln, spieler: partie.spieler.map((x) => ({ name: x.name, typ: 'schwer' })),
+      rechnen: o.rechnen || 'maximal', welten: 1000,
+      runden: [{ nr: r.nr, ansager: r.ansager, haende: r.haende, ansagen: r.ansagen, zuege: o.zuege, abrechnung: ab, code: r.code, angesagtVon: r.angesagtVon, geschoben: r.geschoben }],
+      summe: ab ? ab.total.slice() : [o.beispiel, 157 - o.beispiel], sieger: null, notizen: [],
+      optimiertVon: partie.id, optimiertSchnitt: o.punkte[0], optimiertMin: o.min, optimiertMax: o.max, optimiertAnzahl: o.laeufe ? o.laeufe.length : 1,
+    };
+  }
+
+  root.JassOptimieren = { vorbereiten, nachspielen, zusammenfassen, starte, werteHtml, verbinde, alsPartie, DURCHGAENGE };
   if (node) module.exports = root.JassOptimieren;
 })(typeof self !== 'undefined' ? self : globalThis);

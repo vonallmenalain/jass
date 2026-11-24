@@ -4,7 +4,8 @@
  * Liest das Design aus den gespeicherten Einstellungen (jass-lernen-anzeige-v1,
  * Feld «design») und setzt es als <html data-design="…">; jass-design.css
  * färbt danach die Seite um. Standard ist «nacht» (Nacht & Koralle) – dafür
- * braucht es keine Überschreibung.
+ * braucht es keine Überschreibung. Ausserdem auf jeder Seite: kein Text
+ * markieren, kein Kontextmenü (ausser in Eingabefeldern).
  *
  *   JassDesign.DESIGNS            [[id, Name, Teppich], …]
  *   JassDesign.setze(id)          sofort umschalten (Einstellungen)
@@ -50,6 +51,16 @@
     if (meta) meta.setAttribute('content', FARBE[d]);
   }
 
-  if (root.document) setze(gespeichert());
+  if (root.document) {
+    setze(gespeichert());
+    // Kein Kontextmenü (Bild speichern, Link öffnen, Suche …) ausser in
+    // Eingabefeldern – siehe jass-design.css.
+    root.document.addEventListener('contextmenu', (e) => {
+      if (!(e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]'))) e.preventDefault();
+    });
+    root.document.addEventListener('dragstart', (e) => {
+      if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+    });
+  }
   root.JassDesign = { DESIGNS, setze, gespeichert, ladeSchrift };
 })(typeof self !== 'undefined' ? self : globalThis);

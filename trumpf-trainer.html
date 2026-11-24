@@ -344,6 +344,9 @@
       O.verbinde(v, partie, (p) => V.speichere(p), () => {
         v.outerHTML = vergleichHtml(h);
         verbindeVergleich(h);
+      }, (p) => {
+        E.schreibe(KEY_SERIE, serie);
+        location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&ansicht=optimiert&von=trainer';
       });
     }
 

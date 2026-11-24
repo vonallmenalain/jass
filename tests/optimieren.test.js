@@ -61,3 +61,24 @@ test('mehrere Durchgänge: Schnitt, Spannweite, typischer Durchgang', () => {
   assert.match(html, /<b>99<\/b><small>65–124<\/small>/);
   assert.match(html, /im Schnitt 8 Punkte mehr/);
 });
+
+test('Durchgang mit Gedanken: als Partie für den Verlauf', () => {
+  const aufzeichnung = { nr: 0, ansager: 0, haende, ansagen: [{ s: 0, wahl: 'T2', stufe: 'mensch' }], zuege: [] };
+  const lauf = O.nachspielen({}, aufzeichnung, 'schnell');
+  assert.ok(lauf.zuege.every((z) => z.stufe === 'schwer' && typeof z.grund === 'string' && z.grund.length > 0), 'jeder Zug mit Begründung');
+  assert.ok(lauf.zuege.some((z) => Array.isArray(z.werte) && z.werte.every((w) => typeof w.k === 'number' && typeof w.w === 'number')), 'durchgerechnete Werte wie im Verlauf');
+  assert.deepEqual(lauf.abrechnung.total, lauf.punkte);
+  const partie = {
+    id: 'p1', start: 1, ende: 2, regeln: {}, spieler: [{ name: 'Du', typ: 'mensch' }, { name: 'Anna', typ: 'schwer' }, { name: 'Ben', typ: 'schwer' }, { name: 'Clara', typ: 'schwer' }],
+    runden: [Object.assign({ code: 'T2', angesagtVon: 0, geschoben: false }, aufzeichnung)],
+    optimiert: O.zusammenfassen([lauf, lauf]),
+  };
+  const v = O.alsPartie(partie);
+  assert.equal(v.format, 'jass-partie');
+  assert.equal(v.optimiertVon, 'p1');
+  assert.ok(v.spieler.every((x) => x.typ === 'schwer'));
+  assert.equal(v.runden[0].zuege.length, 36);
+  assert.deepEqual(v.runden[0].haende, haende);
+  assert.deepEqual(v.summe, lauf.punkte);
+  assert.match(O.werteHtml({ schnitt: 100, gespielt: 90, partie }), /data-optimiert-ansehen/);
+});
