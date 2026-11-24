@@ -29,7 +29,7 @@ test('Text aus HTML: Zeilen, Sätze, keine Knöpfe und keine Bildzeichen', () =>
 
 test('Feste Texte der Seiten werden gefunden', () => {
   const s = V.statischeSaetze(fs.readFileSync(path.join(WURZEL, 'training.html'), 'utf8'));
-  assert.deepEqual(s, ['Trumpf wählen', 'Trumpf-Helfer', 'Stiche zählen']);
+  assert.deepEqual(s, ['Trumpf Training', 'Trumpf-Helfer', 'Stiche zählen']);
   const t = V.statischeSaetze(fs.readFileSync(path.join(WURZEL, 'trumpf-trainer.html'), 'utf8'));
   assert.ok(!t.some((x) => x.includes('${')), 'keine Vorlagen aus <script>');
 });
