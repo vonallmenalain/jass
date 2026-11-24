@@ -907,6 +907,69 @@
       for (const k of st.karten) g[k] = 1;
     }
   }
+  // ------------------------------------------ König (Sieben) verlangen
+  // Obenabe: Wer angesagt hat und im ersten Stich selbst ausspielt, spielt
+  // das Ass einer Farbe, in der ihm der König fehlt (z. B. Ass und Dame).
+  // Sein Partner gibt den König darauf, wenn er ihn hat. Kommt er nicht,
+  // hat ihn der Partner nicht – der Ansager wechselt die Farbe.
+  // Undenufe genauso mit der Sechs und der Sieben.
+  function verlangteKarte(k, eff) {
+    // die zweitstärkste Karte der Farbe (König bzw. Sieben)
+    const f = farbeVon(k);
+    let best = -1, bestS = -1;
+    for (let w = 0; w < 9; w++) { const x = f * 9 + w; if (x !== k && STAERKE[eff][x] > bestS) { bestS = STAERKE[eff][x]; best = x; } }
+    return best;
+  }
+  function verlangenStich(runde) {
+    // Der erste Stich, wenn der Ansager bei Obenabe/Undenufe selbst die
+    // oberste Karte angespielt hat – sonst null.
+    if (runde.code !== 'OBE' && runde.code !== 'UNE') return null;
+    const st = runde.stiche.length ? { karten: runde.stiche[0].karten, sitze: runde.stiche[0].sitze } : { karten: runde.stich, sitze: runde.stichSitze };
+    if (!st.karten.length || st.sitze[0] !== runde.angesagtVon) return null;
+    const eff = effModus(runde.code, 0);
+    const k0 = st.karten[0];
+    if (!istOben(k0, eff, new Uint8Array(36))) return null;
+    return { st, eff, k0, kv: verlangteKarte(k0, eff), ansager: runde.angesagtVon };
+  }
+  // Lesen: Hat der Partner des Ansagers die Farbe bedient, aber nicht die
+  // verlangte Karte gegeben, hat er sie nicht.
+  function verlangenNicht(runde, nicht) {
+    const v = verlangenStich(runde);
+    if (!v) return;
+    const p = partner(v.ansager);
+    const i = v.st.sitze.indexOf(p);
+    if (i < 0) return;
+    if (v.st.karten[i] !== v.kv) nicht[p][v.kv] = 1;
+  }
+  // Ausspiel des Ansagers nach der Konvention (oder null)
+  function verlangenAusspiel(spiel, sitz, legal) {
+    const r = spiel.runde;
+    if (r.stichNr !== 0 || r.stich.length || r.angesagtVon !== sitz || (r.code !== 'OBE' && r.code !== 'UNE')) return null;
+    const eff = effModus(r.code, 0);
+    const hand = r.haende[sitz];
+    const kand = legal.filter((k) => {
+      if (!istOben(k, eff, new Uint8Array(36))) return false;
+      const kv = verlangteKarte(k, eff);
+      if (hand.includes(kv)) return false;
+      // die dritte Karte (Dame bzw. Acht) hält er – dann lohnt das Verlangen
+      const f = farbeVon(k);
+      const reihe = [];
+      for (let w = 0; w < 9; w++) reihe.push(f * 9 + w);
+      reihe.sort((a, b) => STAERKE[eff][b] - STAERKE[eff][a]);
+      return hand.includes(reihe[2]);
+    });
+    if (!kand.length) return null;
+    return maxNach(kand, (k) => farbLaenge(hand, farbeVon(k)) * 20 + PUNKTE[eff][k]);
+  }
+  // Antwort des Partners: die verlangte Karte geben (oder null)
+  function verlangenAntwort(spiel, sitz, legal) {
+    const r = spiel.runde;
+    if (r.stichNr !== 0 || !r.stich.length) return null;
+    const v = verlangenStich(r);
+    if (!v || partner(v.ansager) !== sitz) return null;
+    return legal.includes(v.kv) ? v.kv : null;
+  }
+
   // Welche Karte spielt der Schieber nach dieser Regel aus (oder null)?
   function schieberAusspiel(spiel, sitz, legal) {
     const r = spiel.runde;
@@ -1012,6 +1075,7 @@
     // Karten, die einer sicher nicht hat (Ausspiel des Schiebers).
     const nicht = [new Uint8Array(36), new Uint8Array(36), new Uint8Array(36), new Uint8Array(36)];
     if (!(optionen && optionen.zeichen === false)) schieberNicht(runde, nicht);
+    if (optionen && optionen.verlangen) verlangenNicht(runde, nicht);
     nicht[sitz].fill(0);
     return { gespielt, leer, puurOffen, bekannt, trumpf: T0, angezeigt, anzeigen, nicht };
   }
@@ -1170,7 +1234,7 @@
     const ansicht = ansichtAus(spiel, sitz);
     const mittel = mittelZug(ansicht);
     if (legal.length === 1) return { karte: legal[0], grund: mittel.grund, werte: null };
-    const w = wissen(spiel, sitz, { zeichen: o.schieberZeichen !== false });
+    const w = wissen(spiel, sitz, { zeichen: o.schieberZeichen !== false, verlangen: !!o.koenigVerlangen });
     const rng = o.rng || J.zufall(J.neuerSeed());
     const restKarten = runde.haende.reduce((n, h) => n + h.length, 0);
     const exaktAb = o.exaktAb != null ? o.exaktAb : 12;
@@ -1242,6 +1306,19 @@
         const buur = trumpf.find((k) => wertVon(k) === WB);
         const k = buur != null ? buur : minNach(trumpf, (x) => STAERKE[effT][x]);
         return { karte: k, grund: GRUND_TRUMPF_NACH_SCHIEBEN, werte };
+      }
+    }
+    // König (Sieben) verlangen – Ausspiel und Antwort im ersten Stich
+    if (o.koenigVerlangen) {
+      const schwelleV = o.verlangenSchwelle != null ? o.verlangenSchwelle : VERLANGEN_SCHWELLE;
+      const ka = verlangenAusspiel(spiel, sitz, legal);
+      const kb = ka == null ? verlangenAntwort(spiel, sitz, legal) : null;
+      const k = ka != null ? ka : kb;
+      const x = k != null ? werte.find((y) => y.karte === k) : null;
+      if (x && werte[0].wert - x.wert <= schwelleV) {
+        const une = runde.code === 'UNE';
+        const grund = ka != null ? (une ? GRUND_SIEBEN_VERLANGEN : GRUND_KOENIG_VERLANGEN) : (une ? GRUND_SIEBEN_GEBEN : GRUND_KOENIG_GEBEN);
+        return { karte: k, grund, werte };
       }
     }
     if (o.trumpfWeiter !== false) {
@@ -1325,6 +1402,11 @@
   const ZURUECK_SCHWELLE = 2;
   const GLEICH_SCHWELLE = 4;
   const TRUMPF_WEITER_SCHWELLE = 8;
+  const VERLANGEN_SCHWELLE = 8;
+  const GRUND_KOENIG_VERLANGEN = 'Obenabe, erster Stich: Spiel das Ass, wo dir der König fehlt – hat ihn dein Partner, gibt er ihn dir darauf.';
+  const GRUND_SIEBEN_VERLANGEN = 'Undenufe, erster Stich: Spiel die Sechs, wo dir die Sieben fehlt – hat sie dein Partner, gibt er sie dir darauf.';
+  const GRUND_KOENIG_GEBEN = 'Dein Partner verlangt mit dem Ass den König – gib ihn ihm, dann weiss er, dass die Farbe läuft.';
+  const GRUND_SIEBEN_GEBEN = 'Dein Partner verlangt mit der Sechs die Sieben – gib sie ihm, dann weiss er, dass die Farbe läuft.';
   const GRUND_TRUMPF_WEITER = 'Den letzten Trumpf holen: Ihr habt angesagt, nur noch ein Trumpf ist draussen, und du hast den höchsten – zieh ihn heraus.';
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
@@ -1748,6 +1830,10 @@
     GRUND_GLEICHWERTIG_STICH,
     GRUND_GLEICHWERTIG_OFFEN,
     GRUND_TRUMPF_WEITER,
+    GRUND_KOENIG_VERLANGEN,
+    GRUND_SIEBEN_VERLANGEN,
+    GRUND_KOENIG_GEBEN,
+    GRUND_SIEBEN_GEBEN,
     GRUND_UEBERNEHMEN,
     GRUND_UEBERNEHMEN_GLEICH,
     GRUND_TRUMPF_NACH_SCHIEBEN,

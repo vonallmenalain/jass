@@ -288,6 +288,34 @@ test('Mit dem Löser: Ass vor Dame, wenn der König noch draussen ist (Partie mi
   assert.ok(ass >= 3, 'Schaufel Ass in ' + ass + ' von 4');
 });
 
+test('König verlangen (Obenabe): Ass, wo der König fehlt – Partner gibt ihn – sonst hat er ihn nicht', () => {
+  const regeln = J.regelnMitStandard();
+  const k = karte;
+  // Du: Herz Ass und Dame ohne König; Ben (2): Herz König
+  const h0 = [k(H, WA), k(H, WD), k(H, W7), k(S, WA), k(S, WK), k(K, WA), k(K, W9), k(E, WA), k(E, W8)];
+  const h2 = [k(H, WK), k(H, W6), k(S, W6), k(S, W7), k(K, W6), k(K, W7), k(E, W6), k(E, W7), k(E, W9)];
+  const rest = [];
+  for (let x = 0; x < 36; x++) if (!h0.includes(x) && !h2.includes(x)) rest.push(x);
+  const opt = (i) => ({ rng: J.zufall(i), welten: 40, loesenAb: 12, koenigVerlangen: true, verlangenSchwelle: 1000 });
+  const spiel = J.neuesSpiel(regeln, { haende: [h0, rest.slice(0, 9), h2, rest.slice(9, 18)], ersterAnsager: 0 });
+  J.ansagen(spiel, 'OBE');
+  const a = B.schwerZug(spiel, 0, opt(1));
+  assert.equal(a.karte, k(H, WA), 'das Herz-Ass, wo der König fehlt');
+  assert.match(a.grund, /König fehlt/);
+  J.spiele(spiel, 0, a.karte);
+  J.spiele(spiel, 1, J.erlaubteFuer(spiel, 1)[0]);
+  const b = B.schwerZug(spiel, 2, opt(2));
+  assert.equal(b.karte, k(H, WK), 'Ben gibt den König');
+  // Lesen: Gibt der Partner eine andere Herz, hat er den König nicht.
+  const spiel2 = J.neuesSpiel(regeln, { haende: [h0.slice(), rest.slice(0, 9), [k(H, W8)].concat(h2.slice(1)), rest.slice(9, 17).concat(k(H, WK))], ersterAnsager: 0 });
+  J.ansagen(spiel2, 'OBE');
+  J.spiele(spiel2, 0, k(H, WA));
+  J.spiele(spiel2, 1, J.erlaubteFuer(spiel2, 1)[0]);
+  J.spiele(spiel2, 2, k(H, W8));
+  const w = B.wissen(spiel2, 0, { verlangen: true });
+  assert.equal(w.nicht[2][k(H, WK)], 1, 'Ben hat den Herz-König nicht');
+});
+
 test('Den letzten Trumpf holen: nur wenn genau ein Trumpf draussen ist', () => {
   // Schaufel Trumpf, Du sagst an und hast Buur, Nell, Ass, König, Dame.
   // Nach dem ersten Stich (Buur, 6, 7, 8) ist nur noch die 10 draussen.
