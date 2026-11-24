@@ -113,11 +113,15 @@
   <script src="jass-stimme.js"></script>
   <script src="jass-vorlesen.js"></script>
   <script src="jass-erkennung.js"></script>
+  <script src="jass-verlauf.js"></script>
+  <script src="jass-optimieren.js"></script>
   <script>
   (function () {
     'use strict';
     const J = window.JassEngine;
     const B = window.JassBot;
+    const V = window.JassVerlauf;
+    const O = window.JassOptimieren;
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
     const S = window.JassSprechtexte;
@@ -257,12 +261,23 @@
       }
       const wie = ichSchob ? 'Du hast geschoben, angesagt wurde <b>' + name(e.code) + '</b>' : 'Angesagt: <b>' + name(e.code) + '</b>';
       const sprechen = S.vergleich({ punkte: e.punkte, code: e.code, ichSchob }, erwartet, null);
-      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" data-vorlesen data-sprechen="${esc(JSON.stringify(sprechen))}">
+      const partie = e.partieId ? V.lade(e.partieId) : null;
+      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" id="vergleich" data-vorlesen data-sprechen="${esc(JSON.stringify(sprechen))}">
         <h3>Ausgespielt</h3>
-        <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
-        <p class="muted">${wie}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
+        ${O.werteHtml({ schnitt: erwartet, gespielt: e.punkte, partie })}
+        <p class="muted">${wie}.${partie && partie.optimiert ? '' : ' ' + satz}</p>
         ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=helfer" style="align-self:flex-start">📜 Gespielte Runde</a>` : ''}
       </div>`;
+    }
+
+    // «Optimieren» im Vergleich anschliessen.
+    function verbindeVergleich(liste) {
+      const v = $('vergleich');
+      if (!v || !ausgespielt || !ausgespielt.partieId) return;
+      O.verbinde(v, V.lade(ausgespielt.partieId), (p) => V.speichere(p), () => {
+        v.outerHTML = vergleichHtml(liste);
+        verbindeVergleich(liste);
+      });
     }
 
     function zeigeErgebnis(liste) {
@@ -285,6 +300,7 @@
           <span class="bar"><span style="width:${Math.max(3, Math.round((100 * (x.punkte - min)) / Math.max(1, max - min)))}%"></span></span>
           <span class="wert">${Math.round(x.punkte)}</span></div>`).join('')}</div>
         <a class="btn-ghost btn-voll" href="jass-spiel.html?hand=${hand.join('.')}${lage === 'geschoben' && regeln.schieben ? '&amp;geschoben=1' : ''}&amp;trainer=1&amp;zurueck=helfer">${ausgespielt ? 'Nochmals eine Runde' : 'Mit diesen Karten eine Runde'} spielen</a>`;
+      verbindeVergleich(liste);
     }
 
     // Foto der Hand: Karten erkennen (jass-erkennung.js), vorwählen, rechnen.

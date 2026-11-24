@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v20';
+const CACHE_NAME = 'jass-shell-v21';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,6 +18,7 @@ const APP_SHELL = [
   './jass-design.js',
   './jass-design.css',
   './jass-verlauf.js',
+  './jass-optimieren.js',
   './jass-stimme.js',
   './jass-stimme-dateien.js',
   './jass-vorlesen.js',

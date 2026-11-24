@@ -74,6 +74,7 @@
   <script src="jass-karten.js"></script>
   <script src="jass-einstellungen.js"></script>
   <script src="jass-verlauf.js"></script>
+  <script src="jass-optimieren.js"></script>
   <script>
   (function () {
     'use strict';
@@ -81,6 +82,7 @@
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
     const V = window.JassVerlauf;
+    const O = window.JassOptimieren;
     const $ = (id) => document.getElementById(id);
     K.setzeFarben(E.ladeAnzeige().farben);
 
@@ -232,9 +234,9 @@
       const eintrag = werte.find((w) => w.c === gespielt);
       let ergebnis = '';
       if (p.ende && r && r.code) {
-        const diff = eintrag ? p.summe[0] - eintrag.p : null;
         const wie = ichSchob ? `Du hast geschoben, angesagt wurde <b>${esc(modusName(r.code))}</b>` : `Angesagt: <b>${esc(modusName(r.code))}</b>`;
-        ergebnis = `<p>${wie}. Ihr habt <b>${p.summe[0]}</b> Punkte gemacht${eintrag ? `, im Schnitt wären es ${Math.round(eintrag.p)} gewesen (${diff >= 0 ? '+' : '−'}${Math.round(Math.abs(diff))})` : ''}.</p>`;
+        ergebnis = `${O.werteHtml({ schnitt: eintrag ? eintrag.p : null, gespielt: p.summe[0], partie: p })}
+          <p class="muted">${wie}.</p>${computerHtml(p, r)}`;
       } else if (!p.ende) ergebnis = '<p class="muted">Die Hand wurde nicht fertig gespielt.</p>';
       return `<div class="panel stack">
         <h2>${vomHelfer(p) ? '🃏 Trumpf-Helfer' : '🎯 Trumpf-Trainer'}</h2>
@@ -242,6 +244,29 @@
         ${werte.length ? `<p class="muted klein">Ø Punkte je Ansage</p><div class="trainer-werte">${werte.map(zeile).join('')}</div>` : ''}
         ${ergebnis}
       </div>`;
+    }
+
+    // «Optimieren»: wie der Computer dieselbe Verteilung gespielt hat.
+    function computerHtml(p, r) {
+      const o = p.optimiert;
+      if (!o || !o.zuege) return '';
+      const code = r.code;
+      const name = (s) => esc(p.spieler[s].name);
+      const stiche = [];
+      for (const z of o.zuege) (stiche[z.stich] = stiche[z.stich] || []).push(z);
+      const zeilen = stiche.map((zuege, i) => {
+        const eff = J.effModus(code, i);
+        const karten = zuege.map((z) => z.k);
+        const gi = karten.length === 4 ? J.gewinnerIndex(karten, eff) : -1;
+        let punkte = karten.length === 4 ? J.stichPunkte(karten, eff) : 0;
+        if (i === 8) punkte += J.regelnMitStandard(p.regeln).letzterStich;
+        const eigen = r.zuege.filter((z) => z.stich === i).map((z) => z.k).join() === karten.join();
+        return `<div class="stich-zeile">
+          <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${gi >= 0 ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : ''}${eigen ? ' · <span class="muted">wie gespielt</span>' : ''}</span></div>
+          <div class="stich-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}">${mini(z.k, code)}<figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
+        </div>`;
+      }).join('');
+      return `<details class="abschnitt"><summary>So spielt der Computer <small>ein Durchgang · ${o.beispiel != null ? o.beispiel : o.punkte[0]} Punkte</small></summary><div class="inhalt stack" style="gap:8px">${zeilen}</div></details>`;
     }
 
     function rundeHtml(p, r) {
@@ -297,6 +322,7 @@
 
     function verbinde() {
       const a = $('ansicht');
+      O.verbinde(a, partie, gespeichert ? (x) => V.speichere(x) : null, () => zeichneAnsicht());
       a.querySelectorAll('[data-runde]').forEach((b) => b.addEventListener('click', () => { rundeIndex = Number(b.dataset.runde); zeichneAnsicht(); }));
       a.querySelectorAll('.stich-zeile').forEach((z) => z.addEventListener('click', (e) => {
         if (e.target.closest('[data-markieren]')) return;
