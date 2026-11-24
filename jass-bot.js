@@ -1735,8 +1735,10 @@
   const ZURUECK_SCHWELLE = 2;
   const GLEICH_SCHWELLE = 4;
   const TRUMPF_WEITER_SCHWELLE = 8;
-  // Gegnerfarbe meiden (werkzeuge/staerke-duell.js mit gegnerFarbe:true)
-  let GEGNERFARBE_AN = false;
+  // Gegnerfarbe meiden. Gemessen (werkzeuge/staerke-duell.js 600
+  // "tiefe:schnell,gegnerFarbe:true" "tiefe:schnell,gegnerFarbe:false"):
+  // +0,02 ± 0,14 Punkte pro Spiel – neutral, als Konvention übernommen.
+  const GEGNERFARBE_AN = true;
   const GEGNERFARBE_SCHWELLE = 3;
   const GRUND_GEGNERFARBE = 'Gegnerfarbe meiden: Ein Gegner hat eine Farbe ausgespielt und sucht dort – spiel sie ihm nicht zurück.';
   const VERLANGEN_SCHWELLE = 8;
