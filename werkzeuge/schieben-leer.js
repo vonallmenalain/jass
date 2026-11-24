@@ -9,7 +9,14 @@
 // eigenen Ansage laut Rechnung. Ausgabe als JSON-Zeilen; zusammenzählen mit
 // --auswerten <dateien…>.
 //
-// Ergebnis: siehe unten im Kommentar (nach der Messung ergänzt).
+// Ergebnis (24.11.2026, Tiefe schnell, 1600 Verteilungen mit Schieben):
+//   alle 4 Farben (1467):   Schieben − eigene Ansage gespielt +12,7 ± 1,0
+//   mit leerer Farbe (133): +9,7 ± 3,7 (Rechnung sagte +6,8)
+//     Partner macht genau die leere Farbe zu Trumpf (45): −8,1 ± 7,3
+//     Partner macht etwas anderes (88): +10 bis +23
+//     Rechnung sieht Schieben nur ≤ 3 vorn (35): +1,4 ± 7,4
+// → Schieben mit leerer Farbe ist nicht schlechter als gerechnet; nur bei
+//   knappen Fällen ist es ein Unentschieden. Keine neue Regel.
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
 

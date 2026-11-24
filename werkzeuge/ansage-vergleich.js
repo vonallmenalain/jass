@@ -12,6 +12,11 @@
 // Ausgabe: Ø Punkte von Vorhands Team je Ansage, der Unterschied zur
 // ersten Ansage (gepaart, ± Standardfehler) und beim Schieben, was der
 // Partner angesagt hat.
+//
+// Beispiel (24.11.2026, 400 Verteilungen, Tiefe normal): HK KB K10 K8 EA ED
+// E8 E7 E6 – Schieben 105,0 · Kreuz 104,7 (−0,2 ± 2,2) · Ecke 97,3 (−7,6) ·
+// Undenufe 94,4. Nach dem Schieben macht der Partner in 33 % Schaufel (die
+// leere Farbe): dann nur Ø 79,7. Die Trainer-Rechnung gab Kreuz 93 – zu tief.
 const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
