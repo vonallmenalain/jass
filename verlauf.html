@@ -227,7 +227,7 @@
       $('ansicht').hidden = false;
       zeigeAuswahl();
       $('titel').textContent = datum(p.start);
-      $('eyebrow').textContent = V.quelleVon(p) === 'trainer' ? (vomHelfer(p) ? 'Trumpf-Helfer' : 'Trumpf-Trainer') : 'Gegen Computer';
+      $('eyebrow').textContent = p.optimiertVon ? 'Optimiert' : V.quelleVon(p) === 'trainer' ? (vomHelfer(p) ? 'Trumpf-Helfer' : 'Trumpf-Trainer') : 'Gegen Computer';
       zeichneAnsicht();
       window.scrollTo(0, 0);
     }
@@ -239,6 +239,7 @@
         <div class="reihe" style="justify-content:space-between">
           <span><b>${esc(teamName(p, 0))}</b> ${p.ende ? p.summe[0] + ' : ' + p.summe[1] : '(läuft)'} <b>${esc(teamName(p, 1))}</b></span>
         </div>
+        ${p.optimiertVon ? `<p class="muted klein">Der Computer auf allen Plätzen – dieselben Karten, dieselbe Ansage. Dieser Durchgang: <b>${p.summe[0]}</b> Punkte${p.optimiertAnzahl > 1 ? ` (Schnitt aus ${p.optimiertAnzahl}: ${p.optimiertSchnitt}, ${p.optimiertMin}–${p.optimiertMax})` : ''}.</p>` : ''}
         <p class="muted klein">${esc(E.zusammenfassung(J.regelnMitStandard(p.regeln)))} · Rechentiefe ${esc(p.rechnen || 'normal')}${p.welten ? ' (' + Number(p.welten) + ' Verteilungen pro Zug)' : ''} · ${p.spieler.map((x) => esc(x.name) + ' ' + (STUFE[x.typ] || '')).join(', ')}</p>
         <div class="reihe">
           <button class="btn btn-klein" type="button" id="herunterladen">⬇︎ Als Datei</button>
@@ -248,7 +249,7 @@
           <button class="btn-ghost btn-klein" type="button" id="zurListe">Alle Partien</button>
         </div>
         ${p.notizen && p.notizen.length ? `<div class="stack" style="gap:6px">${p.notizen.map((n) => `<div class="notiz">🚩 Runde ${n.runde + 1}${n.stich != null ? ', Stich ' + (n.stich + 1) : ', Ansage'}: ${esc(n.text)}</div>`).join('')}</div>` : ''}
-        ${p.runden.length > 1 || V.quelleVon(p) !== 'trainer' ? `<div class="runden-tabs segmente">${p.runden.map((x, i) => `<button type="button" data-runde="${i}" class="${i === rundeIndex ? 'aktiv' : ''}">Runde ${x.nr + 1}</button>`).join('')}</div>` : ''}
+        ${p.runden.length > 1 || (V.quelleVon(p) !== 'trainer' && !p.optimiertVon) ? `<div class="runden-tabs segmente">${p.runden.map((x, i) => `<button type="button" data-runde="${i}" class="${i === rundeIndex ? 'aktiv' : ''}">Runde ${x.nr + 1}</button>`).join('')}</div>` : ''}
       </div>`;
       $('ansicht').innerHTML = kopf + trainerHtml(p) + (r ? rundeHtml(p, r) : '<div class="panel"><p class="muted">Noch keine Runde.</p></div>');
       verbinde();
@@ -271,7 +272,7 @@
       if (p.ende && r && r.code) {
         const wie = ichSchob ? `Du hast geschoben, angesagt wurde <b>${esc(modusName(r.code))}</b>` : `Angesagt: <b>${esc(modusName(r.code))}</b>`;
         ergebnis = `${O.werteHtml({ schnitt: eintrag ? eintrag.p : null, gespielt: p.summe[0], partie: p })}
-          <p class="muted">${wie}.</p>${computerHtml(p, r)}`;
+          <p class="muted">${wie}.</p>`;
       } else if (!p.ende) ergebnis = '<p class="muted">Die Hand wurde nicht fertig gespielt.</p>';
       return `<div class="panel stack">
         <h2>${vomHelfer(p) ? '🃏 Trumpf-Helfer' : '🎯 Trumpf-Trainer'}</h2>
@@ -279,29 +280,6 @@
         ${werte.length ? `<p class="muted klein">Ø Punkte je Ansage</p><div class="trainer-werte">${werte.map(zeile).join('')}</div>` : ''}
         ${ergebnis}
       </div>`;
-    }
-
-    // «Optimieren»: wie der Computer dieselbe Verteilung gespielt hat.
-    function computerHtml(p, r) {
-      const o = p.optimiert;
-      if (!o || !o.zuege) return '';
-      const code = r.code;
-      const name = (s) => esc(p.spieler[s].name);
-      const stiche = [];
-      for (const z of o.zuege) (stiche[z.stich] = stiche[z.stich] || []).push(z);
-      const zeilen = stiche.map((zuege, i) => {
-        const eff = J.effModus(code, i);
-        const karten = zuege.map((z) => z.k);
-        const gi = karten.length === 4 ? J.gewinnerIndex(karten, eff) : -1;
-        let punkte = karten.length === 4 ? J.stichPunkte(karten, eff) : 0;
-        if (i === 8) punkte += J.regelnMitStandard(p.regeln).letzterStich;
-        const eigen = r.zuege.filter((z) => z.stich === i).map((z) => z.k).join() === karten.join();
-        return `<div class="stich-zeile">
-          <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${gi >= 0 ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : ''}${eigen ? ' · <span class="muted">wie gespielt</span>' : ''}</span></div>
-          <div class="stich-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}">${mini(z.k, code)}<figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
-        </div>`;
-      }).join('');
-      return `<details class="abschnitt"><summary>So spielt der Computer <small>ein Durchgang · ${o.beispiel != null ? o.beispiel : o.punkte[0]} Punkte</small></summary><div class="inhalt stack" style="gap:8px">${zeilen}</div></details>`;
     }
 
     function rundeHtml(p, r) {
@@ -340,7 +318,7 @@
           <div class="stich-karten">${zuege.map((z, j) => `<figure class="${j === gi ? 'sieger' : ''}">${mini(z.k, code)}<figcaption>${name(z.s)}</figcaption></figure>`).join('')}</div>
           ${markiert.map((n) => `<div class="notiz">🚩 ${esc(n.text)}${n.exportiert ? ' <span class="muted klein">· heruntergeladen</span>' : ''}</div>`).join('')}
           <div class="gruende">${gruende}
-            <button class="btn-ghost btn-klein" type="button" data-markieren="${i}" style="align-self:flex-start">🚩 Markieren</button></div>
+            ${p.optimiertVon ? '' : `<button class="btn-ghost btn-klein" type="button" data-markieren="${i}" style="align-self:flex-start">🚩 Markieren</button>`}</div>
         </div>`;
       }).join('');
       const ab = r.abrechnung;
@@ -357,7 +335,7 @@
 
     function verbinde() {
       const a = $('ansicht');
-      O.verbinde(a, partie, gespeichert ? (x) => V.speichere(x) : null, () => zeichneAnsicht());
+      O.verbinde(a, partie, gespeichert ? (x) => V.speichere(x) : null, () => zeichneAnsicht(), zeigeOptimiert);
       a.querySelectorAll('[data-runde]').forEach((b) => b.addEventListener('click', () => { rundeIndex = Number(b.dataset.runde); zeichneAnsicht(); }));
       a.querySelectorAll('.stich-zeile').forEach((z) => z.addEventListener('click', (e) => {
         if (e.target.closest('[data-markieren]')) return;
@@ -529,6 +507,7 @@
     // oben oder Zurück am Handy) führt zur Liste, nicht aus der Seite hinaus.
     function oeffneAusListe(p, ausSpeicher) {
       if (!p) return;
+      if (!ausSpeicher) dateiPartie = p;
       listeScroll = window.scrollY;
       history.pushState({ ansicht: ausSpeicher ? p.id : 'datei' }, '');
       oeffne(p, ausSpeicher);
@@ -536,15 +515,31 @@
     function zurListe() {
       if (history.state && history.state.ansicht) history.back(); else zeigeListe();
     }
+    // «Optimiert ›»: der typische Durchgang des Computers, ebenfalls als
+    // eigener Schritt – Zurück führt zur Partie.
+    let dateiPartie = null;
+    let ansichtScroll = 0;
+    function zeigeOptimiert(p) {
+      if (!p || !p.optimiert) return;
+      ansichtScroll = window.scrollY;
+      history.pushState({ ansicht: gespeichert ? p.id : 'datei', optimiert: true }, '');
+      if (!gespeichert) dateiPartie = p;
+      oeffne(O.alsPartie(p), false);
+    }
     window.addEventListener('popstate', (e) => {
       const st = e.state || {};
       if (auswahl && !st.auswahl) { auswahl = null; zeigeAuswahl(); }
-      if (partie && !st.ansicht) {
-        zeigeListe();
-        window.scrollTo(0, listeScroll);
-      } else if (!partie && st.ansicht && st.ansicht !== 'datei' && V.lade(st.ansicht)) {
-        oeffne(V.lade(st.ansicht), true);
+      if (!st.ansicht) {
+        if (partie) { zeigeListe(); window.scrollTo(0, listeScroll); }
+        return;
       }
+      const basis = st.ansicht === 'datei' ? dateiPartie : V.lade(st.ansicht);
+      if (!basis) return;
+      const ziel = st.optimiert && basis.optimiert ? O.alsPartie(basis) : basis;
+      if (partie && partie.id === ziel.id) return;
+      const zurueckZurPartie = !!(partie && partie.optimiertVon && !st.optimiert);
+      oeffne(ziel, !st.optimiert && st.ansicht !== 'datei');
+      if (zurueckZurPartie) window.scrollTo(0, ansichtScroll);
     });
     $('zurueckLink').addEventListener('click', (e) => {
       const st = history.state || {};
@@ -561,7 +556,9 @@
     $('dialog').addEventListener('click', (e) => { if (e.target === $('dialog')) $('dialog').classList.remove('offen'); });
 
     const id = PARAMS.get('p');
-    if (id && V.lade(id)) oeffne(V.lade(id), true);
+    const gefunden = id ? V.lade(id) : null;
+    if (gefunden && PARAMS.get('ansicht') === 'optimiert' && gefunden.optimiert) oeffne(O.alsPartie(gefunden), false);
+    else if (gefunden) oeffne(gefunden, true);
     else zeigeListe();
   })();
   </script>

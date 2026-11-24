@@ -277,7 +277,7 @@
       O.verbinde(v, V.lade(ausgespielt.partieId), (p) => V.speichere(p), () => {
         v.outerHTML = vergleichHtml(liste);
         verbindeVergleich(liste);
-      });
+      }, (p) => { location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&ansicht=optimiert&von=helfer'; });
     }
 
     function zeigeErgebnis(liste) {
