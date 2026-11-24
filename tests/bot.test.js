@@ -270,6 +270,33 @@ test('Gleichwertige Karten, aber der König ist noch draussen: kein «Stich sich
   assert.ok(gesehen > 0, 'Bauer oder Dame mindestens einmal gewählt');
 });
 
+test('Den letzten Trumpf holen: nur wenn genau ein Trumpf draussen ist', () => {
+  // Schaufel Trumpf, Du sagst an und hast Buur, Nell, Ass, König, Dame.
+  // Nach dem ersten Stich (Buur, 6, 7, 8) ist nur noch die 10 draussen.
+  const regeln = J.regelnMitStandard();
+  const mitTrumpf = (verteilt) => {
+    const haende = verteilt.map((h) => h.slice());
+    const rest = [];
+    for (let k = 9; k < 36; k++) if (!haende.some((h) => h.includes(k))) rest.push(k);
+    for (const h of haende) while (h.length < 9) h.push(rest.shift());
+    return haende;
+  };
+  const opt = (i) => ({ rng: J.zufall(900 + i), welten: 40, trumpfWeiterSchwelle: 1000 });
+  const eins = mitTrumpf([[5, 3, 8, 7, 6], [0], [1], [2, 4]]);
+  const spiel = J.neuesSpiel(regeln, { haende: eins, ersterAnsager: 0 });
+  J.ansagen(spiel, 'T0');
+  for (const [s, k] of [[0, 5], [1, 0], [2, 1], [3, 2]]) J.spiele(spiel, s, k);
+  const z = B.schwerZug(spiel, 0, opt(0));
+  assert.equal(z.karte, karte(S, W9), 'mit dem Nell die 10 holen');
+  assert.match(z.grund, /letzten Trumpf/);
+  // Zwei Trümpfe draussen (7 und 10): keine Regel.
+  const zwei = mitTrumpf([[5, 3, 8, 7, 6], [0, 1], [], [2, 4]]);
+  const spiel2 = J.neuesSpiel(regeln, { haende: zwei, ersterAnsager: 0 });
+  J.ansagen(spiel2, 'T0');
+  J.spiele(spiel2, 0, 5); J.spiele(spiel2, 1, 0); J.spiele(spiel2, 2, spiel2.runde.haende[2][0]); J.spiele(spiel2, 3, 2);
+  assert.doesNotMatch(B.schwerZug(spiel2, 0, opt(1)).grund, /letzten Trumpf/);
+});
+
 test('Ass schmieren als Zeichen: mit Ass, König, Dame geschmiert – der Partner spielt die Farbe zurück', () => {
   const regeln = J.regelnMitStandard();
   const haende = [

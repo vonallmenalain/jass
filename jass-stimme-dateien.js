@@ -417,6 +417,7 @@ window.JassStimmeDateien = {
   "Deine Wahl: Slalom (obenabe beginnt).": "stimme/7cbf704eebc0.mp3",
   "Deine Wahl: Slalom (undenufe beginnt).": "stimme/749d385cf5d3.mp3",
   "Deine Wahl: Undenufe.": "stimme/c74fe85a1db4.mp3",
+  "Den letzten Trumpf holen: Ihr habt angesagt, nur noch ein Trumpf ist draussen, und du hast den höchsten – zieh ihn heraus.": "stimme/2842b62bb448.mp3",
   "Die Runde wird im Verlauf gespeichert.": "stimme/a34f82bb9c87.mp3",
   "Die schnelle Faustregel hätte Ecke Trumpf gesagt – knapp, beides ist vertretbar.": "stimme/049dd4b6804b.mp3",
   "Die schnelle Faustregel hätte Herz Trumpf gesagt – knapp, beides ist vertretbar.": "stimme/3ef980d72fa5.mp3",
