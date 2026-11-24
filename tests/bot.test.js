@@ -259,7 +259,9 @@ test('Gleichwertige Karten, aber der König ist noch draussen: kein «Stich sich
     const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 0 });
     J.ansagen(spiel, 'T3');
     for (const [s, k] of zuege) J.spiele(spiel, s, k);
-    const z = B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120 });
+    // Der Text: mit dem bisherigen Rechenweg (ohne Löser), der hier Bauer
+    // oder Dame wählt – mit dem Löser kommt das Ass (Test unten).
+    const z = B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120, loeser: false });
     if (z.karte === karte(S, WB) || z.karte === karte(S, WD)) {
       gesehen++;
       assert.equal(z.karte, karte(S, WD), 'die höhere der beiden');
@@ -268,6 +270,22 @@ test('Gleichwertige Karten, aber der König ist noch draussen: kein «Stich sich
     }
   }
   assert.ok(gesehen > 0, 'Bauer oder Dame mindestens einmal gewählt');
+});
+
+test('Mit dem Löser: Ass vor Dame, wenn der König noch draussen ist (Partie mit Notiz)', () => {
+  // Zu Ende gespielt bringt das Ass zuerst +5,7 ± 0,7 Punkte gegenüber der
+  // Dame (werkzeuge/stelle-nachrechnen.js); die alte Rechnung sah die Dame vorn.
+  const regeln = J.regelnMitStandard();
+  const haende = [[0, 2, 27, 31, 29, 14, 11, 32, 13], [3, 12, 35, 23, 10, 34, 19, 1, 25], [8, 17, 15, 26, 5, 9, 24, 30, 6], [33, 16, 18, 7, 4, 21, 22, 28, 20]];
+  const zuege = [[0, 32], [1, 34], [2, 30], [3, 28], [0, 27], [1, 35], [2, 9], [3, 33], [1, 10], [2, 15], [3, 16], [0, 11], [3, 22], [0, 31], [1, 19], [2, 24], [0, 14], [1, 12], [2, 17], [3, 18]];
+  let ass = 0;
+  for (let i = 0; i < 4; i++) {
+    const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 0 });
+    J.ansagen(spiel, 'T3');
+    for (const [s, k] of zuege) J.spiele(spiel, s, k);
+    if (B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120 }).karte === karte(S, WA)) ass++;
+  }
+  assert.ok(ass >= 3, 'Schaufel Ass in ' + ass + ' von 4');
 });
 
 test('Den letzten Trumpf holen: nur wenn genau ein Trumpf draussen ist', () => {
