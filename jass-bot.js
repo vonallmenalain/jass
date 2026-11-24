@@ -453,6 +453,145 @@
     return best;
   }
 
+  // ------------------------------------------------- Kartenschätzung
+  // Wie wahrscheinlich spielt jemand mit der Hand `hand` in dieser Lage die
+  // Karte k? Ein kleines Modell (Softmax über die erlaubten Karten) auf
+  // Merkmalen der Karte und der Hand – gelernt aus eigenen Partien des
+  // Computers (werkzeuge/zug-daten.js, werkzeuge/zug-modell.js). Damit
+  // gewichtet «Schwer» die denkbaren Verteilungen: Eine Verteilung, in der
+  // die bisher gespielten Karten aller Spieler gut zu ihrer Hand passen,
+  // zählt mehr – wer tief Herz anspielt, hat eher den Herz-Bock.
+
+  // Gewichte aus werkzeuge/zug-modell.js (in MERKMALE-Reihenfolge).
+  let ZUG_GEWICHTE = null;
+
+  const MERKMALE = [
+    'konstante', 'anspielen', 'trumpf', 'punkte', 'bock', 'einHoeherer', 'hoehereAnteil',
+    'farbLaenge', 'tiefsteFarbe', 'hoechsteFarbe', 'haltBock',
+    'anspielen×tiefste×haltBock', 'anspielen×bock', 'anspielen×trumpf', 'anspielen×trumpf×früh',
+    'anspielen×farbLaenge', 'anspielen×hoechste×nichtBock',
+    'bedient', 'sticht', 'wirftAb', 'gewinnt', 'partnerVorne', 'letzter',
+    'wirftAb×farbLaenge', 'wirftAb×haltBock', 'wirftAb×punkte', 'wirftAb×tiefste',
+    'partnerVorne×punkte', 'partnerVorne×gewinnt', 'gegnerVorne×gewinnt', 'gegnerVorne×gewinnt×punkte',
+    'letzter×gewinnt', 'sticht×partnerVorne', 'gewinnt×stichPunkte', 'bedient×tiefste', 'bedient×hoechste',
+    'misere×gewinnt', 'misere×punkte', 'ohneTrumpf×anspielen×bock',
+  ];
+
+  // Merkmale der Karte k (in `hand`) in der Lage { code, stichNr, stich,
+  // stichSitze, sitz, gespielt: Uint8Array(36) } → Float64Array.
+  function zugMerkmale(k, hand, lage, out) {
+    const eff = effModus(lage.code, lage.stichNr);
+    const T = trumpfVon(eff);
+    const f = farbeVon(k);
+    const n = lage.stich.length;
+    const st = STAERKE[eff];
+    const g = lage.gespielt;
+    let hoeher = 0, laenge = 0, tiefste = 1, hoechste = 1, haltBock = 0;
+    for (let w = 0; w < 9; w++) {
+      const x = f * 9 + w;
+      if (x === k) continue;
+      const inHand = hand.includes(x);
+      if (inHand) { laenge++; if (st[x] < st[k]) tiefste = 0; else hoechste = 0; }
+      if (!g[x] && !inHand && st[x] > st[k]) hoeher++;
+    }
+    laenge++;
+    // hält er die höchste noch offene Karte dieser Farbe?
+    let top = -1, topW = -1;
+    for (let w = 0; w < 9; w++) { const x = f * 9 + w; if (!g[x] && !lage.stich.includes(x) && st[x] > topW) { topW = st[x]; top = x; } }
+    if (top >= 0 && hand.includes(top)) haltBock = 1;
+    const bock = hoeher === 0 ? 1 : 0;
+    const istT = f === T ? 1 : 0;
+    const p = PUNKTE[eff][k] / 11;
+    const an = n === 0 ? 1 : 0;
+    let bedient = 0, sticht = 0, wirft = 0, gewinnt = 0, partnerV = 0, letzter = 0, stichP = 0;
+    if (n > 0) {
+      const led = farbeVon(lage.stich[0]);
+      const gi = gewinnerIndex(lage.stich, eff);
+      const best = lage.stich[gi];
+      partnerV = team(lage.stichSitze[gi]) === team(lage.sitz) ? 1 : 0;
+      gewinnt = schlaegt(k, best, eff) ? 1 : 0;
+      bedient = f === led ? 1 : 0;
+      sticht = !bedient && istT ? 1 : 0;
+      wirft = !bedient && !istT ? 1 : 0;
+      letzter = n === 3 ? 1 : 0;
+      for (const x of lage.stich) stichP += PUNKTE[eff][x];
+      stichP /= 30;
+    }
+    const mis = lage.code === 'MIS' ? 1 : 0;
+    const frueh = lage.stichNr <= 2 ? 1 : 0;
+    const L = laenge / 9;
+    const v = [
+      1, an, istT, p, bock, hoeher === 1 ? 1 : 0, hoeher / 8,
+      L, tiefste, hoechste, haltBock,
+      an * tiefste * haltBock * (bock ? 0 : 1), an * bock, an * istT, an * istT * frueh,
+      an * L, an * hoechste * (1 - bock),
+      bedient, sticht, wirft, gewinnt, partnerV, letzter,
+      wirft * L, wirft * haltBock, wirft * p, wirft * tiefste,
+      partnerV * p, partnerV * gewinnt, (n > 0 ? 1 - partnerV : 0) * gewinnt, (n > 0 ? 1 - partnerV : 0) * gewinnt * p,
+      letzter * gewinnt, sticht * partnerV, gewinnt * stichP, bedient * tiefste, bedient * hoechste,
+      mis * gewinnt, mis * p, (T < 0 ? 1 : 0) * an * bock,
+    ];
+    const o = out || new Float64Array(v.length);
+    for (let i = 0; i < v.length; i++) o[i] = v[i];
+    return o;
+  }
+
+  // log P(gespielte Karte | Hand, Lage) mit den Gewichten `gw`.
+  function zugLogWahrscheinlichkeit(karte, hand, lage, regeln, gw, puffer) {
+    const eff = effModus(lage.code, lage.stichNr);
+    const legal = erlaubteKarten(hand, lage.stich, eff, regeln);
+    if (legal.length <= 1) return 0;
+    let max = -Infinity, wahl = 0;
+    const werte = [];
+    for (const k of legal) {
+      const m = zugMerkmale(k, hand, lage, puffer);
+      let z = 0;
+      for (let i = 0; i < gw.length; i++) z += gw[i] * m[i];
+      werte.push(z);
+      if (z > max) max = z;
+      if (k === karte) wahl = z;
+    }
+    let summe = 0;
+    for (const z of werte) summe += Math.exp(z - max);
+    return wahl - max - Math.log(summe);
+  }
+
+  // Die bisherigen Züge der anderen, einmal pro Entscheidung vorbereitet.
+  function zugVerlauf(spiel, sitz) {
+    const r = spiel.runde;
+    const alle = r.stiche.map((st, i) => ({ karten: st.karten, sitze: st.sitze, nr: i }));
+    if (r.stich.length) alle.push({ karten: r.stich, sitze: r.stichSitze, nr: r.stichNr });
+    const zuege = [];
+    const g = new Uint8Array(36);
+    for (const st of alle) {
+      for (let i = 0; i < st.karten.length; i++) {
+        const p = st.sitze[i];
+        if (p !== sitz) {
+          zuege.push({ p, k: st.karten[i], lage: { code: r.code, stichNr: st.nr, stich: st.karten.slice(0, i), stichSitze: st.sitze.slice(0, i), sitz: p, gespielt: g.slice() } });
+        }
+        g[st.karten[i]] = 1;
+      }
+    }
+    // je Spieler: welche Karten er ab diesem Zug noch gespielt hat
+    const spaeter = [[], [], [], []];
+    for (let i = zuege.length - 1; i >= 0; i--) {
+      const z = zuege[i];
+      spaeter[z.p] = [z.k].concat(spaeter[z.p]);
+      z.danach = spaeter[z.p].slice();
+    }
+    return zuege;
+  }
+
+  // log P(alle bisherigen Züge der anderen | diese Verteilung)
+  function weltLogL(zuege, haende, regeln, gw, puffer) {
+    let ll = 0;
+    for (const z of zuege) {
+      const hand = haende[z.p].concat(z.danach);
+      ll += zugLogWahrscheinlichkeit(z.k, hand, z.lage, regeln, gw, puffer);
+    }
+    return ll;
+  }
+
   // --------------------------------------------------- Schneller Löser
   // Dasselbe wie exakt() – alle Karten offen, beste Züge für beide Teams –,
   // aber schnell genug, um schon ab dem ersten Stich exakt zu rechnen:
@@ -1016,8 +1155,35 @@
     // false) wie früher: Faustregeln bis zum Schluss, exakt erst ab exaktAb.
     const mitLoeser = o.loeser !== false;
     const loesenAb = o.loesenAb != null ? o.loesenAb : exaktAb;
+    const ziehe = () => (info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng));
+    // Kartenschätzung: mehr Verteilungen ziehen, nach den bisherigen Zügen
+    // der anderen gewichten und die glaubwürdigsten nehmen.
+    let auswahl = null;
+    const gw = o.schaetzung ? (o.zugGewichte || ZUG_GEWICHTE) : null;
+    if (gw) {
+      const zuege = zugVerlauf(spiel, sitz);
+      if (zuege.length) {
+        const K = Math.ceil(welten * (o.schaetzungFaktor || 4));
+        const beta = o.schaetzungBeta != null ? o.schaetzungBeta : 1;
+        const kand = [], lw = [];
+        const puffer = new Float64Array(MERKMALE.length);
+        for (let i = 0; i < K; i++) { const h = ziehe(); kand.push(h); lw.push(beta * weltLogL(zuege, h, spiel.regeln, gw, puffer)); }
+        const max = Math.max(...lw);
+        const gew = lw.map((x) => Math.exp(x - max));
+        const summe = gew.reduce((a, b) => a + b, 0);
+        // systematisch ziehen
+        auswahl = [];
+        let c = gew[0] / summe, j = 0;
+        const u0 = rng() / welten;
+        for (let i = 0; i < welten; i++) {
+          const u = u0 + i / welten;
+          while (u > c && j < K - 1) { j++; c += gew[j] / summe; }
+          auswahl.push(kand[j]);
+        }
+      }
+    }
     for (let i = 0; i < welten; i++) {
-      const haende = info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng);
+      const haende = auswahl ? auswahl[i] : ziehe();
       const tt = mitLoeser ? new Map() : null;
       for (const k of legal) {
         const s = simAusSpiel(spiel, haende.map((h) => h.slice()), w);
@@ -1634,7 +1800,7 @@
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
-    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
+    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
     ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
