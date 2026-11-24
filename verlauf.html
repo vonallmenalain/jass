@@ -271,7 +271,7 @@
       let ergebnis = '';
       if (p.ende && r && r.code) {
         const wie = ichSchob ? `Du hast geschoben, angesagt wurde <b>${esc(modusName(r.code))}</b>` : `Angesagt: <b>${esc(modusName(r.code))}</b>`;
-        ergebnis = `${O.werteHtml({ schnitt: eintrag ? eintrag.p : null, gespielt: p.summe[0], partie: p })}
+        ergebnis = `${O.werteHtml({ schnitt: eintrag ? eintrag.p : null, gespielt: p.summe[0], partie: p, gespieltAnsehen: true })}
           <p class="muted">${wie}.</p>`;
       } else if (!p.ende) ergebnis = '<p class="muted">Die Hand wurde nicht fertig gespielt.</p>';
       return `<div class="panel stack">
@@ -330,12 +330,13 @@
           ${notizen.filter((n) => n.stich == null).map((n) => `<div class="notiz">🚩 ${esc(n.text)}</div>`).join('')}
         </div>
         <div class="panel stack"><h3>Karten zu Beginn</h3>${haende}</div>
-        <div class="panel stack"><h3>Stiche</h3>${sticheHtml || '<span class="muted">–</span>'}</div>`;
+        <div class="panel stack" data-stiche><h3>Stiche</h3>${sticheHtml || '<span class="muted">–</span>'}</div>`;
     }
 
     function verbinde() {
       const a = $('ansicht');
-      O.verbinde(a, partie, gespeichert ? (x) => V.speichere(x) : null, () => zeichneAnsicht(), zeigeOptimiert);
+      O.verbinde(a, partie, gespeichert ? (x) => V.speichere(x) : null, () => zeichneAnsicht(), zeigeOptimiert,
+        () => { const z = a.querySelector('[data-stiche]'); if (z) z.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
       a.querySelectorAll('[data-runde]').forEach((b) => b.addEventListener('click', () => { rundeIndex = Number(b.dataset.runde); zeichneAnsicht(); }));
       a.querySelectorAll('.stich-zeile').forEach((z) => z.addEventListener('click', (e) => {
         if (e.target.closest('[data-markieren]')) return;
