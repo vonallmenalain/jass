@@ -89,7 +89,7 @@
     .kachel:active { transform: scale(.98); }
     .kachel.haupt { background: linear-gradient(160deg, rgba(254, 121, 113, 0.22), var(--flaeche) 62%); border-color: rgba(254, 121, 113, 0.35); }
     .kachel svg { width: 28px; height: 28px; color: var(--accent); }
-    /* breite Kachel mit Auswahl direkt darin (Zähler, Jass lernen) */
+    /* breite Kachel mit Auswahl direkt darin (Jass Training, Zähler) */
     .kachel.breit { grid-column: 1 / -1; cursor: default; gap: 12px; }
     .kachel.breit:active { transform: none; }
     .kachel.breit .titel { display: flex; align-items: center; gap: 10px; }
@@ -102,6 +102,37 @@
     .kachel.breit .wahl a:hover, .kachel.breit .wahl a:focus-visible { border-color: var(--accent); outline: none; }
     .kachel.breit .wahl a:active { transform: scale(.97); }
     .kachel b { font-family: "Space Grotesk", "Inter", sans-serif; font-size: 17px; font-weight: 700; line-height: 1.15; }
+    /* Quick Trumpf: neun Karten, was trumpfst du? */
+    .quick { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: var(--flaeche); border: 1px solid var(--linie); }
+    .quick-kopf { display: flex; align-items: center; gap: 8px; }
+    .quick-kopf b { font-family: "Space Grotesk", "Inter", sans-serif; font-size: 17px; }
+    .quick-kopf .weg { margin-left: auto; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--linie); background: transparent; color: var(--muted); font-size: 14px; }
+    .quick-karten { display: flex; padding: 2px 0; }
+    .quick-karten .karte { flex: 0 0 calc(100% / 5.96); filter: drop-shadow(-2px 0 3px rgba(0, 0, 0, .35)); }
+    .quick-karten .karte + .karte { margin-left: calc(-100% / 5.96 * 0.38); }
+    .quick-karten .karte svg { display: block; width: 100%; height: auto; }
+    .quick-wahl { display: flex; flex-direction: column; gap: 6px; }
+    .quick-wahl .zeile { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+    .quick-wahl button {
+      min-height: 42px; border-radius: 12px; border: 2px solid var(--linie); background: #fffdf8; color: #111827;
+      font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px;
+    }
+    .quick-wahl button .farbzeichen { width: 22px; height: 22px; }
+    .quick-wahl button.schieben { background: var(--flaeche-2); color: var(--text); border-color: var(--linie); }
+    .quick-wahl button:disabled { cursor: default; opacity: .45; }
+    .quick-wahl button.meine { opacity: 1; border-color: #facc15; }
+    .quick-wahl button.beste { opacity: 1; border-color: #4ade80; }
+    .quick-ergebnis { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; line-height: 1.4; }
+    .quick-ergebnis p { margin: 0; }
+    .quick-ergebnis .klein { color: var(--muted); font-size: 13px; }
+    .quick-knoepfe { display: flex; gap: 8px; }
+    .quick-knoepfe > * {
+      flex: 1; min-height: 40px; border-radius: 12px; display: grid; place-items: center; text-decoration: none; text-align: center;
+      font-weight: 700; font-size: 14px; white-space: nowrap; padding: 0 6px; border: 1px solid var(--linie); background: transparent; color: var(--text);
+    }
+    .quick-knoepfe .nochmal { background: var(--accent); border-color: var(--accent); color: #1b0d0c; }
+    .quick-balken { height: 6px; border-radius: 3px; background: var(--linie); overflow: hidden; }
+    .quick-balken span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
     .modal-hinten {
       position: fixed; inset: 0; z-index: 80; display: none; align-items: flex-end; justify-content: center;
       padding: 12px; background: rgba(5, 6, 9, 0.72);
@@ -138,6 +169,18 @@
       <a class="los" id="onlineLink" href="jass-online.html"><b>Online weiterspielen</b><span id="onlineText"></span></a>
     </div>
 
+    <section class="quick" id="quick" hidden aria-label="Quick Trumpf">
+      <div class="quick-kopf"><b>Was trumpfst du?</b><button class="weg" type="button" id="quickWeg" aria-label="Ausblenden">✕</button></div>
+      <div class="quick-karten" id="quickKarten"></div>
+      <div class="quick-wahl" id="quickWahl"></div>
+      <div class="quick-ergebnis" id="quickErgebnis" hidden></div>
+      <div class="quick-knoepfe" id="quickKnoepfe" hidden>
+        <button class="nochmal" type="button" id="quickNochmal">Nochmal</button>
+        <a href="trumpf-trainer.html">Trumpf wählen</a>
+        <button type="button" id="quickAus">Ausblenden</button>
+      </div>
+    </section>
+
     <section class="gruppe">
       <h2>Spielecke</h2>
       <div class="kacheln">
@@ -155,7 +198,21 @@
     </section>
 
     <section class="gruppe">
-      <h2>Zählen &amp; Lernen</h2>
+      <h2>Training</h2>
+      <div class="kacheln">
+        <div class="kachel breit">
+          <div class="titel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c3 2 7 2 10 0v-4"/></svg><b>Jass Training</b></div>
+          <div class="wahl">
+            <a href="trumpf-trainer.html">Trumpf wählen</a>
+            <a href="trumpf-helfer.html">Trumpf-Helfer</a>
+            <a href="zaehlen.html">Stiche zählen</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="gruppe">
+      <h2>Zählen</h2>
       <div class="kacheln">
         <div class="kachel breit">
           <div class="titel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/></svg><b>Zähler</b></div>
@@ -163,14 +220,6 @@
             <a href="schieber-zähler.html">Schieber</a>
             <a href="sidi-zähler.html">Sidi</a>
             <a href="coiffeur-zähler.html">Coiffeur</a>
-          </div>
-        </div>
-        <div class="kachel breit">
-          <div class="titel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c3 2 7 2 10 0v-4"/></svg><b>Jass lernen</b></div>
-          <div class="wahl">
-            <a href="zaehlen.html">Stiche zählen</a>
-            <a href="trumpf-trainer.html">Trumpf wählen</a>
-            <a href="trumpf-helfer.html">Trumpf-Helfer</a>
           </div>
         </div>
       </div>
@@ -214,6 +263,116 @@
         try { localStorage.removeItem(KEY); } catch (e) { /* egal */ }
         $('weiter').hidden = true;
       });
+    })();
+  </script>
+  <script src="jass-engine.js"></script>
+  <script src="jass-bot.js"></script>
+  <script src="jass-karten.js"></script>
+  <script src="jass-einstellungen.js"></script>
+  <script>
+    // Quick Trumpf: neun zufällige Karten – was trumpfst du? Der Computer
+    // rechnet schon, während man überlegt (gleich wie «Trumpf wählen»), und
+    // zeigt nach der Antwort seine Wahl mit einem kurzen Grund. Abschalten
+    // unter ⚙ (anzeige.quickTrumpf); «Ausblenden» gilt nur bis zum nächsten Besuch.
+    (function () {
+      const J = window.JassEngine, B = window.JassBot, K = window.JassKarten, E = window.JassEinstellungen;
+      if (!J || !B || !K || !E) return;
+      const $ = (id) => document.getElementById(id);
+      const anzeige = E.ladeAnzeige();
+      if (anzeige.quickTrumpf === false) return;
+      const regeln = E.ladeRegeln();
+      if (K.setzeBild) K.setzeBild(anzeige.kartenbild);
+      if (K.setzeFarben) K.setzeFarben(anzeige.farben);
+      const box = $('quick');
+      const darfSchieben = !!regeln.schieben;
+      const name = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
+      const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      let hand = [], liste = null, wahl = null, rechnung = 0;
+
+      function zeichneKarten(code) {
+        const T = code && code !== 'SCHIEBEN' ? J.MODI[code].trumpf : -1;
+        const c = code && code !== 'SCHIEBEN' ? code : null;
+        $('quickKarten').innerHTML = J.sortiereHand(hand).map((k) => `<div class="karte">${K.svg(k, { trumpf: J.farbeVon(k) === T, code: c })}</div>`).join('');
+      }
+      function knopf(c) {
+        if (c === 'SCHIEBEN') return `<button type="button" class="schieben" data-wahl="SCHIEBEN">↔ Schieben</button>`;
+        const m = J.MODI[c];
+        return m.trumpf >= 0
+          ? `<button type="button" data-wahl="${c}" aria-label="${m.lang}">${K.zeichen(m.trumpf)}</button>`
+          : `<button type="button" data-wahl="${c}">${m.symbol} ${m.name}</button>`;
+      }
+      function zeichneWahl() {
+        const modi = J.erlaubteModi(regeln);
+        const farben = modi.filter((c) => J.MODI[c].trumpf >= 0);
+        const andere = modi.filter((c) => J.MODI[c].trumpf < 0).concat(darfSchieben ? ['SCHIEBEN'] : []);
+        $('quickWahl').innerHTML = [farben, andere].filter((z) => z.length).map((z) => `<div class="zeile">${z.map(knopf).join('')}</div>`).join('');
+      }
+      function neu() {
+        hand = J.verteile(J.zufall(J.neuerSeed()))[0];
+        liste = null; wahl = null;
+        zeichneKarten(null);
+        zeichneWahl();
+        $('quickErgebnis').hidden = true;
+        $('quickKnoepfe').hidden = true;
+        rechne();
+      }
+      // gleich wie «Trumpf wählen»: Rechentiefe aus den Einstellungen
+      function rechne() {
+        const id = ++rechnung;
+        const b = B.bewertung(hand, regeln, { geschoben: !darfSchieben });
+        const ziel = Math.max(200, B.rechentiefe(anzeige.rechnen).ansage * 4);
+        const schritt = () => {
+          if (id !== rechnung) return;
+          const t0 = performance.now();
+          while (b.gemacht < ziel && performance.now() - t0 < 25) b.schritt(5);
+          if (b.gemacht < ziel) {
+            const balken = $('quickBalken');
+            if (balken) balken.style.width = Math.round((100 * b.gemacht) / ziel) + '%';
+            setTimeout(schritt, 0);
+            return;
+          }
+          liste = b.ergebnis();
+          if (wahl) zeigeErgebnis();
+        };
+        setTimeout(schritt, 60);
+      }
+      function zeigeErgebnis() {
+        const beste = liste[0];
+        const meine = liste.find((x) => x.code === wahl) || beste;
+        zeichneKarten(beste.code);
+        $('quickWahl').querySelectorAll('button').forEach((b) => {
+          b.disabled = true;
+          b.classList.toggle('meine', b.dataset.wahl === wahl && wahl !== beste.code);
+          b.classList.toggle('beste', b.dataset.wahl === beste.code);
+        });
+        const grund = esc(B.faustregel(hand, beste.code));
+        const diff = beste.punkte - meine.punkte;
+        $('quickErgebnis').innerHTML = meine === beste
+          ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}.</b> ${grund}</p>`
+          : `<p>Der Computer: <b>${esc(name(beste.code))}</b>. ${grund}</p>
+             <p class="klein">Deine Wahl, ${esc(name(meine.code))}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
+        $('quickErgebnis').hidden = false;
+        $('quickKnoepfe').hidden = false;
+      }
+      $('quickWahl').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-wahl]');
+        if (!b || b.disabled || wahl) return;
+        wahl = b.dataset.wahl;
+        b.classList.add('meine');
+        $('quickWahl').querySelectorAll('button').forEach((x) => { x.disabled = true; });
+        if (liste) { zeigeErgebnis(); return; }
+        $('quickErgebnis').innerHTML = '<p class="klein">Der Computer rechnet noch …</p><div class="quick-balken"><span id="quickBalken"></span></div>';
+        $('quickErgebnis').hidden = false;
+      });
+      $('quickNochmal').addEventListener('click', neu);
+      const ausblenden = () => { rechnung++; box.hidden = true; };
+      $('quickAus').addEventListener('click', ausblenden);
+      $('quickWeg').addEventListener('click', ausblenden);
+      // Zurück auf die Startseite (aus dem Zwischenspeicher des Browsers):
+      // ausgeblendet gilt nur für einen Besuch.
+      window.addEventListener('pageshow', (e) => { if (e.persisted && box.hidden) { box.hidden = false; neu(); } });
+      box.hidden = false;
+      neu();
     })();
   </script>
   <script>

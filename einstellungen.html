@@ -68,6 +68,10 @@
     </div>
 
     <div class="panel stack">
+      <h2>Startseite</h2>
+      <label class="schalter"><span class="text"><span>Quick Trumpf</span><small>Neun Karten: Was trumpfst du?</small></span><input type="checkbox" id="quickTrumpf"></label>
+    </div>
+    <div class="panel stack">
       <h2>Spielregeln</h2>
       <div class="stack" id="regeln" style="gap:10px"></div>
     </div>
@@ -122,6 +126,8 @@
       anzeigeBox = neu;
       E.anzeigeFormular(neu, anzeige, (a) => E.speichereAnzeige(a));
     }
+    $('quickTrumpf').checked = anzeige.quickTrumpf !== false;
+    $('quickTrumpf').addEventListener('change', (e) => { anzeige.quickTrumpf = e.target.checked; E.speichereAnzeige(anzeige); });
     zeichneDesigns();
     zeichneAnzeige();
   })();
