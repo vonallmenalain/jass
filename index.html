@@ -347,10 +347,12 @@
         });
         const grund = esc(B.faustregel(hand, beste.code));
         const diff = beste.punkte - meine.punkte;
+        // erwartete Punkte nur bei einer Ansage, nicht beim Schieben
+        const punkte = (x) => (x.code === 'SCHIEBEN' ? '' : ` (Ø ${Math.round(x.punkte)} Punkte)`);
         $('quickErgebnis').innerHTML = meine === beste
-          ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}.</b> ${grund}</p>`
-          : `<p>Der Computer: <b>${esc(name(beste.code))}</b>. ${grund}</p>
-             <p class="klein">Deine Wahl, ${esc(name(meine.code))}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
+          ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}${punkte(beste)}.</b> ${grund}</p>`
+          : `<p>Der Computer: <b>${esc(name(beste.code))}</b>${punkte(beste)}. ${grund}</p>
+             <p class="klein">Deine Wahl, ${esc(name(meine.code))}${punkte(meine)}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
         $('quickErgebnis').hidden = false;
         $('quickKnoepfe').hidden = false;
       }
