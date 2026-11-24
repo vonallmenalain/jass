@@ -177,7 +177,7 @@
       <div class="quick-knoepfe" id="quickKnoepfe" hidden>
         <button class="nochmal" type="button" id="quickNochmal">Nochmal</button>
         <a href="trumpf-trainer.html">Trumpf Training</a>
-        <button type="button" id="quickAus">Ausblenden</button>
+        <a href="jass-spiel.html" id="quickSpielen">Ausspielen</a>
       </div>
     </section>
 
@@ -355,6 +355,9 @@
              <p class="klein">Deine Wahl, ${esc(name(meine.code))}${punkte(meine)}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
         $('quickErgebnis').hidden = false;
         $('quickKnoepfe').hidden = false;
+        // Ausspielen: genau diese Hand, die eigene Wahl ist schon angesagt;
+        // nach der Runde zurück auf die Startseite.
+        $('quickSpielen').href = 'jass-spiel.html?hand=' + hand.join('.') + '&trainer=1&zurueck=start&ansage=' + encodeURIComponent(wahl);
       }
       $('quickWahl').addEventListener('click', (e) => {
         const b = e.target.closest('[data-wahl]');
@@ -367,8 +370,11 @@
         $('quickErgebnis').hidden = false;
       });
       $('quickNochmal').addEventListener('click', neu);
+      // Für den Verlauf: was der Computer zu dieser Hand gerechnet hat.
+      $('quickSpielen').addEventListener('click', () => {
+        try { localStorage.setItem('jass-quick-v1', JSON.stringify({ hand, wahl, werte: liste.map((x) => ({ c: x.code, p: Math.round(x.punkte * 10) / 10 })), n: liste[0].n })); } catch (e) { /* egal */ }
+      });
       const ausblenden = () => { rechnung++; box.hidden = true; };
-      $('quickAus').addEventListener('click', ausblenden);
       $('quickWeg').addEventListener('click', ausblenden);
       // Zurück auf die Startseite (aus dem Zwischenspeicher des Browsers):
       // ausgeblendet gilt nur für einen Besuch.
