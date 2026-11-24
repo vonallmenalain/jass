@@ -118,7 +118,8 @@
       font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px;
     }
     .quick-wahl button .farbzeichen { width: 22px; height: 22px; }
-    .quick-wahl button:disabled { cursor: default; opacity: .45; }
+    /* nach der Antwort: die anderen gedämpft, aber weiter wählbar */
+    .quick-wahl.fertig button { opacity: .45; }
     .quick-wahl button.meine { opacity: 1; border-color: #facc15; }
     .quick-wahl button.beste { opacity: 1; border-color: #4ade80; }
     .quick-ergebnis { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; line-height: 1.4; }
@@ -273,6 +274,7 @@
     // Man muss ansagen und spielt als Erster aus (wie mit «Ausspielen»). Der
     // Computer rechnet schon, während man überlegt (gleich wie «Trumpf
     // wählen»), und zeigt nach der Antwort seine Wahl mit einem kurzen Grund.
+    // Danach kann man mit denselben Karten umwählen und sieht die Punkte.
     // Abschalten unter ⚙ (anzeige.quickTrumpf); ✕ gilt nur bis zum nächsten Besuch.
     (function () {
       const J = window.JassEngine, B = window.JassBot, K = window.JassKarten, E = window.JassEinstellungen;
@@ -309,6 +311,7 @@
         liste = null; wahl = null;
         zeichneKarten(null);
         zeichneWahl();
+        $('quickWahl').classList.remove('fertig');
         $('quickErgebnis').hidden = true;
         $('quickKnoepfe').hidden = true;
         rechne();
@@ -337,18 +340,18 @@
         const beste = liste[0];
         const meine = liste.find((x) => x.code === wahl) || beste;
         zeichneKarten(beste.code);
+        $('quickWahl').classList.add('fertig');
         $('quickWahl').querySelectorAll('button').forEach((b) => {
-          b.disabled = true;
           b.classList.toggle('meine', b.dataset.wahl === wahl && wahl !== beste.code);
           b.classList.toggle('beste', b.dataset.wahl === beste.code);
+          b.setAttribute('aria-pressed', String(b.dataset.wahl === wahl));
         });
         const grund = esc(B.faustregel(hand, beste.code));
-        const diff = beste.punkte - meine.punkte;
         const punkte = (x) => ` (Ø ${Math.round(x.punkte)} Punkte)`;
         $('quickErgebnis').innerHTML = meine === beste
           ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}${punkte(beste)}.</b> ${grund}</p>`
           : `<p>Der Computer: <b>${esc(name(beste.code))}</b>${punkte(beste)}. ${grund}</p>
-             <p class="klein">Deine Wahl, ${esc(name(meine.code))}${punkte(meine)}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
+             <p>Deine Wahl: <b>${esc(name(meine.code))}</b>${punkte(meine)}.</p>`;
         $('quickErgebnis').hidden = false;
         $('quickKnoepfe').hidden = false;
         // Ausspielen: genau diese Hand, die eigene Wahl ist schon angesagt;
@@ -356,14 +359,17 @@
         $('quickSpielen').href = 'jass-spiel.html?hand=' + hand.join('.') + '&trainer=1&zurueck=start&ansage=' + encodeURIComponent(wahl);
       }
       $('quickWahl').addEventListener('click', (e) => {
+        // auch nach der Antwort: umwählen zeigt die Punkte der neuen Wahl
         const b = e.target.closest('[data-wahl]');
-        if (!b || b.disabled || wahl) return;
+        if (!b) return;
         wahl = b.dataset.wahl;
-        b.classList.add('meine');
-        $('quickWahl').querySelectorAll('button').forEach((x) => { x.disabled = true; });
         if (liste) { zeigeErgebnis(); return; }
-        $('quickErgebnis').innerHTML = '<p class="klein">Der Computer rechnet noch …</p><div class="quick-balken"><span id="quickBalken"></span></div>';
-        $('quickErgebnis').hidden = false;
+        $('quickWahl').classList.add('fertig');
+        $('quickWahl').querySelectorAll('button').forEach((x) => x.classList.toggle('meine', x === b));
+        if ($('quickErgebnis').hidden) {
+          $('quickErgebnis').innerHTML = '<p class="klein">Der Computer rechnet noch …</p><div class="quick-balken"><span id="quickBalken"></span></div>';
+          $('quickErgebnis').hidden = false;
+        }
       });
       $('quickNochmal').addEventListener('click', neu);
       // Für den Verlauf: was der Computer zu dieser Hand gerechnet hat.
