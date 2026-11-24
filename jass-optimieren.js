@@ -10,8 +10,8 @@
  *                                                       → { punkte, zuege, code }
  *   JassOptimieren.starte(partie, beiFortschritt)       → Promise: 8 Durchgänge
  *                                     in Workern, { punkte (Schnitt), min, max, zuege }
- *   JassOptimieren.werteHtml({ schnitt, gespielt, partie })
- *   JassOptimieren.verbinde(element, partie, speichern, beiFertig, beiAnsehen)
+ *   JassOptimieren.werteHtml({ schnitt, gespielt, partie, gespieltAnsehen })
+ *   JassOptimieren.verbinde(element, partie, speichern, beiFertig, beiAnsehen, beiGespielt)
  *   JassOptimieren.alsPartie(partie)  → der typische Durchgang als Partie (Verlauf)
  *
  * Die Seite rechnet nicht selbst: Dieselbe Datei läuft als Web Worker, damit
@@ -166,7 +166,9 @@
     }
     return `<div class="drei-werte" data-werte>
         <div><span>Ø deine Karten</span><b>${rund(o.schnitt)}</b></div>
-        <div><span>Gespielt</span><b>${rund(o.gespielt)}</b></div>
+        ${o.gespieltAnsehen
+          ? `<button type="button" data-gespielt-ansehen aria-label="Gespielte Runde"><span>Gespielt ›</span><b>${rund(o.gespielt)}</b></button>`
+          : `<div><span>Gespielt</span><b>${rund(o.gespielt)}</b></div>`}
         ${ansehen
           ? `<button type="button" class="optimiert" data-optimiert-ansehen aria-label="So spielt der Computer"><span>Optimiert ›</span>${dritte}</button>`
           : `<div class="optimiert"><span>Optimiert</span>${dritte}</div>`}
@@ -176,7 +178,9 @@
   // Knopf «Optimieren» in `el` anschliessen. Nach dem Rechnen steht das
   // Ergebnis in partie.optimiert; speichern(partie) legt es ab. Ein Tipp auf
   // den fertigen Wert ruft beiAnsehen(partie) auf (die gespielte Runde zeigen).
-  function verbinde(el, partie, speichern, beiFertig, beiAnsehen) {
+  function verbinde(el, partie, speichern, beiFertig, beiAnsehen, beiGespielt) {
+    const gespielt = el && el.querySelector('[data-gespielt-ansehen]');
+    if (gespielt && beiGespielt) gespielt.addEventListener('click', () => beiGespielt(partie));
     const ansehen = el && el.querySelector('[data-optimiert-ansehen]');
     if (ansehen && partie && beiAnsehen) ansehen.addEventListener('click', () => beiAnsehen(partie));
     const knopf = el && el.querySelector('[data-optimieren]');

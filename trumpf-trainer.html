@@ -328,7 +328,7 @@
       const partie = e.partieId ? V.lade(e.partieId) : null;
       return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" id="vergleich" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(sprechen))}">
         <h3>Ausgespielt</h3>
-        ${O.werteHtml({ schnitt: erwartet, gespielt: e.punkte, partie })}
+        ${O.werteHtml({ schnitt: erwartet, gespielt: e.punkte, partie, gespieltAnsehen: !!partie })}
         <p class="muted">${wie}${anders}.${partie && partie.optimiert ? '' : ' ' + satz}</p>
         ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=trainer" style="align-self:flex-start" data-verlauf>📜 Gespielte Runde</a>` : ''}
       </div>`;
@@ -347,6 +347,9 @@
       }, (p) => {
         E.schreibe(KEY_SERIE, serie);
         location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&ansicht=optimiert&von=trainer';
+      }, (p) => {
+        E.schreibe(KEY_SERIE, serie);
+        location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&von=trainer';
       });
     }
 
