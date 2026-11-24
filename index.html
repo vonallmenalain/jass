@@ -89,6 +89,18 @@
     .kachel:active { transform: scale(.98); }
     .kachel.haupt { background: linear-gradient(160deg, rgba(254, 121, 113, 0.22), var(--flaeche) 62%); border-color: rgba(254, 121, 113, 0.35); }
     .kachel svg { width: 28px; height: 28px; color: var(--accent); }
+    /* breite Kachel mit Auswahl direkt darin (Zähler, Jass lernen) */
+    .kachel.breit { grid-column: 1 / -1; cursor: default; gap: 12px; }
+    .kachel.breit:active { transform: none; }
+    .kachel.breit .titel { display: flex; align-items: center; gap: 10px; }
+    .kachel.breit .wahl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+    .kachel.breit .wahl a {
+      display: grid; place-items: center; min-height: 46px; padding: 8px 6px; border-radius: 12px; text-align: center;
+      text-decoration: none; color: inherit; font-weight: 700; font-size: 14px; line-height: 1.2;
+      background: color-mix(in srgb, currentColor 7%, transparent); border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+    }
+    .kachel.breit .wahl a:hover, .kachel.breit .wahl a:focus-visible { border-color: var(--accent); outline: none; }
+    .kachel.breit .wahl a:active { transform: scale(.97); }
     .kachel b { font-family: "Space Grotesk", "Inter", sans-serif; font-size: 17px; font-weight: 700; line-height: 1.15; }
     .modal-hinten {
       position: fixed; inset: 0; z-index: 80; display: none; align-items: flex-end; justify-content: center;
@@ -145,32 +157,30 @@
     <section class="gruppe">
       <h2>Zählen &amp; Lernen</h2>
       <div class="kacheln">
-        <button class="kachel" type="button" id="zaehlerBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/></svg><b>Zähler</b></button>
-        <a class="kachel" href="training.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c3 2 7 2 10 0v-4"/></svg><b>Jass lernen</b></a>
+        <div class="kachel breit">
+          <div class="titel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/></svg><b>Zähler</b></div>
+          <div class="wahl">
+            <a href="schieber-zähler.html">Schieber</a>
+            <a href="sidi-zähler.html">Sidi</a>
+            <a href="coiffeur-zähler.html">Coiffeur</a>
+          </div>
+        </div>
+        <div class="kachel breit">
+          <div class="titel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c3 2 7 2 10 0v-4"/></svg><b>Jass lernen</b></div>
+          <div class="wahl">
+            <a href="zaehlen.html">Stiche zählen</a>
+            <a href="trumpf-trainer.html">Trumpf wählen</a>
+            <a href="trumpf-helfer.html">Trumpf-Helfer</a>
+          </div>
+        </div>
       </div>
     </section>
   </div>
 
-  <div class="modal-hinten" id="zaehlerWahl" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="zaehlerTitel">
-      <div class="modal-kopf"><h2 id="zaehlerTitel">Zähler</h2><button type="button" id="zaehlerZu" aria-label="Schliessen">×</button></div>
-      <a class="modus" href="schieber-zähler.html">Schieber</a>
-      <a class="modus" href="sidi-zähler.html">Sidi</a>
-      <a class="modus" href="coiffeur-zähler.html">Coiffeur</a>
-    </div>
-  </div>
 
   <script>
     (function () {
       const $ = (id) => document.getElementById(id);
-      // Zähler wählen
-      const wahl = $('zaehlerWahl');
-      const zu = () => { wahl.classList.remove('offen'); wahl.setAttribute('aria-hidden', 'true'); };
-      $('zaehlerBtn').addEventListener('click', () => { wahl.classList.add('offen'); wahl.setAttribute('aria-hidden', 'false'); });
-      $('zaehlerZu').addEventListener('click', zu);
-      wahl.addEventListener('click', (e) => { if (e.target === wahl) zu(); });
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') zu(); });
-
       // Laufendes Spiel gegen den Computer: weiterspielen oder beenden
       const KEY = 'jass-lernen-spiel-v1';
       function laufend() {
