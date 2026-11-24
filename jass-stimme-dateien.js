@@ -1348,7 +1348,7 @@ window.JassStimmeDateien = {
   "Slalom wechselt jeden Stich zwischen Obenabe und Undenufe – gut mit hohen und tiefen Karten in derselben Farbe.": "stimme/5abc4cec73e3.mp3",
   "So viele Punkte macht euer Team im Schnitt, wenn ihr so ansagt:": "stimme/c5da48ddd790.mp3",
   "Stiche zählen": "stimme/f58b7373c126.mp3",
-  "Trumpf wählen": "stimme/a02359783333.mp3",
+  "Trumpf Training": "stimme/f63a2744c3ff.mp3",
   "Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – spiel im ersten Stich deinen höchsten Trumpf. So weiss er, wie stark du im Trumpf bist: Kommt die Sechs, hast du keinen anderen.": "stimme/3d7ee52c00d3.mp3",
   "Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.": "stimme/7d6025ec0113.mp3",
   "Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.": "stimme/c65321429934.mp3",

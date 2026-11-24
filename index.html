@@ -176,7 +176,7 @@
       <div class="quick-ergebnis" id="quickErgebnis" hidden></div>
       <div class="quick-knoepfe" id="quickKnoepfe" hidden>
         <button class="nochmal" type="button" id="quickNochmal">Nochmal</button>
-        <a href="trumpf-trainer.html">Trumpf wählen</a>
+        <a href="trumpf-trainer.html">Trumpf Training</a>
         <button type="button" id="quickAus">Ausblenden</button>
       </div>
     </section>
@@ -203,7 +203,7 @@
         <div class="kachel breit">
           <div class="titel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-4 9 4-9 4-9-4z"/><path d="M7 11v4c3 2 7 2 10 0v-4"/></svg><b>Jass Training</b></div>
           <div class="wahl">
-            <a href="trumpf-trainer.html">Trumpf wählen</a>
+            <a href="trumpf-trainer.html">Trumpf Training</a>
             <a href="trumpf-helfer.html">Trumpf-Helfer</a>
             <a href="zaehlen.html">Stiche zählen</a>
           </div>
@@ -347,10 +347,12 @@
         });
         const grund = esc(B.faustregel(hand, beste.code));
         const diff = beste.punkte - meine.punkte;
+        // erwartete Punkte nur bei einer Ansage, nicht beim Schieben
+        const punkte = (x) => (x.code === 'SCHIEBEN' ? '' : ` (Ø ${Math.round(x.punkte)} Punkte)`);
         $('quickErgebnis').innerHTML = meine === beste
-          ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}.</b> ${grund}</p>`
-          : `<p>Der Computer: <b>${esc(name(beste.code))}</b>. ${grund}</p>
-             <p class="klein">Deine Wahl, ${esc(name(meine.code))}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
+          ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}${punkte(beste)}.</b> ${grund}</p>`
+          : `<p>Der Computer: <b>${esc(name(beste.code))}</b>${punkte(beste)}. ${grund}</p>
+             <p class="klein">Deine Wahl, ${esc(name(meine.code))}${punkte(meine)}: ${diff < 1 ? 'praktisch gleich gut.' : 'im Schnitt ' + Math.round(diff) + ' Punkte weniger.'}</p>`;
         $('quickErgebnis').hidden = false;
         $('quickKnoepfe').hidden = false;
       }
