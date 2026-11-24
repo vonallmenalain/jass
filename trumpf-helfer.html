@@ -68,7 +68,7 @@
 <body>
   <div class="app" style="--max: 720px">
     <div class="topbar">
-      <a class="icon-btn" href="training.html" aria-label="Zurück">←</a>
+      <a class="icon-btn" href="index.html" aria-label="Zurück">←</a>
       <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Trumpf-Helfer</h1></div>
       <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
     </div>
@@ -264,7 +264,7 @@
       const partie = e.partieId ? V.lade(e.partieId) : null;
       return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" id="vergleich" data-vorlesen data-sprechen="${esc(JSON.stringify(sprechen))}">
         <h3>Ausgespielt</h3>
-        ${O.werteHtml({ schnitt: erwartet, gespielt: e.punkte, partie })}
+        ${O.werteHtml({ schnitt: erwartet, gespielt: e.punkte, partie, gespieltAnsehen: !!partie })}
         <p class="muted">${wie}.${partie && partie.optimiert ? '' : ' ' + satz}</p>
         ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=helfer" style="align-self:flex-start">📜 Gespielte Runde</a>` : ''}
       </div>`;
@@ -277,7 +277,8 @@
       O.verbinde(v, V.lade(ausgespielt.partieId), (p) => V.speichere(p), () => {
         v.outerHTML = vergleichHtml(liste);
         verbindeVergleich(liste);
-      }, (p) => { location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&ansicht=optimiert&von=helfer'; });
+      }, (p) => { location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&ansicht=optimiert&von=helfer'; },
+      (p) => { location.href = 'verlauf.html?p=' + encodeURIComponent(p.id) + '&von=helfer'; });
     }
 
     function zeigeErgebnis(liste) {
