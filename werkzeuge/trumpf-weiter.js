@@ -14,6 +14,17 @@
 // Verteilungen und über die, in denen die Regel etwas geändert hat.
 // Mehrere Prozesse mit verschiedenem [start] laufen lassen und zusammenzählen
 // (--json gibt die Einzelwerte aus).
+//
+// Ergebnis (24.11.2026, Tiefe schnell):
+// 1. Weiter ziehen, sobald man den höchsten Trumpf hat (beliebig viele
+//    draussen), 1600 Spiele: in den geänderten Spielen Schwelle 8 −0,1 ± 0,8,
+//    16 −0,9 ± 0,7, immer −2,1 ± 0,8. Aufgeschlüsselt (996 Spiele «immer»):
+//    3+ Trümpfe draussen −3,2; nach dem Schieben −3,4 ± 0,8; nur 1 draussen
+//    +2,8 ± 1,2 (bei kleiner Lücke +4,9 ± 1,4).
+// 2. Darum nur noch «den letzten Trumpf holen» (genau einer draussen).
+//    Gegenprobe an 2000 neuen Spielen: Schwelle 8 +1,1 ± 1,2 in 168
+//    geänderten Spielen, 16 +0,1 ± 1,2 – neutral bis leicht positiv. Als
+//    Konvention übernommen, Schwelle 8.
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
 
