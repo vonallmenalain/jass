@@ -247,6 +247,29 @@ test('Gleichwertige Karten: die höchste zuerst (Buur vor Nell, im Undenufe Sech
   assert.equal(B.mittelZug(B.ansichtAus(spiel, 0)).karte, 23);
 });
 
+test('Gleichwertige Karten, aber der König ist noch draussen: kein «Stich sicher»', () => {
+  // Aus einer Partie (Ecke Trumpf): Ben hat Schaufel Ass, Dame, Bauer –
+  // der König ist noch bei Clara. Bauer und Dame sind gleichwertig, sicher
+  // ist der Stich mit der Dame aber nicht.
+  const regeln = J.regelnMitStandard();
+  const haende = [[0, 2, 27, 31, 29, 14, 11, 32, 13], [3, 12, 35, 23, 10, 34, 19, 1, 25], [8, 17, 15, 26, 5, 9, 24, 30, 6], [33, 16, 18, 7, 4, 21, 22, 28, 20]];
+  const zuege = [[0, 32], [1, 34], [2, 30], [3, 28], [0, 27], [1, 35], [2, 9], [3, 33], [1, 10], [2, 15], [3, 16], [0, 11], [3, 22], [0, 31], [1, 19], [2, 24], [0, 14], [1, 12], [2, 17], [3, 18]];
+  let gesehen = 0;
+  for (let i = 0; i < 4; i++) {
+    const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 0 });
+    J.ansagen(spiel, 'T3');
+    for (const [s, k] of zuege) J.spiele(spiel, s, k);
+    const z = B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120 });
+    if (z.karte === karte(S, WB) || z.karte === karte(S, WD)) {
+      gesehen++;
+      assert.equal(z.karte, karte(S, WD), 'die höhere der beiden');
+      assert.doesNotMatch(z.grund, /dass der Stich sicher ist/);
+      assert.match(z.grund, /noch nicht/);
+    }
+  }
+  assert.ok(gesehen > 0, 'Bauer oder Dame mindestens einmal gewählt');
+});
+
 test('Ass schmieren als Zeichen: mit Ass, König, Dame geschmiert – der Partner spielt die Farbe zurück', () => {
   const regeln = J.regelnMitStandard();
   const haende = [

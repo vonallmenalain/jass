@@ -25,6 +25,22 @@
     .partie-zeile { display: flex; flex-direction: column; gap: 4px; text-align: left; width: 100%; padding: 12px 14px; }
     .partie-zeile .oben { display: flex; justify-content: space-between; gap: 8px; width: 100%; font-weight: 800; }
     .partie-zeile .unten { font-size: 13px; color: var(--muted); font-weight: 600; }
+    /* Mehrfachauswahl: lange drücken */
+    .partie-zeile { position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+    .auswahl-an .partie-zeile { padding-left: 48px; }
+    .auswahl-an .partie-zeile::before {
+      content: ""; position: absolute; left: 15px; top: 50%; width: 20px; height: 20px; margin-top: -12px;
+      border-radius: 50%; border: 2px solid var(--muted-2); font-size: 13px; line-height: 20px; text-align: center; font-weight: 900;
+    }
+    .auswahl-an .partie-zeile.gewaehlt { border-color: var(--accent); }
+    .auswahl-an .partie-zeile.gewaehlt::before { content: "✓"; background: var(--accent); border-color: var(--accent); color: #1a0c0b; }
+    .auswahl-leiste {
+      position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; gap: 8px;
+      margin: 0 -4px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+      border-radius: 18px 18px 0 0; background: var(--panel-strong); border: 1px solid var(--border);
+      box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .auswahl-leiste[hidden] { display: none; }
     .runden-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
     .runden-tabs button { flex-shrink: 0; }
     .mini { display: inline-block; width: 38px; vertical-align: middle; }
@@ -65,6 +81,15 @@
       <div class="topbar-titel"><span class="eyebrow" id="eyebrow">Gegen Computer &amp; Trumpf-Trainer</span><h1 id="titel">Gespielte Partien</h1></div>
     </div>
     <section class="stack" id="liste"></section>
+    <div class="auswahl-leiste" id="auswahlLeiste" hidden>
+      <div class="reihe" style="justify-content:space-between"><b id="auswahlZahl"></b>
+        <span class="reihe" style="gap:6px"><button class="btn-ghost btn-klein" type="button" id="auswahlAlle">Alle</button><button class="btn-ghost btn-klein" type="button" id="auswahlEnde" aria-label="Auswahl beenden">✕</button></span></div>
+      <div class="reihe" style="gap:6px">
+        <button class="btn btn-klein" type="button" id="auswahlLaden">⬇︎ Herunterladen</button>
+        <button class="btn-ghost btn-klein" type="button" id="auswahlTeilen">Teilen</button>
+        <button class="btn-ghost btn-klein" type="button" id="auswahlKopieren">Kopieren</button>
+      </div>
+    </div>
     <section class="stack" id="ansicht" hidden></section>
   </div>
 
@@ -128,7 +153,7 @@
         </div>` : ''}
         <div class="panel stack">
           <div class="segmente" id="filter">${knopf('alle', 'Alle')}${knopf('spiel', 'Gegen Computer')}${knopf('trainer', '🎯 Training')}</div>
-          <label class="btn-ghost btn-klein" style="cursor:pointer;align-self:flex-start">📂 Datei öffnen<input type="file" accept=".json,application/json" id="dateiOeffnen" hidden></label>
+          <label class="btn-ghost btn-klein" style="cursor:pointer;align-self:flex-start">📂 Datei öffnen<input type="file" accept=".json,.txt,application/json,text/plain" id="dateiOeffnen" hidden></label>
         </div>
         ${alle.length ? alle.map((p) => {
           const n = p.notizen ? p.notizen.length : 0;
@@ -143,7 +168,8 @@
             <span class="unten">${was}${n ? ' · 🚩 ' + n : ''}</span>
           </button>`;
         }).join('') : `<div class="panel"><p class="muted">${filter === 'trainer' ? 'Noch keine Hand im Trumpf-Trainer oder Trumpf-Helfer ausgespielt.' : 'Noch keine Partie gespielt.'}</p></div>`}`;
-      $('liste').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', () => oeffne(V.lade(b.dataset.id), true)));
+      $('liste').querySelectorAll('[data-id]').forEach(verbindeZeile);
+      zeigeAuswahl();
       // Alle offenen Markierungen in eine Datei – danach abgehakt, die
       // nächste Datei beginnt neu.
       const markierungsFile = () => {
@@ -161,9 +187,8 @@
         fertig(d);
       });
       if ($('markierungenTeilen')) $('markierungenTeilen').addEventListener('click', () => {
-        const { d, f } = markierungsFile();
-        const daten = navigator.canShare && navigator.canShare({ files: [f] }) ? { files: [f], title: f.name } : { title: f.name, text: JSON.stringify(d) };
-        navigator.share(daten).then(() => fertig(d), () => {});
+        const d = V.markierungsDatei();
+        teile(JSON.stringify(d), V.markierungsDateiname()).then((ok) => { if (ok) fertig(d); });
       });
       $('filter').addEventListener('click', (e) => {
         const b = e.target.closest('[data-filter]');
@@ -175,9 +200,18 @@
         const f = e.target.files[0];
         if (!f) return;
         f.text().then((t) => {
-          const p = JSON.parse(t);
-          if (!V.istPartie(p)) throw new Error('keine Partie');
-          oeffne(p, false);
+          const x = JSON.parse(t);
+          if (Array.isArray(x)) {
+            // Mehrere Partien: in die Liste übernehmen.
+            const neu = x.filter((p) => V.istPartie(p) && !V.lade(p.id));
+            if (!x.some((p) => V.istPartie(p))) throw new Error('keine Partie');
+            neu.forEach((p) => V.speichere(p));
+            toast(neu.length === 1 ? '1 Partie übernommen' : neu.length + ' Partien übernommen');
+            zeigeListe();
+            return;
+          }
+          if (!V.istPartie(x)) throw new Error('keine Partie');
+          oeffneAusListe(x, false);
         }).catch(() => alert('Diese Datei ist keine Jass-Partie.'));
       });
     }
@@ -191,6 +225,7 @@
       rundeIndex = 0;
       $('liste').hidden = true;
       $('ansicht').hidden = false;
+      zeigeAuswahl();
       $('titel').textContent = datum(p.start);
       $('eyebrow').textContent = V.quelleVon(p) === 'trainer' ? (vomHelfer(p) ? 'Trumpf-Helfer' : 'Trumpf-Trainer') : 'Gegen Computer';
       zeichneAnsicht();
@@ -329,16 +364,16 @@
         z.classList.toggle('offen');
       }));
       a.querySelectorAll('[data-markieren]').forEach((b) => b.addEventListener('click', () => markiere(Number(b.dataset.markieren))));
-      $('zurListe').addEventListener('click', zeigeListe);
+      $('zurListe').addEventListener('click', zurListe);
       $('herunterladen').addEventListener('click', herunterladen);
       if ($('teilen')) $('teilen').addEventListener('click', teilen);
       $('kopieren').addEventListener('click', () => {
-        navigator.clipboard.writeText(JSON.stringify(partie)).then(() => toast('In die Zwischenablage kopiert'), () => toast('Kopieren ging nicht'));
+        kopiere(JSON.stringify(partie));
       });
       if ($('loeschen')) $('loeschen').addEventListener('click', () => {
         if (!confirm('Diese Partie löschen?')) return;
         V.loesche(partie.id);
-        zeigeListe();
+        zurListe();
       });
     }
 
@@ -377,11 +412,144 @@
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
-    function teilen() {
-      const f = datei();
-      const daten = navigator.canShare && navigator.canShare({ files: [f] }) ? { files: [f], title: f.name } : { title: f.name, text: JSON.stringify(partie) };
-      navigator.share(daten).catch(() => {});
+    function teilen() { teile(JSON.stringify(partie, null, 1), V.dateiname(partie)); }
+
+    // Teilen: als .txt-Datei – Android lässt beim Teilen keine .json-Datei
+    // zu. Geht das nicht, als Text; geht auch das nicht, in die
+    // Zwischenablage. → Promise(true, wenn geteilt)
+    function teile(text, name) {
+      const txt = name.replace(/\.json$/, '.txt');
+      let p = null;
+      try {
+        const f = new File([text], txt, { type: 'text/plain' });
+        if (navigator.canShare && navigator.canShare({ files: [f] })) p = navigator.share({ files: [f], title: txt });
+        else if (navigator.share) p = navigator.share({ title: txt, text });
+      } catch (e) { p = Promise.reject(e); }
+      if (!p) { kopiere(text); return Promise.resolve(false); }
+      return p.then(() => true, (e) => {
+        if (!(e && e.name === 'AbortError')) kopiere(text, 'Teilen ging nicht – in die Zwischenablage kopiert');
+        return false;
+      });
     }
+
+    function kopiere(text, meldung) {
+      const ok = () => toast(meldung || 'In die Zwischenablage kopiert');
+      const alt = () => {
+        const t = document.createElement('textarea');
+        t.value = text;
+        t.setAttribute('readonly', '');
+        t.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(t);
+        t.select();
+        let geklappt = false;
+        try { geklappt = document.execCommand('copy'); } catch (e) { /* egal */ }
+        t.remove();
+        if (geklappt) ok(); else toast('Kopieren ging nicht');
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, alt);
+      else alt();
+    }
+
+    // ----------------------------------------------- Mehrfachauswahl
+    // Lange drücken (oder Rechtsklick) auf eine Partie: Auswahl beginnt.
+    // Danach wählt jeder Tipp eine Partie an oder ab. Zurück beendet sie.
+
+    let auswahl = null;      // Set der gewählten ids – oder null
+    let listeScroll = 0;
+
+    function verbindeZeile(b) {
+      let uhr = null; let start = null; let lang = false;
+      const halt = () => { if (uhr) { clearTimeout(uhr); uhr = null; } };
+      b.addEventListener('pointerdown', (e) => {
+        if (e.button > 0) return;
+        lang = false;
+        start = [e.clientX, e.clientY];
+        halt();
+        uhr = setTimeout(() => { uhr = null; lang = true; langGedrueckt(b.dataset.id); }, 480);
+      });
+      b.addEventListener('pointermove', (e) => { if (uhr && start && Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 10) halt(); });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => b.addEventListener(t, halt));
+      b.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (!lang) { halt(); lang = true; langGedrueckt(b.dataset.id); }
+      });
+      b.addEventListener('click', (e) => {
+        if (lang) { lang = false; e.preventDefault(); return; }
+        if (auswahl) umschalten(b.dataset.id);
+        else oeffneAusListe(V.lade(b.dataset.id), true);
+      });
+    }
+
+    function langGedrueckt(id) {
+      if (!auswahl) {
+        auswahl = new Set();
+        history.pushState({ auswahl: true }, '');
+      }
+      auswahl.add(id);
+      if (navigator.vibrate) navigator.vibrate(12);
+      zeigeAuswahl();
+    }
+    function umschalten(id) {
+      if (auswahl.has(id)) auswahl.delete(id); else auswahl.add(id);
+      if (!auswahl.size) { history.back(); return; }
+      zeigeAuswahl();
+    }
+    function zeigeAuswahl() {
+      const an = !!auswahl && !partie;
+      $('liste').classList.toggle('auswahl-an', an);
+      $('liste').querySelectorAll('[data-id]').forEach((b) => b.classList.toggle('gewaehlt', an && auswahl.has(b.dataset.id)));
+      $('auswahlLeiste').hidden = !an;
+      if (!an) return;
+      $('auswahlZahl').textContent = auswahl.size === 1 ? '1 Partie ausgewählt' : auswahl.size + ' Partien ausgewählt';
+      $('auswahlTeilen').hidden = !navigator.share;
+    }
+    const gewaehlte = () => V.alle().filter((p) => auswahl && auswahl.has(p.id));
+    function dateinameFuer(liste) {
+      if (liste.length === 1) return V.dateiname(liste[0]);
+      const d = new Date(); const zwei = (n) => String(n).padStart(2, '0');
+      return `jass-partien-${liste.length}-${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}-${zwei(d.getHours())}${zwei(d.getMinutes())}.json`;
+    }
+    // Eine Partie als Objekt, mehrere als Liste – «Datei öffnen» nimmt beides.
+    const inhalt = (liste, eingerueckt) => JSON.stringify(liste.length === 1 ? liste[0] : liste, null, eingerueckt ? 1 : 0);
+
+    $('auswahlEnde').addEventListener('click', () => history.back());
+    $('auswahlAlle').addEventListener('click', () => {
+      $('liste').querySelectorAll('[data-id]').forEach((b) => auswahl.add(b.dataset.id));
+      zeigeAuswahl();
+    });
+    $('auswahlLaden').addEventListener('click', () => {
+      const l = gewaehlte();
+      if (l.length) speichereDatei(new File([inhalt(l, true)], dateinameFuer(l), { type: 'application/json' }));
+    });
+    $('auswahlTeilen').addEventListener('click', () => { const l = gewaehlte(); if (l.length) teile(inhalt(l, true), dateinameFuer(l)); });
+    $('auswahlKopieren').addEventListener('click', () => { const l = gewaehlte(); if (l.length) kopiere(inhalt(l)); });
+
+    // ------------------------------------------------ Zurück
+    // Eine Partie aus der Liste öffnen ist ein eigener Schritt: Zurück (Pfeil
+    // oben oder Zurück am Handy) führt zur Liste, nicht aus der Seite hinaus.
+    function oeffneAusListe(p, ausSpeicher) {
+      if (!p) return;
+      listeScroll = window.scrollY;
+      history.pushState({ ansicht: ausSpeicher ? p.id : 'datei' }, '');
+      oeffne(p, ausSpeicher);
+    }
+    function zurListe() {
+      if (history.state && history.state.ansicht) history.back(); else zeigeListe();
+    }
+    window.addEventListener('popstate', (e) => {
+      const st = e.state || {};
+      if (auswahl && !st.auswahl) { auswahl = null; zeigeAuswahl(); }
+      if (partie && !st.ansicht) {
+        zeigeListe();
+        window.scrollTo(0, listeScroll);
+      } else if (!partie && st.ansicht && st.ansicht !== 'datei' && V.lade(st.ansicht)) {
+        oeffne(V.lade(st.ansicht), true);
+      }
+    });
+    $('zurueckLink').addEventListener('click', (e) => {
+      const st = history.state || {};
+      if (st.auswahl || st.ansicht) { e.preventDefault(); history.back(); }
+    });
 
     function toast(text) {
       const t = document.createElement('div');

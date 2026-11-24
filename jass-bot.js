@@ -841,7 +841,10 @@
       const hoch = nimmt ? hoechsteGleichwertige(wahl.karte, runde.haende[sitz], effG, w.gespielt) : wahl.karte;
       const x = hoch !== wahl.karte ? werte.find((y) => y.karte === hoch) : null;
       if (x && wahl.wert - x.wert <= GLEICH_SCHWELLE) {
-        const grund = hoch === mittel.karte ? mittel.grund : runde.stich.length ? GRUND_GLEICHWERTIG_STICH : GRUND_GLEICHWERTIG;
+        // «Sicher» nur, wenn keine höhere Karte dieser Farbe mehr draussen ist.
+        const sicher = hoehereDraussen(hoch, effG, w.gespielt, runde.haende[sitz]) === 0;
+        const grund = hoch === mittel.karte && sicher ? mittel.grund
+          : !sicher ? GRUND_GLEICHWERTIG_OFFEN : runde.stich.length ? GRUND_GLEICHWERTIG_STICH : GRUND_GLEICHWERTIG;
         return { karte: hoch, grund, werte };
       }
     }
@@ -885,6 +888,7 @@
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
   const GRUND_GLEICHWERTIG_STICH = 'Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.';
+  const GRUND_GLEICHWERTIG_OFFEN = 'Gleichwertige Karten: Für die Punkte ist es gleich – spiel die höhere. Sicher ist der Stich damit aber noch nicht.';
   const GRUND_TRUMPF_NACH_SCHIEBEN = 'Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – spiel im ersten Stich deinen höchsten Trumpf. So weiss er, wie stark du im Trumpf bist: Kommt die Sechs, hast du keinen anderen.';
   const GRUND_ASSE_NACH_SCHIEBEN = 'Dein Partner hat nach deinem Schieben Obenabe angesagt – spiel zuerst alle deine Asse. So weiss er genau, welche du hast: Kommt kein Ass, hast du keines.';
   const GRUND_SECHSEN_NACH_SCHIEBEN = 'Dein Partner hat nach deinem Schieben Undenufe angesagt – spiel zuerst alle deine Sechsen. So weiss er genau, welche du hast: Kommt keine Sechs, hast du keine.';
@@ -1286,6 +1290,7 @@
     GRUND_ASS_SCHMIEREN,
     GRUND_GLEICHWERTIG,
     GRUND_GLEICHWERTIG_STICH,
+    GRUND_GLEICHWERTIG_OFFEN,
     GRUND_UEBERNEHMEN,
     GRUND_UEBERNEHMEN_GLEICH,
     GRUND_TRUMPF_NACH_SCHIEBEN,
