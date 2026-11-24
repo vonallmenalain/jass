@@ -498,6 +498,7 @@ window.JassStimmeDateien = {
   "Gespielt wird Obenabe.": "stimme/d1aa0df0d7b6.mp3",
   "Gespielt wird Undenufe.": "stimme/5bcb653f62c9.mp3",
   "Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.": "stimme/3608089a5180.mp3",
+  "Gleichwertige Karten: Für die Punkte ist es gleich – spiel die höhere. Sicher ist der Stich damit aber noch nicht.": "stimme/1dc5a9d35599.mp3",
   "Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.": "stimme/bf1082656214.mp3",
   "Gut!": "stimme/46d474ef1997.mp3",
   "Herz ist Trumpf.": "stimme/e1288c9a2038.mp3",
