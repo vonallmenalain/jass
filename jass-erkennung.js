@@ -1,7 +1,7 @@
 /*
  * jass-erkennung.js – Karten auf einem Foto der Hand erkennen.
  * ---------------------------------------------------------------------------
- * Das Netz (erkennung/karten-1.onnx) ist ein MobileNetV3 mit kleinem FPN: Es
+ * Das Netz (erkennung/karten-2.onnx) ist ein MobileNetV3 mit kleinem FPN: Es
  * liefert für jede der 36 Karten eine Heatmap (ein Wert pro 8 × 8 Pixel), die
  * dort anschlägt, wo eine Ecke dieser Karte zu sehen ist (bei Bildkarten auch
  * ein Stück der Figur). Trainiert wurde es nur mit künstlichen Kartenfächern
@@ -22,8 +22,8 @@
 
   const ORT_VERSION = '1.20.1';
   const ORT_BASIS = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@' + ORT_VERSION + '/dist/';
-  const MODELL = 'erkennung/karten-1.onnx';
-  const KURZE_SEITE = 320;        // so gross wurde trainiert (Karten 55–155 px breit)
+  const MODELL = 'erkennung/karten-2.onnx';
+  const KURZE_SEITE = 416;        // so gross wurde nachtrainiert (Karten ~70–200 px breit)
   const STUFE = 8;
   const MITTEL = [0.485, 0.456, 0.406];
   const STREUUNG = [0.229, 0.224, 0.225];
@@ -66,7 +66,7 @@
     return t;
   }
 
-  // Grösse fürs Netz: kurze Seite 320, beide Seiten Vielfache von 32.
+  // Grösse fürs Netz: kurze Seite 416, beide Seiten Vielfache von 32.
   function netzGroesse(breite, hoehe) {
     const s = KURZE_SEITE / Math.min(breite, hoehe);
     return { w: Math.max(32, Math.round((breite * s) / 32) * 32), h: Math.max(32, Math.round((hoehe * s) / 32) * 32) };
