@@ -950,7 +950,8 @@
   //   anzeigen: wer eine Farbe angezeigt hat und welche zwei Karten er
   //             darum (wohl) hält – eine davon muss in seiner Hand sein,
   //             solange sie noch nicht gespielt ist.
-  function ansageWissen(spiel, sitz, w) {
+  function ansageWissen(spiel, sitz, w, optionen) {
+    const gegnerLesen = !!(optionen && optionen.gegnerAnzeigen);
     const r = spiel.runde;
     if (!r.code) return null;
     const ansager = r.angesagtVon !== sitz ? r.angesagtVon : -1;
@@ -959,9 +960,10 @@
     for (const st of r.stiche) st.karten.forEach((k, i) => gespieltVon[st.sitze[i]].push(k));
     r.stich.forEach((k, i) => gespieltVon[r.stichSitze[i]].push(k));
     const anzeigen = [];
-    // Anzeigen sind für den Partner gedacht – nur seine werden gelesen.
+    // Anzeigen sind für den Partner gedacht – gelesen werden seine, mit
+    // gegnerAnzeigen auch die der Gegner (sie zeigen ihrem Partner dasselbe).
     for (const a of (w && w.anzeigen) || []) {
-      if (a.sitz !== partner(sitz)) continue;
+      if (a.sitz === sitz || (a.sitz !== partner(sitz) && !gegnerLesen)) continue;
       if (a.hoch.some((k) => gespieltVon[a.sitz].includes(k))) continue;   // hat er schon gezeigt
       const offen = a.hoch.filter((k) => !w.gespielt[k] && !r.haende[sitz].includes(k));
       if (offen.length) anzeigen.push({ sitz: a.sitz, offen });
@@ -1008,7 +1010,7 @@
     const welten = restKarten <= exaktAb ? (o.weltenExakt || 30) : (o.welten || 120);
     const summe = new Map(legal.map((k) => [k, 0]));
     const meinTeam = team(sitz);
-    const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz, o.anzeigenBeachten === false ? null : w);
+    const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz, o.anzeigenBeachten === false ? null : w, o);
     // Mit dem schnellen Löser: die Faustregeln spielen nur bis `loesenAb`
     // Karten übrig sind, den Rest rechnet loese() exakt. Ohne (loeser:
     // false) wie früher: Faustregeln bis zum Schluss, exakt erst ab exaktAb.
