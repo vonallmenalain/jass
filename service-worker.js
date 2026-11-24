@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v29';
+const CACHE_NAME = 'jass-shell-v33';
 const APP_SHELL = [
   './',
   './index.html',

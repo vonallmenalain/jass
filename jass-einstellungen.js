@@ -27,6 +27,7 @@
     klang: 'papier',      // Töne am Tisch: aus | papier | holz | weich (jass-toene.js)
     lautstaerke: 45,      // 0..100
     design: 'nacht',      // nacht | stube | raster | gold (jass-design.js)
+    quickTrumpf: true,    // Startseite: neun Karten, «Was trumpfst du?»
     stand: 2,             // Version der gespeicherten Anzeige (für Umstellungen)
   };
 
