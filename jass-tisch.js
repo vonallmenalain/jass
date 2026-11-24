@@ -395,11 +395,22 @@
       setTimeout(schritt, 30);
     }
 
-    el('tipp').addEventListener('click', () => {
+    let tippLaeuft = false;
+    el('tipp').addEventListener('click', async () => {
       if (z.eingabe === 'ansage') { tippAnsage(); return; }
-      if (!meinKartenZug()) return;
-      const t = o.tippKarte ? o.tippKarte() : B.schwerZug(z.spiel, z.ansichtSitz, B.rechentiefe(anzeige().rechnen));
-      if (!t) return;
+      if (!meinKartenZug() || tippLaeuft) return;
+      // Der Tipp rechnet wie ein Computer-Zug (bis 2 s) – im Hintergrund.
+      tippLaeuft = true;
+      kommentar('💡 …');
+      let t = null;
+      const stich = z.spiel.runde.stichNr * 4 + z.spiel.runde.stich.length;
+      try {
+        t = o.tippKarte ? await o.tippKarte()
+          : root.JassRechner ? await root.JassRechner.tipp(z.spiel, z.ansichtSitz, B.rechentiefe(anzeige().rechnen))
+            : B.schwerZug(z.spiel, z.ansichtSitz, B.rechentiefe(anzeige().rechnen));
+      } finally { tippLaeuft = false; }
+      // inzwischen weitergespielt? Dann gilt der Tipp nicht mehr.
+      if (!t || !meinKartenZug() || z.spiel.runde.stichNr * 4 + z.spiel.runde.stich.length !== stich) { kommentar(''); return; }
       gewaehlt = anzeige().einTipp ? null : t.karte;
       zeichneHand();
       const b = el('hand').querySelector(`[data-karte="${t.karte}"]`);

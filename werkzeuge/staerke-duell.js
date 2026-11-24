@@ -21,7 +21,7 @@ function einstellung(text) {
   const o = {};
   for (const teil of String(text).split(',').filter(Boolean)) {
     const [k, v] = teil.split(':');
-    if (k === 'tiefe') Object.assign(o, B.rechentiefe(v));
+    if (k === 'tiefe') Object.assign(o, B.rechentiefe(v), { zeitMs: 0 });   // ohne Zeitgrenze: unabhängig von der Rechnerlast
     else o[k] = v === 'false' ? false : v === 'true' ? true : Number.isNaN(Number(v)) ? v : Number(v);
   }
   return o;

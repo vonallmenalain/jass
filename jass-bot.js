@@ -1248,6 +1248,12 @@
     // false) wie früher: Faustregeln bis zum Schluss, exakt erst ab exaktAb.
     const mitLoeser = o.loeser !== false;
     const loesenAb = o.loesenAb != null ? o.loesenAb : exaktAb;
+    // Zeitgrenze: so viele Verteilungen wie in o.zeitMs passen (mindestens
+    // o.mindestWelten) – der erste Stich ist am teuersten.
+    const start = Date.now();
+    const zeitMs = o.zeitMs || 0;
+    const mindest = Math.min(welten, o.mindestWelten || 80);
+    let gerechnet = 0;
     const ziehe = () => (info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng));
     // Kartenschätzung: mehr Verteilungen ziehen, nach den bisherigen Zügen
     // der anderen gewichten und die glaubwürdigsten nehmen.
@@ -1260,22 +1266,29 @@
         const beta = o.schaetzungBeta != null ? o.schaetzungBeta : 1;
         const kand = [], lw = [];
         const puffer = new Float64Array(MERKMALE.length);
-        for (let i = 0; i < K; i++) { const h = ziehe(); kand.push(h); lw.push(beta * weltLogL(zuege, h, spiel.regeln, gw, puffer)); }
+        // höchstens etwa ein Drittel der Zeitgrenze für das Ziehen und Gewichten
+        for (let i = 0; i < K; i++) {
+          if (zeitMs && i >= Math.min(K, 2 * mindest) && Date.now() - start > zeitMs * 0.35) break;
+          const h = ziehe(); kand.push(h); lw.push(beta * weltLogL(zuege, h, spiel.regeln, gw, puffer));
+        }
         const max = Math.max(...lw);
         const gew = lw.map((x) => Math.exp(x - max));
         const summe = gew.reduce((a, b) => a + b, 0);
         // systematisch ziehen
         auswahl = [];
+        const K2 = kand.length;
         let c = gew[0] / summe, j = 0;
         const u0 = rng() / welten;
         for (let i = 0; i < welten; i++) {
           const u = u0 + i / welten;
-          while (u > c && j < K - 1) { j++; c += gew[j] / summe; }
+          while (u > c && j < K2 - 1) { j++; c += gew[j] / summe; }
           auswahl.push(kand[j]);
         }
       }
     }
     for (let i = 0; i < welten; i++) {
+      if (zeitMs && i >= mindest && Date.now() - start > zeitMs) break;
+      gerechnet++;
       const haende = auswahl ? auswahl[i] : ziehe();
       const tt = mitLoeser ? new Map() : null;
       for (const k of legal) {
@@ -1290,7 +1303,7 @@
         summe.set(k, summe.get(k) + wert);
       }
     }
-    const werte = legal.map((k) => ({ karte: k, wert: summe.get(k) / welten }));
+    const werte = legal.map((k) => ({ karte: k, wert: summe.get(k) / Math.max(1, gerechnet) }));
     werte.sort((a, b) => b.wert - a.wert);
     // Ausspiel des Schiebers (siehe schieberAusspiel): Trumpf ziehen hat
     // gemessen +2,6 ± 0,8 Punkte gebracht (werkzeuge/trumpf-ziehen.js), die
@@ -1392,8 +1405,8 @@
     let grund = mittel.grund;
     if (wahl.karte !== mittel.karte) {
       grund = info
-        ? 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt, die zur Ansage passen: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.'
-        : 'Ich habe ' + welten + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
+        ? 'Ich habe ' + gerechnet + ' mögliche Kartenverteilungen durchgespielt, die zur Ansage passen: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.'
+        : 'Ich habe ' + gerechnet + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
     }
     return { karte: wahl.karte, grund, werte };
   }
@@ -1884,11 +1897,18 @@
   //   exaktAb      ab so vielen Karten auf dem Tisch wird exakt gerechnet
   //   ansage       so viele Verteilungen für die Wahl des Trumpfs
   // Standard ist «normal» mit 300 Verteilungen pro Zug.
+  // welten: so viele Kartenverteilungen pro Zug (ab exaktAb Karten
+  // weltenExakt); jede wird mit Faustregeln gespielt, bis loesenAb Karten
+  // übrig sind, dann exakt gelöst. schaetzung: die Verteilungen nach den
+  // bisherigen Zügen gewichten. zeitMs: Zeitgrenze pro Zug.
+  // Gemessen (werkzeuge/staerke-duell.js, 600 Spiele bei maximal): Löser ab
+  // 16 + Kartenschätzung + König verlangen +1,4 ± 0,5 Punkte pro Spiel
+  // gegenüber dem Stand davor.
   const RECHENTIEFE = {
-    schnell: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80 },
-    normal: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200 },
-    gruendlich: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400 },
-    maximal: { welten: 1000, weltenExakt: 200, exaktAb: 12, ansage: 600 },
+    schnell: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80, loesenAb: 16, schaetzung: true, zeitMs: 800 },
+    normal: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200, loesenAb: 16, schaetzung: true, zeitMs: 1200 },
+    gruendlich: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400, loesenAb: 16, schaetzung: true, zeitMs: 1500 },
+    maximal: { welten: 1000, weltenExakt: 200, exaktAb: 12, ansage: 600, loesenAb: 16, schaetzung: true, zeitMs: 2000 },
   };
   function rechentiefe(name) { return RECHENTIEFE[name] || RECHENTIEFE.normal; }
 

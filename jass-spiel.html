@@ -80,6 +80,7 @@
 
   <script src="jass-engine.js"></script>
   <script src="jass-bot.js"></script>
+  <script src="jass-rechner.js"></script>
   <script src="jass-karten.js"></script>
   <script src="jass-toene.js"></script>
   <script src="jass-einstellungen.js"></script>
@@ -92,6 +93,7 @@
     'use strict';
     const J = window.JassEngine;
     const B = window.JassBot;
+    const R = window.JassRechner;
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
     const T = window.JassTisch;
@@ -158,9 +160,7 @@
       speichereAnzeige: () => speichereAnzeige(anzeige),
       historieDa: () => !!(partie && partie.runden.length),
       tippKarte() {
-        const t = B.schwerZug(spiel, 0, B.rechentiefe(anzeige.rechnen));
-        letzterTipp = t.karte;
-        return t;
+        return R.tipp(spiel, 0, B.rechentiefe(anzeige.rechnen)).then((t) => { letzterTipp = t.karte; return t; });
       },
     });
 
@@ -360,7 +360,8 @@
             tisch.kommentar(esc(spieler[s].name) + ' überlegt …');
             await tisch.warte(tempo().denken + 250);
             if (!lebt()) return;
-            const w = B.waehleAnsage(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
+            const w = await R.ansage(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
+            if (!lebt()) return;
             wahl = w.code;
             V.ansage(partie, r, s, wahl, { stufe: spieler[s].typ, grund: w.grund, liste: w.liste });
             tisch.kommentar('');   // Gedanken nur im Dialog «Stiche & Gedanken», nicht live
@@ -388,7 +389,8 @@
         } else {
           await tisch.warte(tempo().denken);
           if (!lebt()) return;
-          const zug = B.waehleKarte(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
+          const zug = await R.zug(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
+          if (!lebt()) return;
           karte = zug.karte;
           V.karte(partie, r, s, karte, { stufe: spieler[s].typ, grund: zug.grund, werte: zug.werte });
         }

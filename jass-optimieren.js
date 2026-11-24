@@ -2,7 +2,7 @@
  * jass-optimieren.js – eine gespielte Trainer-Runde vom Computer nachspielen.
  * ---------------------------------------------------------------------------
  * Genau dieselbe Verteilung (alle vier Hände) und dieselbe Ansage, aber auf
- * allen vier Plätzen spielt der Computer («Schwer», Rechentiefe «Maximal»). Er kennt dabei nur seine eigenen Karten – wie ein Mensch.
+ * allen vier Plätzen spielt der Computer («Schwer», Rechentiefe «Normal»). Er kennt dabei nur seine eigenen Karten – wie ein Mensch.
  * Heraus kommt, wie viele Punkte mit diesen Karten drin lagen.
  *
  *   JassOptimieren.vorbereiten(regeln, aufzeichnung)   → Spiel nach der Ansage
@@ -92,8 +92,9 @@
 
   // beiFortschritt(anteil 0..1)
   function starte(partie, beiFortschritt, anzahl) {
-    // Immer mit der grössten Rechentiefe: Es geht um das Beste, was drin lag.
-    const daten = { regeln: partie.regeln, aufzeichnung: aufzeichnungVon(partie), rechnen: 'maximal' };
+    // Rechentiefe «normal» des neuen Computers (Löser, Kartenschätzung):
+    // 8 Durchgänge mit «maximal» dauerten auf dem Handy mehrere Minuten.
+    const daten = { regeln: partie.regeln, aufzeichnung: aufzeichnungVon(partie), rechnen: 'normal' };
     const n = anzahl || DURCHGAENGE;
     const kerne = (root.navigator && root.navigator.hardwareConcurrency) || 2;
     const parallel = Math.max(1, Math.min(4, kerne - 1, n));
@@ -208,7 +209,7 @@
     return {
       format: 'jass-partie', version: 1, id: partie.id + '-optimiert', start: partie.start, ende: o.zeit || partie.ende,
       regeln: partie.regeln, spieler: partie.spieler.map((x) => ({ name: x.name, typ: 'schwer' })),
-      rechnen: o.rechnen || 'maximal', welten: 1000,
+      rechnen: o.rechnen || 'normal', welten: B ? B.rechentiefe(o.rechnen || 'normal').welten : 300,
       runden: [{ nr: r.nr, ansager: r.ansager, haende: r.haende, ansagen: r.ansagen, zuege: o.zuege, abrechnung: ab, code: r.code, angesagtVon: r.angesagtVon, geschoben: r.geschoben }],
       summe: ab ? ab.total.slice() : [o.beispiel, 157 - o.beispiel], sieger: null, notizen: [],
       optimiertVon: partie.id, optimiertSchnitt: o.punkte[0], optimiertMin: o.min, optimiertMax: o.max, optimiertAnzahl: o.laeufe ? o.laeufe.length : 1,
