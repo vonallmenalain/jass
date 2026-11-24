@@ -12,6 +12,10 @@
 // lesen mit). Ausgabe: Unterschied für das ansagende Team, über alle und
 // über die Spiele, in denen die Konvention etwas geändert hat. --json für
 // die Einzelwerte.
+//
+// Ergebnis (24.11.2026, Tiefe schnell, Schwelle 8, 600 Spiele): +0,12 ± 0,31
+// über alle; in 111 geänderten +0,62 ± 1,67 (Obenabe −1,1 ± 2,5, Undenufe
+// +1,7 ± 2,2) – neutral, als Konvention übernommen (Standard an).
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
 
@@ -24,7 +28,7 @@ function spiele(i, code, mit) {
   const spiel = J.neuesSpiel(regeln, { seed: 400000 + i, ersterAnsager: 0 });
   J.ansagen(spiel, code);
   const r = spiel.runde;
-  const opt = Object.assign({ rng: J.zufall(i * 17 + 3), loesenAb: 16 }, B.rechentiefe(tiefe), mit ? { koenigVerlangen: true, verlangenSchwelle: Number(schwelleStr) } : {});
+  const opt = Object.assign({ rng: J.zufall(i * 17 + 3), loesenAb: 16 }, B.rechentiefe(tiefe), mit ? { koenigVerlangen: true, verlangenSchwelle: Number(schwelleStr) } : { koenigVerlangen: false });
   const zuege = [];
   while (r.phase === 'spiel') { const s = r.amZug; const k = B.schwerZug(spiel, s, opt).karte; zuege.push(k); J.spiele(spiel, s, k); }
   return { punkte: r.abrechnung.total[0], zuege: zuege.join() };

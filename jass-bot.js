@@ -1235,7 +1235,7 @@
     const ansicht = ansichtAus(spiel, sitz);
     const mittel = mittelZug(ansicht);
     if (legal.length === 1) return { karte: legal[0], grund: mittel.grund, werte: null };
-    const w = wissen(spiel, sitz, { zeichen: o.schieberZeichen !== false, verlangen: !!o.koenigVerlangen });
+    const w = wissen(spiel, sitz, { zeichen: o.schieberZeichen !== false, verlangen: o.koenigVerlangen !== false });
     const rng = o.rng || J.zufall(J.neuerSeed());
     const restKarten = runde.haende.reduce((n, h) => n + h.length, 0);
     const exaktAb = o.exaktAb != null ? o.exaktAb : 12;
@@ -1309,8 +1309,10 @@
         return { karte: k, grund: GRUND_TRUMPF_NACH_SCHIEBEN, werte };
       }
     }
-    // König (Sieben) verlangen – Ausspiel und Antwort im ersten Stich
-    if (o.koenigVerlangen) {
+    // König (Sieben) verlangen – Ausspiel und Antwort im ersten Stich.
+    // Gemessen (werkzeuge/koenig-verlangen.js, 600 Spiele): neutral, +0,6 ±
+    // 1,7 in den 111 geänderten – als Konvention übernommen.
+    if (o.koenigVerlangen !== false) {
       const schwelleV = o.verlangenSchwelle != null ? o.verlangenSchwelle : VERLANGEN_SCHWELLE;
       const ka = verlangenAusspiel(spiel, sitz, legal);
       const kb = ka == null ? verlangenAntwort(spiel, sitz, legal) : null;
