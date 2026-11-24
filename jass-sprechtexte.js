@@ -29,7 +29,6 @@
   const modusName = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
   const modus = (c) => modusName(c) + '.';
   const karte = (k) => J.FARBEN[J.farbeVon(k)].name + ' ' + J.WERT_NAMEN[J.wertVon(k)] + '.';
-  const hand = (karten) => ['Deine Karten:'].concat(J.sortiereHand(karten, null).map(karte));
   const punkte = (n) => (n === 1 ? '1 Punkt' : n + ' Punkte');
 
   // ------------------------------------------------------- Stiche zählen
@@ -44,24 +43,14 @@
   }
 
   function zaehlenAufgabe(code, karten, letzter) {
-    return [zaehlenModus(code), FRAGE[karten.length] || FRAGE[4]].concat(karten.map(karte), letzter ? [LETZTER] : []);
-  }
-
-  // «Ass: 11.» – im Trumpf heissen Bauer und Neun Buur und Nell.
-  function wertSatz(k, code, wert) {
-    const T = J.MODI[code] ? J.MODI[code].trumpf : -1;
-    const w = J.wertVon(k);
-    let name = J.WERT_NAMEN[w];
-    if (J.farbeVon(k) === T && w === J.WB) name = 'Buur';
-    else if (J.farbeVon(k) === T && w === J.W9) name = 'Nell';
-    return name + ': ' + wert + '.';
+    // Die Karten selbst werden nicht vorgelesen – man sieht sie.
+    return [zaehlenModus(code), FRAGE[karten.length] || FRAGE[4]].concat(letzter ? [LETZTER] : []);
   }
 
   const zusammen = (n) => (n === 1 ? 'Zusammen ist es 1 Punkt.' : 'Zusammen sind es ' + rund(n, ZAEHLEN_MAX) + ' Punkte.');
 
   function zaehlenLoesung(code, karten, werte, letzter, summe, richtig) {
-    return [richtig ? 'Richtig!' : 'Nicht ganz.']
-      .concat(karten.map((k, i) => wertSatz(k, code, werte[i])), letzter ? ['Letzter Stich: 5.'] : [], [zusammen(summe)]);
+    return [richtig ? 'Richtig!' : 'Nicht ganz.'].concat(letzter ? ['Letzter Stich: 5.'] : [], [zusammen(summe)]);
   }
 
   const zaehlenErgebnis = (richtig, laenge, rekord) => [richtig + ' von ' + laenge + ' richtig.'].concat(rekord ? ['Neuer Rekord!'] : []);
@@ -86,7 +75,7 @@
     if (vorbei) lage = [geschoben ? 'Dein Partner hatte geschoben.' : 'Du warst Vorhand.'];
     else if (geschoben) lage = ['Dein Partner hat geschoben – jetzt musst du ansagen.', 'Was ist Trumpf?'];
     else lage = ['Du bist Vorhand und sagst an.', 'Was ist Trumpf – oder schiebst du?'];
-    return karten ? lage.concat(hand(karten)) : lage;
+    return lage;   // die Karten nicht vorlesen – man sieht sie
   }
 
   const URTEIL = ['Da gab es Besseres.', 'Geht so.', 'Gut!', 'Sehr gut!', 'Perfekt!'];
@@ -173,13 +162,10 @@
     for (const c of ['T0', 'T1', 'T2', 'T3', 'OBE', 'UNE']) {
       add(zaehlenModus(c));
       add(werteTabelle(c));
-      for (let k = 0; k < 36; k++) add(wertSatz(k, c, J.PUNKTE[J.effModus(c, 0)][k]));
     }
     add(Object.values(FRAGE)); add(LETZTER); add(['Richtig!', 'Nicht ganz.', 'Letzter Stich: 5.']);
     for (let n = 0; n <= ZAEHLEN_MAX; n++) add(zusammen(n));
     for (const l of [5, 10, 20]) for (let r = 0; r <= l; r++) add(zaehlenErgebnis(r, l, true));
-    for (let k = 0; k < 36; k++) add(karte(k));
-    add('Deine Karten:');
     // Trainer
     add(trainerLage(true)); add(trainerLage(false)); add(trainerLage(true, null, true)); add(trainerLage(false, null, true));
     add(URTEIL);
@@ -215,7 +201,7 @@
   }
 
   const api = {
-    modus, karte, hand, zaehlenAufgabe, zaehlenLoesung, zaehlenErgebnis, werteTabelle,
+    modus, karte, zaehlenAufgabe, zaehlenLoesung, zaehlenErgebnis, werteTabelle,
     trainerLage, trainerAuswertung, vergleich, trainerFertig, AUSSPIELEN_HINWEIS,
     helferVorschlag, HELFER_RUNDE, FOTO_LADEN, FOTO_FEHLER, fotoErkannt, alle,
   };

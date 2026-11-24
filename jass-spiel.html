@@ -58,7 +58,7 @@
       <details class="abschnitt"><summary>Anzeige &amp; Hilfen</summary><div class="inhalt" id="anzeigeFormular"></div></details>
     </div>
 
-    <a class="btn-ghost btn-voll" href="verlauf.html" style="margin-bottom:4px">📜 Gespielte Partien</a>
+    <a class="btn-ghost btn-voll" href="verlauf.html?von=spiel" style="margin-bottom:4px">📜 Gespielte Partien</a>
 
     <div class="start-leiste">
       <button class="btn btn-voll" type="button" id="startBtn">Spiel starten</button>
@@ -429,7 +429,7 @@
         ${tisch.verlaufHtml()}
         <div class="reihe"><button class="btn" type="button" id="nochmals" style="flex:1">Nochmals spielen</button>
         <button class="btn-ghost" type="button" id="zurueck">Einstellungen</button></div>
-        <a class="btn-ghost btn-voll" href="verlauf.html?p=${encodeURIComponent(partie ? partie.id : '')}">Partie nochmals ansehen</a>`, false);
+        <a class="btn-ghost btn-voll" href="verlauf.html?von=spiel&amp;p=${encodeURIComponent(partie ? partie.id : '')}">Partie nochmals ansehen</a>`, false);
       box.querySelector('#nochmals').addEventListener('click', () => {
         tisch.schliesseDialog();
         spiel = J.neuesSpiel(spiel.regeln);

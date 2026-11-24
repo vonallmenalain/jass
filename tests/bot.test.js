@@ -144,7 +144,6 @@ test('Vorlesen: Jeder Satz, den Tipp und Computer sagen können, ist vertonbar',
         while (r.phase === 'spiel') {
           const s = r.amZug;
           const z = B.waehleKarte(spiel, s, stufe, { rng, welten: 6, weltenExakt: 4 });
-          pruefe(B.sprechKarte(z.karte, r.code));
           pruefe(B.sprechGrund(z.grund));
           J.spiele(spiel, s, z.karte);
         }

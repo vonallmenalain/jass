@@ -108,6 +108,10 @@
       <button class="ende" type="button" id="beenden">Beenden</button>
     </div>
 
+    <div class="weiter" id="online" hidden>
+      <a class="los" id="onlineLink" href="jass-online.html"><b>Online weiterspielen</b><span id="onlineText"></span></a>
+    </div>
+
     <section class="gruppe">
       <h2>Spielecke</h2>
       <div class="kacheln">
@@ -170,6 +174,15 @@
           : 'Runde ' + Math.min(s.rundeNr + 1, re.runden) + ' von ' + re.runden + ' läuft';
         $('weiter').hidden = false;
       }
+      // Laufender Online-Tisch (jass-online.js merkt ihn sich, solange man sitzt)
+      try {
+        const t = JSON.parse(localStorage.getItem('jass-online-aktiv-v1') || 'null');
+        if (t && /^[A-Z2-9]{6}$/.test(t.code) && Date.now() - (t.zeit || 0) < 24 * 3600 * 1000) {
+          $('onlineLink').href = 'jass-online.html?t=' + t.code;
+          $('onlineText').textContent = [t.name, t.stand].filter(Boolean).join(' · ');
+          $('online').hidden = false;
+        }
+      } catch (e) { /* egal */ }
       let sicher = false;
       $('beenden').addEventListener('click', () => {
         const b = $('beenden');

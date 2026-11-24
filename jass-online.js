@@ -51,6 +51,22 @@ if (EMULATOR) {
 
 const KEY_NAME = 'jass-online-name-v1';
 const KEY_TISCHE = 'jass-online-tische-v1';
+// Der Tisch, an dem ich gerade sitze – die Startseite zeigt ihn mit einem
+// Knopf zum direkten Zurückkehren (index.html).
+const KEY_AKTIV = 'jass-online-aktiv-v1';
+function merkeAktiv() {
+  const fertig = info && info.status === 'fertig';
+  if (!code || !info || meinSitz < 0 || fertig) {
+    const alt = E.lese(KEY_AKTIV);
+    if (alt && (!code || alt.code === code)) { try { localStorage.removeItem(KEY_AKTIV); } catch (e) { /* egal */ } }
+    return;
+  }
+  const r = spiel && spiel.regeln;
+  let stand = '';
+  if (info.status === 'lobby') stand = 'Lobby';
+  else if (spiel && r) stand = r.spielende === 'punkte' ? 'Runde ' + (spiel.rundeNr + 1) + ' · bis ' + r.zielPunkte : 'Runde ' + Math.min(spiel.rundeNr + 1, r.runden) + ' von ' + r.runden;
+  E.schreibe(KEY_AKTIV, { code, name: info.name || code, stand, zeit: Date.now() });
+}
 const ZEICHEN = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const COMPUTER = ['Anna', 'Ben', 'Clara', 'Dario'];
 const LAGE = ['Platz 1', 'Platz 2', 'Platz 3', 'Platz 4'];
@@ -179,6 +195,7 @@ function zeichneZuletzt() {
 
 function vergissTisch(c) {
   E.schreibe(KEY_TISCHE, (E.lese(KEY_TISCHE) || []).filter((t) => t.code !== c));
+  try { if ((E.lese(KEY_AKTIV) || {}).code === c) localStorage.removeItem(KEY_AKTIV); } catch (e) { /* egal */ }
 }
 
 // Öffentliche Tische mit freien Plätzen. Der Gastgeber trägt seinen Tisch
@@ -455,6 +472,7 @@ function aktualisiereJetzt() {
   if (!infoGeladen) return;
   if (!info) {
     vergissTisch(code);
+    try { if ((E.lese(KEY_AKTIV) || {}).code === code) localStorage.removeItem(KEY_AKTIV); } catch (e) { /* egal */ }
     fehler('<b>Diesen Tisch gibt es nicht (mehr).</b><br>Vielleicht hat ihn der Gastgeber geschlossen. Code: ' + esc(code));
     return;
   }
@@ -464,6 +482,7 @@ function aktualisiereJetzt() {
   setzePraesenz();
   planeUebernahme();
   pflegeOffen();
+  merkeAktiv();
   if (info.status === 'lobby') {
     praesentiert = -1;
     tisch.schliesseDialog();

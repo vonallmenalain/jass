@@ -404,7 +404,7 @@
       zeichneHand();
       const b = el('hand').querySelector(`[data-karte="${t.karte}"]`);
       if (b && anzeige().einTipp) b.classList.add('vorschlag');
-      kommentar('💡 <b>' + J.kartenName(t.karte, z.spiel.runde.code) + ':</b> ' + escapeHtml(t.grund), [B.sprechKarte(t.karte, z.spiel.runde.code), B.sprechGrund(t.grund)]);
+      kommentar('💡 <b>' + J.kartenName(t.karte, z.spiel.runde.code) + ':</b> ' + escapeHtml(t.grund), [B.sprechGrund(t.grund)]);
     });
 
     el('letzter').addEventListener('click', () => {

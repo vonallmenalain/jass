@@ -16,7 +16,7 @@
     hilfen: true,         // erlaubte Karten hervorheben
     tipps: true,          // Tipp-Knopf
     gedanken: false,      // alle Gedanken und Stiche anzeigen (im Training immer an)
-    farben: 'klassisch',  // klassisch | vier
+    farben: 'klassisch',  // immer Rot & Schwarz (die Auswahl «Vier Farben» gibt es nicht mehr)
     einTipp: false,       // Karte mit einem Tipp spielen (sonst: antippen, dann nochmals)
     rechnen: 'maximal',   // Rechentiefe der Computer, Tipps und Trainer: «maximal» = 1000 Verteilungen (JassBot.RECHENTIEFE)
     kartenbild: 'foto',   // foto (unsere Karten) | eigen | klassisch (SVG-cards) – karten/README.md
@@ -63,6 +63,7 @@
   function ladeAnzeige() {
     const gespeichert = lese(KEY_ANZEIGE) || {};
     const a = Object.assign({}, STANDARD_ANZEIGE, gespeichert);
+    a.farben = 'klassisch';
     // Stand 2: «Maximal» ist neu Standard – auch für alle, die noch den
     // alten Standard («Normal») gespeichert haben.
     if ((gespeichert.stand || 1) < 2) {
@@ -245,7 +246,6 @@
         <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Töne am Tisch</span>${segmente('klang', (root.JassToene ? root.JassToene.KLAENGE : [['aus', 'Aus']]), a.klang)}
           <div class="reihe" style="gap:10px;align-items:center"><span class="muted klein">Leise</span><input type="range" min="0" max="100" step="5" value="${Number(a.lautstaerke) || 0}" data-r="lautstaerke" aria-label="Lautstärke" style="flex:1"><span class="muted klein">Laut</span>
           <button class="btn-ghost btn-klein" type="button" data-probe>▶ Probe</button></div></div>` : ''}
-        <div class="stack" style="gap:8px;padding:6px 0 10px"><span>Kartenfarben</span>${segmente('farben', [['klassisch', 'Rot & Schwarz'], ['vier', 'Vier Farben']], a.farben)}</div>
         ${o.spiel !== false ? `
         ${schalter('hilfen', 'Erlaubte Karten hervorheben', '', a.hilfen)}
         ${o.tipps !== false ? schalter('tipps', 'Tipp-Knopf', '', a.tipps) : ''}
