@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jass-shell-v19';
+const CACHE_NAME = 'jass-shell-v20';
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,6 +14,9 @@ const APP_SHELL = [
   './zaehlen.html',
   './trumpf-helfer.html',
   './verlauf.html',
+  './einstellungen.html',
+  './jass-design.js',
+  './jass-design.css',
   './jass-verlauf.js',
   './jass-stimme.js',
   './jass-stimme-dateien.js',
@@ -30,7 +33,9 @@ const APP_SHELL = [
   './jass-einstellungen.js',
   './jass-ui.css',
   './karten/svg-cards.svg',
-  './app.webmanifest'
+  './app.webmanifest',
+  './icons/logo.svg',
+  './icons/icon-192.png'
 ];
 
 // Skripte und Stile kommen frisch aus dem Netz, solange es eines gibt –
