@@ -153,11 +153,15 @@
   <script src="jass-stimme.js"></script>
   <script src="jass-vorlesen.js"></script>
   <script src="jass-einstellungen.js"></script>
+  <script src="jass-verlauf.js"></script>
+  <script src="jass-optimieren.js"></script>
   <script>
   (function () {
     'use strict';
     const J = window.JassEngine;
     const B = window.JassBot;
+    const V = window.JassVerlauf;
+    const O = window.JassOptimieren;
     const K = window.JassKarten;
     const E = window.JassEinstellungen;
     const S = window.JassSprechtexte;
@@ -321,12 +325,26 @@
       const wie = ichSchob ? 'Du hast geschoben, angesagt wurde <b>' + namen(e.code) + '</b>' : 'Angesagt: <b>' + namen(e.code) + '</b>';
       const anders = !ichSchob && e.code !== h.wahl ? ' (im Trainer hattest du ' + namen(h.wahl) + ' gewählt)' : '';
       const sprechen = S.vergleich({ punkte: e.punkte, code: e.code, ichSchob }, erwartet, h.wahl);
-      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(sprechen))}">
+      const partie = e.partieId ? V.lade(e.partieId) : null;
+      return `<div class="vergleich ${diff <= -10 ? 'unter' : ''}" id="vergleich" data-vorlesen data-sprechen="${escapeHtml(JSON.stringify(sprechen))}">
         <h3>Ausgespielt</h3>
-        <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
-        <p class="muted">${wie}${anders}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
+        ${O.werteHtml({ schnitt: erwartet, gespielt: e.punkte, partie })}
+        <p class="muted">${wie}${anders}.${partie && partie.optimiert ? '' : ' ' + satz}</p>
         ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=trainer" style="align-self:flex-start" data-verlauf>📜 Gespielte Runde</a>` : ''}
       </div>`;
+    }
+
+    // Verlauf-Link und «Optimieren» im Vergleich anschliessen.
+    function verbindeVergleich(h) {
+      const v = $('vergleich');
+      if (!v) return;
+      const verlaufLink = v.querySelector('[data-verlauf]');
+      if (verlaufLink) verlaufLink.addEventListener('click', () => E.schreibe(KEY_SERIE, serie));
+      const partie = h.ausgespielt && h.ausgespielt.partieId ? V.lade(h.ausgespielt.partieId) : null;
+      O.verbinde(v, partie, (p) => V.speichere(p), () => {
+        v.outerHTML = vergleichHtml(h);
+        verbindeVergleich(h);
+      });
     }
 
     function zeigeAuswertung(h) {
@@ -368,8 +386,7 @@
       zeigeKopf();
       // Vor dem Wechsel in den Verlauf die Serie merken – der Pfeil dort
       // führt zu dieser Hand zurück.
-      const verlaufLink = a.querySelector('[data-verlauf]');
-      if (verlaufLink) verlaufLink.addEventListener('click', () => E.schreibe(KEY_SERIE, serie));
+      verbindeVergleich(h);
       $('weiterBtn').addEventListener('click', weiter);
       $('ausspielenBtn').addEventListener('click', () => {
         E.schreibe(KEY_SERIE, serie);
