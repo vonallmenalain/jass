@@ -750,6 +750,26 @@
     return kandidaten;
   }
 
+  // Farben, in denen ein Gegner von `sitz` in dieser Runde ausgespielt hat,
+  // ohne den Bock zu spielen (angezogen oder gesucht) – und die er noch hat.
+  function gegnerFarben(spiel, sitz, w) {
+    const r = spiel.runde;
+    const gespielt = new Uint8Array(36);
+    let maske = 0;
+    for (const st of r.stiche.concat(r.stich.length ? [{ karten: r.stich, sitze: r.stichSitze, eff: effModus(r.code, r.stichNr) }] : [])) {
+      const eff = st.eff;
+      const k = st.karten[0], p = st.sitze[0];
+      const f = farbeVon(k);
+      if (team(p) !== team(sitz) && f !== trumpfVon(eff) && !(w.leer[p] & bit(f))) {
+        let bock = true;
+        for (let x = f * 9; x < f * 9 + 9 && bock; x++) if (x !== k && !gespielt[x] && STAERKE[eff][x] > STAERKE[eff][k]) bock = false;
+        if (!bock) maske |= bit(f);
+      }
+      for (const x of st.karten) gespielt[x] = 1;
+    }
+    return maske;
+  }
+
   // Wie ein Zug gespielt wurde: ausgespielt, in der Farbe gespielt,
   // gestochen, weggeworfen – oder geschmiert (eine Zehn oder ein Ass auf den
   // Stich des Partners ist kein Zeichen der Schwäche).
@@ -1188,7 +1208,9 @@
   // Gemessen (werkzeuge/trumpf-weiter.js): Weiter ziehen, solange mehrere
   // Trümpfe draussen sind, kostet im Schnitt Punkte (nach dem Schieben am
   // meisten); den letzten holen bringt etwas.
-  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen) {
+  // ohneBock (zum Messen): auch ziehen, wenn man den höchsten Trumpf nicht
+  // hat – dann mit dem tiefsten (der Partner hat vielleicht den höchsten).
+  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen, ohneBock) {
     const r = spiel.runde;
     if (r.stich.length || r.stichNr === 0) return null;
     if (r.angesagtVon !== sitz && r.angesagtVon !== partner(sitz)) return null;
@@ -1199,13 +1221,15 @@
     if (!meine.length) return null;
     const hoch = maxNach(meine, (k) => STAERKE[eff][k]);
     const hand = r.haende[sitz];
-    if (hoehereDraussen(hoch, eff, w.gespielt, hand) > 0) return null;
+    const bock = hoehereDraussen(hoch, eff, w.gespielt, hand) === 0;
+    if (!bock && !ohneBock) return null;
+    // Trümpfe, die noch draussen sind (nicht beim Partner bekannt: zählt mit)
     let draussen = 0;
     for (let k = T * 9; k < T * 9 + 9; k++) if (!w.gespielt[k] && !hand.includes(k)) draussen++;
     if (!draussen || draussen > maxDraussen) return null;
     const leer = (s) => !!(w.leer[s] & bit(T));
     if (leer((sitz + 1) % 4) && leer((sitz + 3) % 4)) return null;
-    return hoch;
+    return bock ? hoch : minNach(meine, (k) => STAERKE[eff][k]);
   }
 
   function wissen(spiel, sitz, optionen) {
@@ -1617,7 +1641,7 @@
       }
     }
     if (o.trumpfWeiter !== false) {
-      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1);
+      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1, !!o.trumpfWeiterOhneBock);
       const x = k != null ? werte.find((y) => y.karte === k) : null;
       const schwelleT = o.trumpfWeiterSchwelle != null ? o.trumpfWeiterSchwelle : TRUMPF_WEITER_SCHWELLE;
       if (x && werte[0].wert - x.wert <= schwelleT) return fertig({ karte: k, grund: GRUND_TRUMPF_WEITER, werte });
@@ -1638,6 +1662,20 @@
         const x = werte.find((y) => y.karte === kand);
         const schwelleZ = o.zurueckSchwelle != null ? o.zurueckSchwelle : ZURUECK_SCHWELLE;
         if (x && werte[0].wert - x.wert <= schwelleZ) return fertig({ karte: kand, grund: GRUND_ZURUECK, werte });
+      }
+    }
+    // Gegnerfarbe meiden: Hat ein Gegner eine Nebenfarbe ausgespielt, ohne
+    // den Bock zu spielen (angezogen oder gesucht), spielt man sie ihm nicht
+    // zurück – ausser mit dem Bock selbst oder wenn es klar mehr bringt.
+    if (!runde.stich.length && (o.gegnerFarbe != null ? o.gegnerFarbe : GEGNERFARBE_AN)) {
+      const meiden = gegnerFarben(spiel, sitz, w);
+      const effM = effModus(runde.code, runde.stichNr);
+      const best = werte[0].karte;
+      const fB = farbeVon(best);
+      if ((meiden & bit(fB)) && hoehereDraussen(best, effM, w.gespielt, runde.haende[sitz]) > 0) {
+        const andere = werte.find((x) => !(meiden & bit(farbeVon(x.karte))));
+        const schwelleG = o.gegnerFarbeSchwelle != null ? o.gegnerFarbeSchwelle : GEGNERFARBE_SCHWELLE;
+        if (andere && werte[0].wert - andere.wert <= schwelleG) return fertig({ karte: andere.karte, grund: GRUND_GEGNERFARBE, werte });
       }
     }
     // Gleichwertige Karten anspielen: die höchste zuerst (Buur vor Nell,
@@ -1697,6 +1735,12 @@
   const ZURUECK_SCHWELLE = 2;
   const GLEICH_SCHWELLE = 4;
   const TRUMPF_WEITER_SCHWELLE = 8;
+  // Gegnerfarbe meiden. Gemessen (werkzeuge/staerke-duell.js 600
+  // "tiefe:schnell,gegnerFarbe:true" "tiefe:schnell,gegnerFarbe:false"):
+  // +0,02 ± 0,14 Punkte pro Spiel – neutral, als Konvention übernommen.
+  const GEGNERFARBE_AN = true;
+  const GEGNERFARBE_SCHWELLE = 3;
+  const GRUND_GEGNERFARBE = 'Gegnerfarbe meiden: Ein Gegner hat eine Farbe ausgespielt und sucht dort – spiel sie ihm nicht zurück.';
   const VERLANGEN_SCHWELLE = 8;
   const GRUND_KOENIG_VERLANGEN = 'Obenabe, erster Stich: Spiel das Ass, wo dir der König fehlt – hat ihn dein Partner, gibt er ihn dir darauf.';
   const GRUND_SIEBEN_VERLANGEN = 'Undenufe, erster Stich: Spiel die Sechs, wo dir die Sieben fehlt – hat sie dein Partner, gibt er sie dir darauf.';
@@ -2125,6 +2169,7 @@
     GRUND_GLEICHWERTIG_STICH,
     GRUND_GLEICHWERTIG_OFFEN,
     GRUND_TRUMPF_WEITER,
+    GRUND_GEGNERFARBE,
     GRUND_KOENIG_VERLANGEN,
     GRUND_SIEBEN_VERLANGEN,
     GRUND_KOENIG_GEBEN,
@@ -2219,7 +2264,7 @@
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
-    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, schaetzungsWelten, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, ZUG_GEWICHTE, menschGewichte, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
+    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, schaetzungsWelten, gegnerFarben, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, ZUG_GEWICHTE, menschGewichte, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
     ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

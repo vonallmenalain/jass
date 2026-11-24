@@ -494,6 +494,7 @@ window.JassStimmeDateien = {
   "Für Misère braucht man viele tiefe Karten und wenige Asse.": "stimme/5860e1af7eae.mp3",
   "Für Obenabe braucht man mehr Asse, am besten mit Königen dahinter.": "stimme/30a89f077c48.mp3",
   "Für Undenufe braucht man mehr Sechser, am besten mit Siebnern dahinter.": "stimme/d5c100efeb15.mp3",
+  "Gegnerfarbe meiden: Ein Gegner hat eine Farbe ausgespielt und sucht dort – spiel sie ihm nicht zurück.": "stimme/088109580973.mp3",
   "Geht so.": "stimme/7ceea9d4e66b.mp3",
   "Gelb: unsicher.": "stimme/b41d5ad5a3cd.mp3",
   "Genau die beste Ansage.": "stimme/3dd1965abce7.mp3",

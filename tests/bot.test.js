@@ -508,3 +508,21 @@ test('Kartenschätzung: Menschen lesen sich stärker nach den Konventionen', () 
   // tief anziehen aus der starken Farbe: beim Menschen wahrscheinlicher
   assert.ok(mensch > computer, `Mensch ${mensch.toFixed(2)} > Computer ${computer.toFixed(2)}`);
 });
+
+test('Gegnerfarbe: gesuchte Farbe eines Gegners nicht zurückspielen', () => {
+  // Du (0) schiebt, Ben (2) sagt Herz an. Du spielt den Buur, dann den
+  // Kreuz-Bauer (sucht – König ohne Ass); Clara (3) sticht mit dem Ass und
+  // spielt jetzt aus.
+  const haende = [[7, 30, 25, 23, 13, 28, 5, 17, 14], [18, 35, 10, 33, 6, 27, 22, 19, 3], [9, 32, 15, 20, 0, 2, 16, 12, 24], [1, 11, 8, 26, 4, 29, 34, 31, 21]];
+  const regeln = Object.assign(J.regelnMitStandard(), { modi: { T: true, OBE: true, UNE: true, SLO: false, SLU: false, MIS: false }, weisen: false, stoeck: false });
+  const spiel = J.neuesSpiel(regeln, { haende, ersterAnsager: 0 });
+  J.schieben(spiel); J.ansagen(spiel, 'T1');
+  for (const [s, k] of [[0, 14], [1, 10], [2, 16], [3, 11], [0, 23], [1, 22], [2, 20], [3, 26]]) J.spiele(spiel, s, k);
+  const w = { leer: [0, 0, 0, 0] };
+  assert.equal(B.gegnerFarben(spiel, 3, w), 1 << K, 'für Clara ist Kreuz Gegnerfarbe');
+  assert.equal(B.gegnerFarben(spiel, 2, w), 0, 'für Ben (Partner) nicht');
+  const z = B.schwerZug(spiel, 3, { rng: J.zufall(1), welten: 30, loesenAb: 12, schaetzung: false, gegnerFarbe: true, gegnerFarbeSchwelle: 100 });
+  assert.notEqual(J.farbeVon(z.karte), K, 'spielt eine andere Farbe');
+  const ohne = B.schwerZug(spiel, 3, { rng: J.zufall(1), welten: 30, loesenAb: 12, schaetzung: false, gegnerFarbe: false });
+  assert.ok(J.erlaubteFuer(spiel, 3).includes(ohne.karte));
+});
