@@ -1,11 +1,12 @@
 /*
  * jass-rechner.js – die Züge des Computers im Hintergrund rechnen.
  * ---------------------------------------------------------------------------
- * Ein Zug von «Schwer» rechnet bis zu 2 Sekunden. Im Hauptablauf der Seite
- * würde sie so lange einfrieren (Animationen ruckeln). Darum rechnet ein Web
+ * Ein Zug von «Schwer» rechnet im Schnitt etwa 2 Sekunden (selten bis 8).
+ * Im Hauptablauf der Seite würde sie so lange einfrieren (Animationen
+ * ruckeln). Darum rechnet ein Web
  * Worker – dieselbe Datei, mit jass-engine.js und jass-bot.js.
  *
- *   JassRechner.zug(spiel, sitz, stufe, optionen)    → Promise({ karte, grund, werte })
+ *   JassRechner.zug(spiel, sitz, stufe, optionen)    → Promise({ karte, grund, werte, annahmen, ohne })
  *   JassRechner.ansage(spiel, sitz, stufe, optionen) → Promise({ code, grund, liste })
  *   JassRechner.tipp(spiel, sitz, optionen)          → Promise wie zug (schwerZug)
  *

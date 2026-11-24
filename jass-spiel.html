@@ -160,19 +160,25 @@
       speichereAnzeige: () => speichereAnzeige(anzeige),
       historieDa: () => !!(partie && partie.runden.length),
       tippKarte() {
-        return R.tipp(spiel, 0, B.rechentiefe(anzeige.rechnen)).then((t) => { letzterTipp = t.karte; return t; });
+        return R.tipp(spiel, 0, rechenOptionen()).then((t) => { letzterTipp = t.karte; return t; });
       },
     });
 
     // «📜 Stiche & Gedanken» (Option «Alle Gedanken und Stiche anzeigen»):
     // die ganze Partie bis jetzt – Ansagen und Stiche aller Runden mit den
     // Gedanken jedes Spielers. Fremde Karten auf der Hand zeigt es nicht.
+    // Rechentiefe; dazu, wer ein Mensch ist – Menschen halten sich beim
+    // Ablesen ihrer Karten stärker an die Konventionen.
+    function rechenOptionen() {
+      return Object.assign({ menschen: [0, 1, 2, 3].filter((s) => spieler[s].typ === 'mensch') }, B.rechentiefe(anzeige.rechnen));
+    }
     function gedankeHtml(z, code) {
       const name = esc(spieler[z.s].name);
       const karte = esc(J.kartenName(z.k, code));
       if (z.stufe === 'mensch') return `<div class="gedanke"><b>${name}</b> ${z.s === 0 ? 'spielst' : 'spielt'} ${karte}${z.tipp != null && z.tipp !== z.k ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : ''}</div>`;
       const werte = z.werte && z.werte.length > 1 ? `<div class="werte">Rechnung (Ø Vorsprung): ${z.werte.map((w) => esc(J.kurzName(w.k)) + ' ' + w.w).join(' · ')}</div>` : '';
-      return `<div class="gedanke"><b>${name}</b> spielt ${karte}${z.grund ? '<br>' + esc(z.grund) : ''}${werte}</div>`;
+      const annahmen = V.annahmenText(z, (s) => spieler[s].name, code).map((t) => `<div class="annahme">${esc(t)}</div>`).join('');
+      return `<div class="gedanke"><b>${name}</b> spielt ${karte}${z.grund ? '<br>' + esc(z.grund) : ''}${annahmen}${werte}</div>`;
     }
     function historieHtml() {
       if (!partie || !spiel || !partie.runden.length) return '<p class="muted">Noch nichts gespielt.</p>';
@@ -389,10 +395,10 @@
         } else {
           await tisch.warte(tempo().denken);
           if (!lebt()) return;
-          const zug = await R.zug(spiel, s, spieler[s].typ, B.rechentiefe(anzeige.rechnen));
+          const zug = await R.zug(spiel, s, spieler[s].typ, rechenOptionen());
           if (!lebt()) return;
           karte = zug.karte;
-          V.karte(partie, r, s, karte, { stufe: spieler[s].typ, grund: zug.grund, werte: zug.werte });
+          V.karte(partie, r, s, karte, { stufe: spieler[s].typ, grund: zug.grund, werte: zug.werte, annahmen: zug.annahmen, ohne: zug.ohne });
         }
         const vorher = r.stoeckGemeldet;
         const erg = J.spiele(spiel, s, karte);

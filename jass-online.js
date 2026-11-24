@@ -900,13 +900,14 @@ async function computerZug(n, stufe, stand) {
   if (jetzt.art !== n.art || jetzt.sitz !== n.sitz) return;
   // im Hintergrund rechnen (jass-rechner.js); danach prüfen, ob die Lage noch gilt
   const R = window.JassRechner;
+  const opt = Object.assign({ menschen: [0, 1, 2, 3].filter((s) => sitze[s] && sitze[s].typ === 'mensch') }, B.rechentiefe(anzeige.rechnen));
   const nochGleich = () => istHost && log.length === stand && spiel && P.naechster(spiel).art === n.art && P.naechster(spiel).sitz === n.sitz;
   if (n.art === 'ansage') {
     const w = R ? await R.ansage(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen)) : B.waehleAnsage(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
     if (!nochGleich()) return;
     schreibe(w.code === 'SCHIEBEN' ? { t: 'p', s: n.sitz } : { t: 'a', s: n.sitz, c: w.code });
   } else {
-    const z = R ? await R.zug(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen)) : B.waehleKarte(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
+    const z = R ? await R.zug(spiel, n.sitz, stufe, opt) : B.waehleKarte(spiel, n.sitz, stufe, opt);
     if (!nochGleich()) return;
     schreibe(P.kartenEreignis(spiel, n.sitz, z.karte));
   }

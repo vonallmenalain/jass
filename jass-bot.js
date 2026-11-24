@@ -612,13 +612,127 @@
   }
 
   // log P(alle bisherigen Züge der anderen | diese Verteilung)
-  function weltLogL(zuege, haende, regeln, gw, puffer) {
+  // gwFuer(sitz) → Gewichte für die Züge dieses Spielers (Menschen anders
+  // als Computer); einzeln: Float64Array für die einzelnen Züge (oder null).
+  function weltLogL(zuege, haende, regeln, gwFuer, puffer, einzeln) {
     let ll = 0;
-    for (const z of zuege) {
+    for (let j = 0; j < zuege.length; j++) {
+      const z = zuege[j];
       const hand = haende[z.p].concat(z.danach);
-      ll += zugLogWahrscheinlichkeit(z.k, hand, z.lage, regeln, gw, puffer);
+      const l = zugLogWahrscheinlichkeit(z.k, hand, z.lage, regeln, gwFuer(z.p), puffer);
+      if (einzeln) einzeln[j] = l;
+      ll += l;
     }
     return ll;
+  }
+
+  // Menschen halten sich stärker an die Konventionen als die Computer, von
+  // denen das Modell gelernt hat: Anziehen (tief aus der starken Farbe),
+  // Suchen (König/Dame ohne Ass), erstes Abwerfen nie aus der starken Farbe.
+  const KONVENTION_MENSCH = {
+    'anspielen×tiefste×haltBock': 2.0,
+    'anspielen×tiefste×sucht': 1.2,
+    'anspielen×tiefste×sucht×trumpfWeg': 0.8,
+    'anspielen×tiefste×schwach': -0.8,
+    'erstesAbwerfen×haltHoch': -1.5,
+  };
+  function menschGewichte(gw) {
+    const m = Array.from(gw);
+    for (const [name, plus] of Object.entries(KONVENTION_MENSCH)) {
+      const i = MERKMALE.indexOf(name);
+      if (i >= 0) m[i] += plus;
+    }
+    return m;
+  }
+
+  // Was der Computer aus den gewichteten Verteilungen über die anderen
+  // annimmt – nur, was sich durch die gespielten Karten deutlich verschoben
+  // hat. Ergebnis: alle solchen Annahmen (mit ind = gilt in Kandidat i),
+  // stärkste zuerst; begruende(a) hängt den Zug an, der sie am stärksten
+  // ausgelöst hat.
+  function annahmenAus(spiel, sitz, w, kand, lw, lpListe, zuege) {
+    const r = spiel.runde;
+    const eff = effModus(r.code, r.stichNr);
+    const meine = r.haende[sitz];
+    const K = kand.length;
+    if (!K) return [];
+    const max = Math.max(...lw);
+    const gew = lw.map((x) => Math.exp(x - max));
+    const summe = gew.reduce((a, b) => a + b, 0);
+    const kandidaten = [];
+    for (let f = 0; f < 4; f++) {
+      // die höchste noch offene Karte dieser Farbe, die ich nicht selbst habe
+      let top = -1, topS = -1;
+      for (let x = f * 9; x < f * 9 + 9; x++) {
+        if (w.gespielt[x] || meine.includes(x) || r.stich.includes(x)) continue;
+        if (STAERKE[eff][x] > topS) { topS = STAERKE[eff][x]; top = x; }
+      }
+      for (let q = 0; q < 4; q++) {
+        if (q === sitz) continue;
+        const pruefe = [];
+        if (top >= 0) pruefe.push({ art: 'hoch', karte: top, test: (h) => h[q].includes(top) });
+        if (!(w.leer[q] & bit(f))) pruefe.push({ art: 'leer', farbe: f, test: (h) => !h[q].some((k) => farbeVon(k) === f) });
+        for (const pr of pruefe) {
+          const ind = new Uint8Array(K);
+          let vorher = 0, nachher = 0;
+          for (let i = 0; i < K; i++) { if (pr.test(kand[i])) { ind[i] = 1; vorher++; nachher += gew[i]; } }
+          vorher /= K; nachher /= summe;
+          if (vorher > 0.95 || vorher < 0.05) continue;
+          const d = nachher - vorher;
+          const art = pr.art === 'hoch' && d < 0 ? 'nichtHoch' : pr.art;
+          if (art === 'hoch' && !(nachher >= 0.6 && d >= 0.25)) continue;
+          if (art === 'nichtHoch' && !(nachher <= 0.2 && -d >= 0.25)) continue;
+          if (art === 'leer' && !(nachher >= 0.6 && d >= 0.25)) continue;
+          const a = { s: q, art, p: Math.round(nachher * 100), v: Math.round(vorher * 100) };
+          if (pr.karte != null) a.karte = pr.karte;
+          if (pr.farbe != null) a.farbe = pr.farbe;
+          // ind: gilt die Annahme in Kandidat i (bei nichtHoch umgekehrt)
+          if (art === 'nichtHoch') for (let i = 0; i < K; i++) ind[i] = 1 - ind[i];
+          Object.defineProperty(a, 'ind', { value: ind, enumerable: false });
+          Object.defineProperty(a, 'staerke', { value: Math.abs(d), enumerable: false });
+          kandidaten.push(a);
+        }
+      }
+    }
+    kandidaten.sort((a, b) => b.staerke - a.staerke);
+    return kandidaten;
+  }
+
+  // Der Zug, der eine Annahme am stärksten stützt: Er ist in den
+  // Verteilungen, in denen sie gilt, deutlich wahrscheinlicher.
+  function begruende(a, spiel, lpListe, zuege) {
+    if (a.zug !== undefined) return a;
+    const r = spiel.runde;
+    const K = lpListe.length;
+    const f = a.farbe != null ? a.farbe : farbeVon(a.karte);
+    let bestJ = -1, bestD = 0.3;
+    for (let j = 0; j < zuege.length; j++) {
+      // nur Züge, die mit der Farbe zu tun haben: in ihr gespielt oder auf
+      // einen Stich in ihr (stechen, abwerfen)
+      const z = zuege[j];
+      if (farbeVon(z.k) !== f && !(z.lage.stich.length && farbeVon(z.lage.stich[0]) === f)) continue;
+      let s1 = 0, n1 = 0, s0 = 0, n0 = 0;
+      for (let i = 0; i < K; i++) { if (a.ind[i]) { s1 += lpListe[i][j]; n1++; } else { s0 += lpListe[i][j]; n0++; } }
+      if (!n1 || !n0) continue;
+      const dd = s1 / n1 - s0 / n0;
+      if (dd > bestD) { bestD = dd; bestJ = j; }
+    }
+    if (bestJ < 0) { a.zug = null; return a; }
+    const z = zuege[bestJ];
+    const effZ = effModus(r.code, z.lage.stichNr);
+    const st = z.lage.stich;
+    let wie;
+    if (!st.length) wie = 'angespielt';
+    else if (farbeVon(z.k) === farbeVon(st[0])) wie = 'zugegeben';
+    else if (farbeVon(z.k) === trumpfVon(effZ)) wie = 'gestochen';
+    else {
+      // Wirft er eine Zehn oder ein Ass auf den Stich des Partners, ist das
+      // Schmieren, kein Zeichen der Schwäche.
+      const vorne = z.lage.stichSitze[gewinnerIndex(st, effZ)];
+      wie = vorne === (z.p + 2) % 4 && PUNKTE[effZ][z.k] >= 10 ? 'geschmiert' : 'abgeworfen';
+    }
+    a.zug = { s: z.p, k: z.k, n: z.lage.stichNr, wie };
+    return a;
   }
 
   // --------------------------------------------------- Schneller Löser
@@ -1082,7 +1196,9 @@
   }
 
   // Verteilt die unbekannten Karten passend zum Wissen auf die anderen.
-  function welt(spiel, sitz, w, rng) {
+  // weltZieher bereitet alles vor, was für jede Verteilung gleich bleibt
+  // (Schwer zieht tausende pro Zug); welt zieht eine einzelne.
+  function weltZieher(spiel, sitz, w) {
     const runde = spiel.runde;
     const meine = runde.haende[sitz];
     const bekanntAlle = new Set(w.bekannt.flat());
@@ -1090,42 +1206,60 @@
     for (let k = 0; k < 36; k++) if (!w.gespielt[k] && !meine.includes(k) && !bekanntAlle.has(k)) unbekannt.push(k);
     const braucht = [0, 1, 2, 3].map((s) => (s === sitz ? 0 : runde.haende[s].length - w.bekannt[s].length));
     const puur = w.trumpf >= 0 ? J.karte(w.trumpf, WB) : -1;
-    const darf = (s, k) => {
+    // darf[k]: Bitmaske der Plätze, die Karte k haben können
+    const darf = new Uint8Array(36);
+    for (const k of unbekannt) {
       const f = farbeVon(k);
-      if (w.nicht && w.nicht[s][k]) return false;
-      if (!(w.leer[s] & bit(f))) return true;
-      return k === puur && w.puurOffen[s];
-    };
-    for (let versuch = 0; versuch < 40; versuch++) {
-      const haende = [0, 1, 2, 3].map((s) => (s === sitz ? meine.slice() : w.bekannt[s].slice()));
-      const frei = braucht.slice();
-      const karten = J.mische(unbekannt, rng);
-      const moeglich = (k) => { let n = 0; for (let s = 0; s < 4; s++) if (s !== sitz && frei[s] > 0 && darf(s, k)) n++; return n; };
-      karten.sort((a, b) => moeglich(a) - moeglich(b));
-      let ok = true;
-      for (const k of karten) {
-        let summe = 0;
-        for (let s = 0; s < 4; s++) if (s !== sitz && frei[s] > 0 && darf(s, k)) summe += frei[s];
-        if (!summe) { ok = false; break; }
-        let r = rng() * summe;
-        let ziel = -1;
-        for (let s = 0; s < 4; s++) {
-          if (s === sitz || frei[s] <= 0 || !darf(s, k)) continue;
-          r -= frei[s];
-          if (r < 0) { ziel = s; break; }
-        }
-        if (ziel < 0) for (let s = 3; s >= 0; s--) if (s !== sitz && frei[s] > 0 && darf(s, k)) { ziel = s; break; }
-        haende[ziel].push(k);
-        frei[ziel]--;
+      for (let s = 0; s < 4; s++) {
+        if (s === sitz) continue;
+        if (w.nicht && w.nicht[s][k]) continue;
+        if (!(w.leer[s] & bit(f)) || (k === puur && w.puurOffen[s])) darf[k] |= 1 << s;
       }
-      if (ok) return haende;
     }
-    // Widersprüchliches Wissen: ohne Einschränkungen verteilen.
-    const haende = [0, 1, 2, 3].map((s) => (s === sitz ? meine.slice() : w.bekannt[s].slice()));
-    const karten = J.mische(unbekannt, rng);
-    let i = 0;
-    for (let s = 0; s < 4; s++) if (s !== sitz) while (haende[s].length < runde.haende[s].length) haende[s].push(karten[i++]);
-    return haende;
+    // Reihenfolge: zuerst die Karten mit den wenigsten möglichen Plätzen
+    // (stabil nach dem Mischen – wie ein stabiles Sortieren)
+    const moeglich = new Uint8Array(36);
+    for (const k of unbekannt) for (let s = 0; s < 4; s++) if ((darf[k] >> s) & 1 && braucht[s] > 0) moeglich[k]++;
+    const n = unbekannt.length;
+    const karten = new Array(n);
+    const frei = [0, 0, 0, 0];
+    return function (rng) {
+      for (let versuch = 0; versuch < 40; versuch++) {
+        const haende = [0, 1, 2, 3].map((s) => (s === sitz ? meine.slice() : w.bekannt[s].slice()));
+        for (let s = 0; s < 4; s++) frei[s] = braucht[s];
+        const gemischt = J.mische(unbekannt, rng);
+        let j = 0;
+        for (let m = 0; m <= 4; m++) for (let i = 0; i < n; i++) if (moeglich[gemischt[i]] === m) karten[j++] = gemischt[i];
+        let ok = true;
+        for (let i = 0; i < n; i++) {
+          const k = karten[i];
+          const d = darf[k];
+          let summe = 0;
+          for (let s = 0; s < 4; s++) if (frei[s] > 0 && (d >> s) & 1) summe += frei[s];
+          if (!summe) { ok = false; break; }
+          let r = rng() * summe;
+          let ziel = -1;
+          for (let s = 0; s < 4; s++) {
+            if (frei[s] <= 0 || !((d >> s) & 1)) continue;
+            r -= frei[s];
+            if (r < 0) { ziel = s; break; }
+          }
+          if (ziel < 0) for (let s = 3; s >= 0; s--) if (frei[s] > 0 && (d >> s) & 1) { ziel = s; break; }
+          haende[ziel].push(k);
+          frei[ziel]--;
+        }
+        if (ok) return haende;
+      }
+      // Widersprüchliches Wissen: ohne Einschränkungen verteilen.
+      const haende = [0, 1, 2, 3].map((s) => (s === sitz ? meine.slice() : w.bekannt[s].slice()));
+      const gemischt = J.mische(unbekannt, rng);
+      let i = 0;
+      for (let s = 0; s < 4; s++) if (s !== sitz) while (haende[s].length < runde.haende[s].length) haende[s].push(gemischt[i++]);
+      return haende;
+    };
+  }
+  function welt(spiel, sitz, w, rng) {
+    return weltZieher(spiel, sitz, w)(rng);
   }
 
   function simAusSpiel(spiel, haende, w) {
@@ -1166,10 +1300,23 @@
   }
 
   // Hätte jemand mit dieser Hand so angesagt?
+  // Gleiches Ergebnis wie mit handWerte, aber abgebrochen, sobald eine
+  // andere Spielart klar besser wäre (die meisten Hände passen nicht).
   function passtZurAnsage(hand, regeln, code, darfSchieben) {
-    const h = handWerte(hand, regeln);
-    if (h.werte[code] == null || h.werte[code] < h.best - ANSAGE_TOLERANZ) return false;
-    if (darfSchieben && h.bestPunkte < SCHIEBEN_SCHWELLE - SCHIEBEN_TOLERANZ) return false;
+    const modi = J.erlaubteModi(regeln);
+    if (!modi.includes(code)) return false;
+    const wert = (c) => {
+      const p = schaetze(hand, c).punkte;
+      return { p, v: (2 * p - 157) * (regeln.multiplikatoren ? Number(regeln.faktoren[c]) || 1 : 1) };
+    };
+    const eigen = wert(code);
+    let best = -Infinity, bestPunkte = 0;
+    for (const c of modi) {
+      const x = c === code ? eigen : wert(c);
+      if (x.v > eigen.v + ANSAGE_TOLERANZ) return false;
+      if (x.v > best) { best = x.v; bestPunkte = x.p; }
+    }
+    if (darfSchieben && bestPunkte < SCHIEBEN_SCHWELLE - SCHIEBEN_TOLERANZ) return false;
     return true;
   }
   // … oder geschoben?
@@ -1218,12 +1365,13 @@
   // Eine Welt, die zu Ansage, Schieben und Anzeigen passt. Findet sich
   // keine, zuerst ohne die Anzeigen (vielleicht war es keine), dann
   // irgendeine.
-  function weltPassend(spiel, sitz, w, rng, info) {
+  function weltPassend(spiel, sitz, w, rng, info, zieher) {
+    const z = zieher || weltZieher(spiel, sitz, w);
     for (let versuch = 0; versuch < 120; versuch++) {
-      const haende = welt(spiel, sitz, w, rng);
+      const haende = z(rng);
       if (passtZumWissen(haende, spiel.regeln, info, versuch >= 70)) return haende;
     }
-    return welt(spiel, sitz, w, rng);
+    return z(rng);
   }
 
   // ------------------------------------------------------- Stufe schwer
@@ -1248,29 +1396,38 @@
     // false) wie früher: Faustregeln bis zum Schluss, exakt erst ab exaktAb.
     const mitLoeser = o.loeser !== false;
     const loesenAb = o.loesenAb != null ? o.loesenAb : exaktAb;
-    // Zeitgrenze: so viele Verteilungen wie in o.zeitMs passen (mindestens
-    // o.mindestWelten) – der erste Stich ist am teuersten.
+    // Notbremse: Dauert ein Zug länger als o.zeitMs (langsames Gerät), hört
+    // er nach mindestens o.mindestWelten Verteilungen auf. Sonst wird alles
+    // fertig gerechnet – der erste Stich ist am teuersten.
     const start = Date.now();
     const zeitMs = o.zeitMs || 0;
     const mindest = Math.min(welten, o.mindestWelten || 80);
     let gerechnet = 0;
-    const ziehe = () => (info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng));
+    const zieher = weltZieher(spiel, sitz, w);
+    const ziehe = () => (info ? weltPassend(spiel, sitz, w, rng, info, zieher) : zieher(rng));
     // Kartenschätzung: mehr Verteilungen ziehen, nach den bisherigen Zügen
     // der anderen gewichten und die glaubwürdigsten nehmen.
     let auswahl = null;
+    let kand = null, lw = null, lpListe = null, annahmen = null, zuegeV = null;
     const gw = o.schaetzung ? (o.zugGewichte || ZUG_GEWICHTE) : null;
     if (gw) {
       const zuege = zugVerlauf(spiel, sitz);
       if (zuege.length) {
         const K = Math.ceil(welten * (o.schaetzungFaktor || 4));
         const beta = o.schaetzungBeta != null ? o.schaetzungBeta : 1;
-        const kand = [], lw = [];
+        kand = []; lw = []; lpListe = [];
         const puffer = new Float64Array(MERKMALE.length);
+        const menschen = o.menschen || [];
+        const gwM = menschen.length ? menschGewichte(gw) : gw;
+        const gwFuer = (p) => (menschen.includes(p) ? gwM : gw);
         // höchstens etwa ein Drittel der Zeitgrenze für das Ziehen und Gewichten
         for (let i = 0; i < K; i++) {
           if (zeitMs && i >= Math.min(K, 2 * mindest) && Date.now() - start > zeitMs * 0.35) break;
-          const h = ziehe(); kand.push(h); lw.push(beta * weltLogL(zuege, h, spiel.regeln, gw, puffer));
+          const h = ziehe();
+          const lp = new Float64Array(zuege.length);
+          kand.push(h); lw.push(beta * weltLogL(zuege, h, spiel.regeln, gwFuer, puffer, lp)); lpListe.push(lp);
         }
+        if (o.annahmen !== false) { annahmen = annahmenAus(spiel, sitz, w, kand, lw, lpListe, zuege); zuegeV = zuege; }
         const max = Math.max(...lw);
         const gew = lw.map((x) => Math.exp(x - max));
         const summe = gew.reduce((a, b) => a + b, 0);
@@ -1286,10 +1443,8 @@
         }
       }
     }
-    for (let i = 0; i < welten; i++) {
-      if (zeitMs && i >= mindest && Date.now() - start > zeitMs) break;
-      gerechnet++;
-      const haende = auswahl ? auswahl[i] : ziehe();
+    // eine Verteilung für alle erlaubten Karten durchrechnen
+    function bewerteWelt(haende, ziel) {
       const tt = mitLoeser ? new Map() : null;
       for (const k of legal) {
         const s = simAusSpiel(spiel, haende.map((h) => h.slice()), w);
@@ -1300,9 +1455,71 @@
           wert = loese(s, meinTeam, tt);
         } else if (restKarten - 1 <= exaktAb) wert = exakt(s, meinTeam, -Infinity, Infinity);
         else { simZuEnde(s); wert = simWert(s, meinTeam); }
-        summe.set(k, summe.get(k) + wert);
+        ziel.set(k, ziel.get(k) + wert);
       }
     }
+    for (let i = 0; i < welten; i++) {
+      if (zeitMs && i >= mindest && Date.now() - start > zeitMs) break;
+      gerechnet++;
+      bewerteWelt(auswahl ? auswahl[i] : ziehe(), summe);
+    }
+    // Annahmen anhängen; mit der Gegenprobe «ohne Annahmen» (ungewichtete
+    // Verteilungen): Hätte ich ohne sie eine andere Karte gespielt?
+    const fertig = (res) => {
+      if (!annahmen || !annahmen.length) return res;
+      let darum = null;
+      if (kand && kand.length) {
+        const M = Math.min(kand.length, o.gegenprobeWelten || 80);
+        const proWelt = [];
+        const ohne = new Map(legal.map((k) => [k, 0]));
+        for (let i = 0; i < M; i++) {
+          const m = new Map(legal.map((k) => [k, 0]));
+          bewerteWelt(kand[i], m);
+          proWelt.push(m);
+          for (const k of legal) ohne.set(k, ohne.get(k) + m.get(k));
+        }
+        let best = legal[0];
+        for (const k of legal) if (ohne.get(k) > ohne.get(best)) best = k;
+        // nur ein klarer Unterschied zählt: ≥ 1,5 Punkte und doppelt so gross
+        // wie die Unsicherheit (Standardfehler über die Verteilungen)
+        let klar = false;
+        if (best !== res.karte && M > 1) {
+          const d = proWelt.map((m) => m.get(best) - m.get(res.karte));
+          const mw = d.reduce((x, y) => x + y, 0) / M;
+          const se = Math.sqrt(d.reduce((x, y) => x + (y - mw) * (y - mw), 0) / (M - 1) / M);
+          klar = mw >= 1.5 && mw >= 2 * se;
+        }
+        if (klar) {
+          res.ohne = best;
+          // Welche Annahme macht den Unterschied? Die, unter der meine Karte
+          // gegenüber der anderen am meisten gewinnt («hat» vor «hat nicht»).
+          let bestGap = 2;
+          for (const a of annahmen) {
+            let s1 = 0, n1 = 0, s0 = 0, n0 = 0;
+            for (let i = 0; i < M; i++) {
+              const d = proWelt[i].get(res.karte) - proWelt[i].get(best);
+              if (a.ind[i]) { s1 += d; n1++; } else { s0 += d; n0++; }
+            }
+            if (n1 < 4 || n0 < 4) continue;
+            const gap = (s1 / n1 - s0 / n0) * (a.art === 'nichtHoch' ? 0.8 : 1);
+            if (gap > bestGap) { bestGap = gap; darum = a; }
+          }
+        }
+      }
+      // höchstens zwei, die entscheidende zuerst; dieselbe Karte nur einmal
+      // («Anna hat das Ass» sagt schon, dass Ben es nicht hat)
+      const reihe = darum ? [darum].concat(annahmen.filter((a) => a !== darum)) : annahmen.slice();
+      reihe.sort((x, y) => (y === darum) - (x === darum) || (x.art === 'nichtHoch') - (y.art === 'nichtHoch') || y.staerke - x.staerke);
+      const zeige = [];
+      for (const a of reihe) {
+        if (zeige.length >= 2) break;
+        if (a !== darum && a.karte != null && zeige.some((b) => b.karte === a.karte)) continue;
+        zeige.push(a);
+      }
+      if (darum) darum.darum = true;
+      res.annahmen = zeige.map((a) => begruende(a, spiel, lpListe, zuegeV));
+      return res;
+    };
     const werte = legal.map((k) => ({ karte: k, wert: summe.get(k) / Math.max(1, gerechnet) }));
     werte.sort((a, b) => b.wert - a.wert);
     // Ausspiel des Schiebers (siehe schieberAusspiel): Trumpf ziehen hat
@@ -1310,7 +1527,7 @@
     // Wahl der Karte als Zeichen misst werkzeuge/schieber-zeichen.js.
     if (o.schieberZeichen !== false) {
       const z = schieberAusspiel(spiel, sitz, legal);
-      if (z) return { karte: z.karte, grund: z.grund, werte };
+      if (z) return fertig({ karte: z.karte, grund: z.grund, werte });
     } else if (o.trumpfZiehen !== false && runde.stichNr === 0 && !runde.stich.length && runde.geschoben && runde.angesagtVon === partner(sitz)) {
       // bisherige Regel (zum Vergleich): der Buur, sonst der kleinste Trumpf
       const effT = effModus(runde.code, 0);
@@ -1319,7 +1536,7 @@
       if (trumpf.length) {
         const buur = trumpf.find((k) => wertVon(k) === WB);
         const k = buur != null ? buur : minNach(trumpf, (x) => STAERKE[effT][x]);
-        return { karte: k, grund: GRUND_TRUMPF_NACH_SCHIEBEN, werte };
+        return fertig({ karte: k, grund: GRUND_TRUMPF_NACH_SCHIEBEN, werte });
       }
     }
     // König (Sieben) verlangen – Ausspiel und Antwort im ersten Stich.
@@ -1334,14 +1551,14 @@
       if (x && werte[0].wert - x.wert <= schwelleV) {
         const une = runde.code === 'UNE';
         const grund = ka != null ? (une ? GRUND_SIEBEN_VERLANGEN : GRUND_KOENIG_VERLANGEN) : (une ? GRUND_SIEBEN_GEBEN : GRUND_KOENIG_GEBEN);
-        return { karte: k, grund, werte };
+        return fertig({ karte: k, grund, werte });
       }
     }
     if (o.trumpfWeiter !== false) {
       const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1);
       const x = k != null ? werte.find((y) => y.karte === k) : null;
       const schwelleT = o.trumpfWeiterSchwelle != null ? o.trumpfWeiterSchwelle : TRUMPF_WEITER_SCHWELLE;
-      if (x && werte[0].wert - x.wert <= schwelleT) return { karte: k, grund: GRUND_TRUMPF_WEITER, werte };
+      if (x && werte[0].wert - x.wert <= schwelleT) return fertig({ karte: k, grund: GRUND_TRUMPF_WEITER, werte });
     }
     // Bei (fast) gleichem Wert die Wahl der Faustregel nehmen.
     let wahl = werte[0];
@@ -1358,7 +1575,7 @@
         const kand = minNach(zurueck, (k) => STAERKE[effA][k]);
         const x = werte.find((y) => y.karte === kand);
         const schwelleZ = o.zurueckSchwelle != null ? o.zurueckSchwelle : ZURUECK_SCHWELLE;
-        if (x && werte[0].wert - x.wert <= schwelleZ) return { karte: kand, grund: GRUND_ZURUECK, werte };
+        if (x && werte[0].wert - x.wert <= schwelleZ) return fertig({ karte: kand, grund: GRUND_ZURUECK, werte });
       }
     }
     // Gleichwertige Karten anspielen: die höchste zuerst (Buur vor Nell,
@@ -1377,7 +1594,7 @@
         const sicher = hoehereDraussen(hoch, effG, w.gespielt, runde.haende[sitz]) === 0;
         const grund = hoch === mittel.karte && sicher ? mittel.grund
           : !sicher ? GRUND_GLEICHWERTIG_OFFEN : runde.stich.length ? GRUND_GLEICHWERTIG_STICH : GRUND_GLEICHWERTIG;
-        return { karte: hoch, grund, werte };
+        return fertig({ karte: hoch, grund, werte });
       }
     }
     // Ass schmieren als Zeichen: Liegt der Partner vorne und halte ich in
@@ -1390,7 +1607,7 @@
       if (kand.length) {
         const k = maxNach(kand, (x) => PUNKTE[effS][x]);
         const x = werte.find((y) => y.karte === k);
-        if (x && werte[0].wert - x.wert <= SCHMIER_SCHWELLE) return { karte: k, grund: GRUND_ASS_SCHMIEREN, werte };
+        if (x && werte[0].wert - x.wert <= SCHMIER_SCHWELLE) return fertig({ karte: k, grund: GRUND_ASS_SCHMIEREN, werte });
       }
     }
     // Verwerfen: Sieht die Rechnung kaum einen Unterschied, kommt die Karte
@@ -1400,7 +1617,7 @@
     const vk = schwelle > 0 ? verwerfKarte(ansicht, effModus(runde.code, runde.stichNr), legal) : null;
     if (vk != null) {
       const x = werte.find((y) => y.karte === vk);
-      if (x && werte[0].wert - x.wert <= schwelle) return { karte: vk, grund: GRUND_VERWERFEN_SCHWACH, werte };
+      if (x && werte[0].wert - x.wert <= schwelle) return fertig({ karte: vk, grund: GRUND_VERWERFEN_SCHWACH, werte });
     }
     let grund = mittel.grund;
     if (wahl.karte !== mittel.karte) {
@@ -1408,7 +1625,7 @@
         ? 'Ich habe ' + gerechnet + ' mögliche Kartenverteilungen durchgespielt, die zur Ansage passen: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.'
         : 'Ich habe ' + gerechnet + ' mögliche Kartenverteilungen durchgespielt: Mit dieser Karte macht ihr im Schnitt am meisten Punkte.';
     }
-    return { karte: wahl.karte, grund, werte };
+    return fertig({ karte: wahl.karte, grund, werte });
   }
 
   // Bis zu diesem Unterschied (eigene minus fremde Punkte, also rund die
@@ -1900,15 +2117,18 @@
   // welten: so viele Kartenverteilungen pro Zug (ab exaktAb Karten
   // weltenExakt); jede wird mit Faustregeln gespielt, bis loesenAb Karten
   // übrig sind, dann exakt gelöst. schaetzung: die Verteilungen nach den
-  // bisherigen Zügen gewichten. zeitMs: Zeitgrenze pro Zug.
+  // bisherigen Zügen gewichten. zeitMs: Notbremse pro Zug – gerechnet
+  // werden alle Verteilungen; nur wenn ein Zug (langsames Gerät) länger
+  // dauert, hört er dort auf. Gemessen ohne Grenze (Node, maximal): Ø etwa
+  // 1,7 s pro Zug mit Auswahl, die ersten Stiche 2–3 s, selten bis 6 s.
   // Gemessen (werkzeuge/staerke-duell.js, 600 Spiele bei maximal): Löser ab
   // 16 + Kartenschätzung + König verlangen +1,4 ± 0,5 Punkte pro Spiel
   // gegenüber dem Stand davor.
   const RECHENTIEFE = {
-    schnell: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80, loesenAb: 16, schaetzung: true, zeitMs: 800 },
-    normal: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200, loesenAb: 16, schaetzung: true, zeitMs: 1200 },
-    gruendlich: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400, loesenAb: 16, schaetzung: true, zeitMs: 1500 },
-    maximal: { welten: 1000, weltenExakt: 200, exaktAb: 12, ansage: 600, loesenAb: 16, schaetzung: true, zeitMs: 2000 },
+    schnell: { welten: 120, weltenExakt: 30, exaktAb: 12, ansage: 80, loesenAb: 16, schaetzung: true, zeitMs: 8000 },
+    normal: { welten: 300, weltenExakt: 60, exaktAb: 12, ansage: 200, loesenAb: 16, schaetzung: true, zeitMs: 8000 },
+    gruendlich: { welten: 600, weltenExakt: 120, exaktAb: 12, ansage: 400, loesenAb: 16, schaetzung: true, zeitMs: 8000 },
+    maximal: { welten: 1000, weltenExakt: 200, exaktAb: 12, ansage: 600, loesenAb: 16, schaetzung: true, zeitMs: 8000 },
   };
   function rechentiefe(name) { return RECHENTIEFE[name] || RECHENTIEFE.normal; }
 
@@ -1937,7 +2157,7 @@
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
-    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
+    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, ZUG_GEWICHTE, menschGewichte, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
     ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
