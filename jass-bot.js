@@ -1208,7 +1208,9 @@
   // Gemessen (werkzeuge/trumpf-weiter.js): Weiter ziehen, solange mehrere
   // Trümpfe draussen sind, kostet im Schnitt Punkte (nach dem Schieben am
   // meisten); den letzten holen bringt etwas.
-  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen) {
+  // ohneBock (zum Messen): auch ziehen, wenn man den höchsten Trumpf nicht
+  // hat – dann mit dem tiefsten (der Partner hat vielleicht den höchsten).
+  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen, ohneBock) {
     const r = spiel.runde;
     if (r.stich.length || r.stichNr === 0) return null;
     if (r.angesagtVon !== sitz && r.angesagtVon !== partner(sitz)) return null;
@@ -1219,13 +1221,15 @@
     if (!meine.length) return null;
     const hoch = maxNach(meine, (k) => STAERKE[eff][k]);
     const hand = r.haende[sitz];
-    if (hoehereDraussen(hoch, eff, w.gespielt, hand) > 0) return null;
+    const bock = hoehereDraussen(hoch, eff, w.gespielt, hand) === 0;
+    if (!bock && !ohneBock) return null;
+    // Trümpfe, die noch draussen sind (nicht beim Partner bekannt: zählt mit)
     let draussen = 0;
     for (let k = T * 9; k < T * 9 + 9; k++) if (!w.gespielt[k] && !hand.includes(k)) draussen++;
     if (!draussen || draussen > maxDraussen) return null;
     const leer = (s) => !!(w.leer[s] & bit(T));
     if (leer((sitz + 1) % 4) && leer((sitz + 3) % 4)) return null;
-    return hoch;
+    return bock ? hoch : minNach(meine, (k) => STAERKE[eff][k]);
   }
 
   function wissen(spiel, sitz, optionen) {
@@ -1637,7 +1641,7 @@
       }
     }
     if (o.trumpfWeiter !== false) {
-      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1);
+      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1, !!o.trumpfWeiterOhneBock);
       const x = k != null ? werte.find((y) => y.karte === k) : null;
       const schwelleT = o.trumpfWeiterSchwelle != null ? o.trumpfWeiterSchwelle : TRUMPF_WEITER_SCHWELLE;
       if (x && werte[0].wert - x.wert <= schwelleT) return fertig({ karte: k, grund: GRUND_TRUMPF_WEITER, werte });
