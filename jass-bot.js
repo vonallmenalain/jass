@@ -475,6 +475,10 @@
     'partnerVorne×punkte', 'partnerVorne×gewinnt', 'gegnerVorne×gewinnt', 'gegnerVorne×gewinnt×punkte',
     'letzter×gewinnt', 'sticht×partnerVorne', 'gewinnt×stichPunkte', 'bedient×tiefste', 'bedient×hoechste',
     'misere×gewinnt', 'misere×punkte', 'ohneTrumpf×anspielen×bock',
+    // Konventionen (Anzeigen, Suchen, erstes Abwerfen)
+    'haltZweite', 'anspielen×tiefste×sucht', 'anspielen×tiefste×sucht×trumpfWeg', 'anspielen×tiefste×schwach',
+    'erstesAbwerfen', 'erstesAbwerfen×haltHoch', 'erstesAbwerfen×farbLaenge', 'erstesAbwerfen×tiefste',
+    'wirftAb×partnerVorne×punkte',
   ];
 
   // Merkmale der Karte k (in `hand`) in der Lage { code, stichNr, stich,
@@ -499,6 +503,18 @@
     let top = -1, topW = -1;
     for (let w = 0; w < 9; w++) { const x = f * 9 + w; if (!g[x] && !lage.stich.includes(x) && st[x] > topW) { topW = st[x]; top = x; } }
     if (top >= 0 && hand.includes(top)) haltBock = 1;
+    // die zweit- und dritthöchste noch offene Karte (z. B. König, Dame, wenn das Ass draussen ist)
+    let haltZweite = 0, haltHoch = haltBock;
+    {
+      const offen = [];
+      for (let w = 0; w < 9; w++) { const x = f * 9 + w; if (!g[x] && !lage.stich.includes(x)) offen.push(x); }
+      offen.sort((a, b) => st[b] - st[a]);
+      if (offen[1] != null && hand.includes(offen[1])) { haltZweite = 1; haltHoch = 1; }
+      if (offen[2] != null && hand.includes(offen[2])) haltHoch = 1;
+    }
+    // Trümpfe, die noch bei anderen sein können
+    let trumpfDraussen = 0;
+    if (T >= 0) for (let w = 0; w < 9; w++) { const x = T * 9 + w; if (!g[x] && !hand.includes(x) && !lage.stich.includes(x)) trumpfDraussen++; }
     const bock = hoeher === 0 ? 1 : 0;
     const istT = f === T ? 1 : 0;
     const p = PUNKTE[eff][k] / 11;
@@ -520,6 +536,11 @@
     const mis = lage.code === 'MIS' ? 1 : 0;
     const frueh = lage.stichNr <= 2 ? 1 : 0;
     const L = laenge / 9;
+    const nichtT = istT ? 0 : 1;
+    const sucht = haltHoch && !haltBock ? 1 : 0;           // König/Dame ohne das Ass
+    const trumpfWeg = T < 0 || trumpfDraussen === 0 ? 1 : 0;
+    const schwach = haltHoch ? 0 : 1;
+    const erstes = n > 0 && (lage.abgeworfen || 0) === 0 ? 1 : 0;
     const v = [
       1, an, istT, p, bock, hoeher === 1 ? 1 : 0, hoeher / 8,
       L, tiefste, hoechste, haltBock,
@@ -530,6 +551,9 @@
       partnerV * p, partnerV * gewinnt, (n > 0 ? 1 - partnerV : 0) * gewinnt, (n > 0 ? 1 - partnerV : 0) * gewinnt * p,
       letzter * gewinnt, sticht * partnerV, gewinnt * stichP, bedient * tiefste, bedient * hoechste,
       mis * gewinnt, mis * p, (T < 0 ? 1 : 0) * an * bock,
+      haltZweite, an * tiefste * nichtT * sucht, an * tiefste * nichtT * sucht * trumpfWeg, an * tiefste * nichtT * schwach,
+      wirft * erstes, wirft * erstes * haltHoch, wirft * erstes * L, wirft * erstes * tiefste,
+      wirft * partnerV * p,
     ];
     const o = out || new Float64Array(v.length);
     for (let i = 0; i < v.length; i++) o[i] = v[i];
@@ -563,13 +587,17 @@
     if (r.stich.length) alle.push({ karten: r.stich, sitze: r.stichSitze, nr: r.stichNr });
     const zuege = [];
     const g = new Uint8Array(36);
+    const abgeworfen = [0, 0, 0, 0];
     for (const st of alle) {
+      const T = trumpfVon(effModus(r.code, st.nr));
       for (let i = 0; i < st.karten.length; i++) {
         const p = st.sitze[i];
+        const k = st.karten[i];
         if (p !== sitz) {
-          zuege.push({ p, k: st.karten[i], lage: { code: r.code, stichNr: st.nr, stich: st.karten.slice(0, i), stichSitze: st.sitze.slice(0, i), sitz: p, gespielt: g.slice() } });
+          zuege.push({ p, k, lage: { code: r.code, stichNr: st.nr, stich: st.karten.slice(0, i), stichSitze: st.sitze.slice(0, i), sitz: p, gespielt: g.slice(), abgeworfen: abgeworfen[p] } });
         }
-        g[st.karten[i]] = 1;
+        if (i > 0 && farbeVon(k) !== farbeVon(st.karten[0]) && farbeVon(k) !== T) abgeworfen[p]++;
+        g[k] = 1;
       }
     }
     // je Spieler: welche Karten er ab diesem Zug noch gespielt hat

@@ -28,7 +28,7 @@ for (const d of dateien) {
     const z = JSON.parse(zeile);
     const g = new Uint8Array(36);
     for (const k of z.g) g[k] = 1;
-    const lage = { code: z.c, stichNr: z.n, stich: z.st, stichSitze: z.ss, sitz: z.s, gespielt: g };
+    const lage = { code: z.c, stichNr: z.n, stich: z.st, stichSitze: z.ss, sitz: z.s, gespielt: g, abgeworfen: z.a || 0 };
     const legal = J.erlaubteKarten(z.h, z.st, J.effModus(z.c, z.n), regeln);
     if (legal.length < 2 || !legal.includes(z.k)) continue;
     const X = legal.map((k) => B.zugMerkmale(k, z.h, lage));

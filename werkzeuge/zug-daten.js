@@ -6,7 +6,7 @@
 //
 // Eine Zeile pro Zug: { c: Spielart, n: Stich, st: Karten im Stich,
 // ss: Sitze dazu, s: Sitz, h: Hand, g: schon gespielte Karten (mit dem
-// laufenden Stich), k: gespielte Karte }. Trainiert wird mit
+// laufenden Stich), a: wie oft s schon abgeworfen hat, k: gespielte Karte }. Trainiert wird mit
 // werkzeuge/zug-modell.js.
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
@@ -38,7 +38,14 @@ for (let i = START; i < START + N; i++) {
     const legal = J.erlaubteFuer(spiel, s);
     const k = B.schwerZug(spiel, s, Object.assign({ rng }, o)).karte;
     if (legal.length > 1) {
-      zeilen.push(JSON.stringify({ c: r.code, n: r.stichNr, st: r.stich.slice(), ss: r.stichSitze.slice(), s, h: r.haende[s].slice(), g: gespielt.concat(r.stich), k }));
+      // wie oft hat s in dieser Runde schon abgeworfen (Farbe nicht, kein Trumpf)?
+      let a = 0;
+      const alle = r.stiche.map((st, i) => ({ karten: st.karten, sitze: st.sitze, nr: i })).concat([{ karten: r.stich, sitze: r.stichSitze, nr: r.stichNr }]);
+      for (const st of alle) {
+        const T = J.trumpfVon(J.effModus(r.code, st.nr));
+        st.karten.forEach((x, i) => { if (i > 0 && st.sitze[i] === s && J.farbeVon(x) !== J.farbeVon(st.karten[0]) && J.farbeVon(x) !== T) a++; });
+      }
+      zeilen.push(JSON.stringify({ c: r.code, n: r.stichNr, st: r.stich.slice(), ss: r.stichSitze.slice(), s, h: r.haende[s].slice(), g: gespielt.concat(r.stich), a, k }));
     }
     J.spiele(spiel, s, k);
     if (r.stich.length === 0 || r.phase !== 'spiel') { /* Stich fertig */ }
