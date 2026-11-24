@@ -353,9 +353,9 @@
       const led = J.farbeVon(r.stich[0]);
       const T = J.trumpfVon(J.aktuellerEff(r));
       const farbe = J.FARBEN[led].name;
-      if (led === T) return 'Es wurde Trumpf gespielt – du musst Trumpf angeben.';
+      if (led === T) return 'Es wurde Trumpf ausgespielt – du musst Trumpf angeben.';
       if (J.farbeVon(k) === T) return 'Untertrumpfen ist nicht erlaubt: Dein Trumpf ist tiefer als der im Stich.';
-      return 'Es wurde ' + farbe + ' angespielt – du musst ' + farbe + ' angeben' + (T >= 0 ? ' (oder stechen).' : '.');
+      return 'Es wurde ' + farbe + ' ausgespielt – du musst ' + farbe + ' angeben' + (T >= 0 ? ' (oder stechen).' : '.');
     }
 
     el('ansage').addEventListener('click', (e) => {

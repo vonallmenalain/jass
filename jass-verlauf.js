@@ -197,7 +197,7 @@
 
   // Was ein Computer über die anderen annahm (schwerZug: annahmen, ohne) –
   // als Sätze, z. B. «Ich nehme an, Clara hat den Herz-König (80 % statt
-  // 30 %), weil Clara im 3. Stich die Herz-Sechs angespielt hat. Darum die
+  // 30 %), weil Clara im 3. Stich die Herz-Sechs ausgespielt hat. Darum die
   // Kreuz-Zehn statt das Herz-Ass.» name(sitz) liefert den Namen (als Text).
   const ARTIKEL = ['die', 'die', 'die', 'die', 'die', 'den', 'die', 'den', 'das'];
   function engine() {
@@ -219,16 +219,42 @@
     const du = (s) => /^du$/i.test(String(name(s)).trim());
     const wer = (s) => (du(s) ? 'du' : name(s));
     const hat = (s) => (du(s) ? 'hast' : 'hat');
-    const WIE = { angespielt: 'angespielt', zugegeben: 'zugegeben', gestochen: 'damit gestochen', abgeworfen: 'abgeworfen', geschmiert: 'geschmiert' };
+    const WIE = { angespielt: 'ausgespielt', zugegeben: 'gespielt', gestochen: 'gestochen', abgeworfen: 'weggeworfen', geschmiert: 'geschmiert', zuerstWeg: 'weggeworfen' };
+    const prozent = (p, v) => `(${p}\u00a0% statt ${v}\u00a0%)`;
+    // «weil Ben im 6. Stich das Herz-Ass weggeworfen hat» – bei zwei Zügen
+    // mit demselben Wort: «… und Clara im 3. Stich den Herz-Bauer weggeworfen haben»
+    const weil = (gruende, a) => {
+      if (!gruende.length) return '';
+      // «als Erstes den Ecke-König weggeworfen (nicht Herz)»: wer zuerst
+      // wegwirft, nimmt die schwächste Farbe
+      const farbeA = a.farbe != null ? a.farbe : J.farbeVon(a.karte);
+      if (gruende.some((g) => g.wie === 'zuerstWeg')) {
+        return ', weil ' + gruende.map((g) => (g.wie === 'zuerstWeg'
+          ? `${wer(g.s)} im ${g.n + 1}. Stich als Erstes ${karteMitArtikel(g.k, code)} weggeworfen ${hat(g.s)} (nicht ${J.FARBEN[farbeA].name})`
+          : `${wer(g.s)} im ${g.n + 1}. Stich ${karteMitArtikel(g.k, code)} ${WIE[g.wie] || 'gespielt'} ${hat(g.s)}`)).join(' und ');
+      }
+      const teil = (g) => `${wer(g.s)} im ${g.n + 1}. Stich ${karteMitArtikel(g.k, code)}`;
+      const wort = (g) => WIE[g.wie] || 'gespielt';
+      if (gruende.length === 2 && gruende[0].s === gruende[1].s) {
+        // dieselbe Person: «weil Anna im 2. Stich die Herz-Dame und im 3. Stich den Herz-König weggeworfen hat»
+        const zweiter = `im ${gruende[1].n + 1}. Stich ${karteMitArtikel(gruende[1].k, code)}`;
+        return wort(gruende[0]) === wort(gruende[1])
+          ? `, weil ${teil(gruende[0])} und ${zweiter} ${wort(gruende[1])} ${hat(gruende[0].s)}`
+          : `, weil ${teil(gruende[0])} ${wort(gruende[0])} und ${zweiter} ${wort(gruende[1])} ${hat(gruende[0].s)}`;
+      }
+      if (gruende.length === 2 && wort(gruende[0]) === wort(gruende[1])) {
+        const plural = gruende.some((g) => du(g.s)) ? 'habt' : 'haben';
+        return `, weil ${teil(gruende[0])} und ${teil(gruende[1])} ${wort(gruende[0])} ${plural}`;
+      }
+      return ', weil ' + gruende.map((g) => `${teil(g)} ${wort(g)} ${hat(g.s)}`).join(' und ');
+    };
     let darumGesagt = false;
     for (const a of z.annahmen) {
       let was;
-      if (a.art === 'hoch') was = `${wer(a.s)} ${hat(a.s)} ${karteMitArtikel(a.karte, code)} (${a.p}\u00a0% statt ${a.v}\u00a0%)`;
-      else if (a.art === 'nichtHoch') was = `${wer(a.s)} ${hat(a.s)} ${karteMitArtikel(a.karte, code)} nicht (${100 - a.p}\u00a0% statt ${100 - a.v}\u00a0%)`;
-      else was = `${wer(a.s)} ${hat(a.s)} ${a.farbe === 0 || a.farbe === 3 ? 'keine' : 'kein'} ${J.FARBEN[a.farbe].name} mehr (${a.p}\u00a0% statt ${a.v}\u00a0%)`;
-      let satz = 'Ich nehme an, ' + was;
-      if (a.zug) satz += `, weil ${wer(a.zug.s)} im ${a.zug.n + 1}. Stich ${karteMitArtikel(a.zug.k, code)} ${WIE[a.zug.wie] || 'gespielt'} ${hat(a.zug.s)}`;
-      satz += '.';
+      if (a.art === 'hoch') was = `${wer(a.s)} ${hat(a.s)} ${karteMitArtikel(a.karte, code)} ${prozent(a.p, a.v)}`;
+      else if (a.art === 'nichtHoch') was = `${wer(a.s)} ${hat(a.s)} ${karteMitArtikel(a.karte, code)} nicht ${prozent(100 - a.p, 100 - a.v)}`;
+      else was = `${wer(a.s)} ${hat(a.s)} ${a.farbe === 0 || a.farbe === 3 ? 'keine' : 'kein'} ${J.FARBEN[a.farbe].name} mehr ${prozent(a.p, a.v)}`;
+      let satz = 'Ich nehme an, ' + was + weil(a.gruende || (a.zug ? [a.zug] : []), a) + '.';
       if (a.darum && z.ohne != null) {
         satz += ` Darum ${karteMitArtikel(z.k, code)} statt ${karteMitArtikel(z.ohne, code)}.`;
         darumGesagt = true;

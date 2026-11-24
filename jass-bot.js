@@ -237,7 +237,7 @@
     }
     if (f !== T && vomPartner(f)) return { karte: k, grund: GRUND_ZURUECK };
     if (f !== T && istTief(k, eff) && starkIn(f)) return { karte: k, grund: GRUND_ANZEIGEN };
-    return { karte: k, grund: 'Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe an und schone deine hohen Karten.' };
+    return { karte: k, grund: 'Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe aus und schone deine hohen Karten.' };
   }
 
   function farbLaenge(hand, f) {
@@ -325,7 +325,7 @@
   const GRUND_ZURUECK = 'Dein Partner hat diese Farbe angezeigt: Er ist dort stark. Spiel sie ihm zurück.';
   const GRUND_ANZEIGEN = 'Anzeigen: Spiel eine tiefe Karte der Farbe, in der du stark bist – so weiss dein Partner, was er dir zurückspielen soll.';
   const GRUND_ZUGEBEN = 'Du kannst den Stich nicht billig machen – gib die Karte, die am wenigsten wert ist.';
-  const GRUND_VERWERFEN = 'Du hast die Farbe nicht und kannst den Stich nicht billig machen – verwirf eine Karte, die wenig wert ist.';
+  const GRUND_VERWERFEN = 'Du hast die Farbe nicht und kannst den Stich nicht billig machen – wirf eine Karte weg, die wenig wert ist.';
 
   function misereZug(v, eff, legal) {
     if (!v.stich.length) {
@@ -333,7 +333,7 @@
         const hoeher = hoehereDraussen(x, eff, v.gespielt, v.hand);
         return -hoeher * 4 + STAERKE[eff][x];
       });
-      return { karte: k, grund: 'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.' };
+      return { karte: k, grund: 'Misère: Spiel eine tiefe Karte aus, die bestimmt jemand anderes überstechen muss.' };
     }
     const gi = gewinnerIndex(v.stich, eff);
     const vorneKarte = v.stich[gi];
@@ -613,28 +613,79 @@
 
   // log P(alle bisherigen Züge der anderen | diese Verteilung)
   // gwFuer(sitz) → Gewichte für die Züge dieses Spielers (Menschen anders
-  // als Computer); einzeln: Float64Array für die einzelnen Züge (oder null).
-  function weltLogL(zuege, haende, regeln, gwFuer, puffer, einzeln) {
+  // als Computer); zaehltFuer(sitz) → wie stark seine Züge zählen (1 = voll);
+  // einzeln: Float64Array für die einzelnen Züge (oder null).
+  function weltLogL(zuege, haende, regeln, gwFuer, puffer, einzeln, zaehltFuer) {
     let ll = 0;
     for (let j = 0; j < zuege.length; j++) {
       const z = zuege[j];
       const hand = haende[z.p].concat(z.danach);
       const l = zugLogWahrscheinlichkeit(z.k, hand, z.lage, regeln, gwFuer(z.p), puffer);
       if (einzeln) einzeln[j] = l;
-      ll += l;
+      ll += zaehltFuer ? zaehltFuer(z.p) * l : l;
     }
     return ll;
+  }
+
+  // Kartenschätzung: K Verteilungen ziehen und jede nach den bisherigen
+  // Zügen der anderen gewichten (lw: Log-Wahrscheinlichkeit, lpListe: je Zug).
+  function kandidatenZiehen(spiel, zuege, ziehe, K, gw, o, abbruch) {
+    const kand = [], lw = [], lpListe = [];
+    const puffer = new Float64Array(MERKMALE.length);
+    const menschen = o.menschen || [];
+    const gwM = menschen.length ? menschGewichte(gw) : gw;
+    const gwFuer = (p) => (menschen.includes(p) ? gwM : gw);
+    const mg = o.menschGewicht != null ? o.menschGewicht : MENSCH_GEWICHT;
+    const zaehltFuer = menschen.length && mg !== 1 ? (p) => (menschen.includes(p) ? mg : 1) : null;
+    for (let i = 0; i < K; i++) {
+      if (abbruch && abbruch(i)) break;
+      const h = ziehe();
+      const lp = new Float64Array(zuege.length);
+      kand.push(h); lw.push(weltLogL(zuege, h, spiel.regeln, gwFuer, puffer, lp, zaehltFuer)); lpListe.push(lp);
+    }
+    return { kand, lw, lpListe };
+  }
+
+  // Für Werkzeuge (werkzeuge/annahmen-eichung.js): die gewichteten
+  // Verteilungen, wie schwerZug sie für die Kartenschätzung zieht.
+  function schaetzungsWelten(spiel, sitz, optionen) {
+    const o = optionen || {};
+    const w = wissen(spiel, sitz, { zeichen: o.schieberZeichen !== false, verlangen: o.koenigVerlangen !== false });
+    const rng = o.rng || J.zufall(J.neuerSeed());
+    const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz, o.anzeigenBeachten === false ? null : w, o);
+    const zieher = weltZieher(spiel, sitz, w);
+    const ziehe = () => (info ? weltPassend(spiel, sitz, w, rng, info, zieher) : zieher(rng));
+    const zuege = zugVerlauf(spiel, sitz);
+    const K = Math.ceil((o.welten || 1000) * (o.schaetzungFaktor || 4));
+    const erg = kandidatenZiehen(spiel, zuege, ziehe, K, o.zugGewichte || ZUG_GEWICHTE, o, null);
+    return Object.assign(erg, { w, zuege });
   }
 
   // Menschen halten sich stärker an die Konventionen als die Computer, von
   // denen das Modell gelernt hat: Anziehen (tief aus der starken Farbe),
   // Suchen (König/Dame ohne Ass), erstes Abwerfen nie aus der starken Farbe.
+  // Die angezeigten Annahmen rechnen mit gedämpften Gewichten (Temperatur
+  // < 1): Die Züge sind nicht unabhängig und das Modell nicht perfekt – mit
+  // vollem Gewicht wären die Prozente zu sicher. Geeicht mit
+  // werkzeuge/annahmen-eichung.js (120 Partien, alle Computer, 55 491
+  // Aussagen): Mit t = 1 klangen die angezeigten Annahmen 84 % sicher und
+  // stimmten 81 %, mit t = 0,7 klingen sie 82 % und stimmen 86 % – lieber
+  // etwas vorsichtig. Zum Spielen bleibt das volle Gewicht: Über alle
+  // Aussagen ist t = 1 am genauesten (Log-Verlust 0,520 gegen 0,522).
+  const ANNAHMEN_TEMPERATUR = 0.7;
+  // Die Züge von Menschen zählen weniger: Das Modell ist von Computern
+  // gelernt, Menschen weichen mehr davon ab (geschätzt, nicht gemessen –
+  // Partien von Menschen mit bekannten Karten fehlen).
+  const MENSCH_GEWICHT = 0.6;
+  // Halb so stark wie ursprünglich gesetzt: Auch Menschen spielen nicht
+  // immer nach den Regeln (eine Partie mit «zuerst Ecke weggeworfen, obwohl
+  // Herz schwächer war» machte die Schätzung 97 % sicher – und falsch).
   const KONVENTION_MENSCH = {
-    'anspielen×tiefste×haltBock': 2.0,
-    'anspielen×tiefste×sucht': 1.2,
-    'anspielen×tiefste×sucht×trumpfWeg': 0.8,
-    'anspielen×tiefste×schwach': -0.8,
-    'erstesAbwerfen×haltHoch': -1.5,
+    'anspielen×tiefste×haltBock': 1.0,
+    'anspielen×tiefste×sucht': 0.6,
+    'anspielen×tiefste×sucht×trumpfWeg': 0.4,
+    'anspielen×tiefste×schwach': -0.4,
+    'erstesAbwerfen×haltHoch': -0.75,
   };
   function menschGewichte(gw) {
     const m = Array.from(gw);
@@ -650,14 +701,15 @@
   // hat. Ergebnis: alle solchen Annahmen (mit ind = gilt in Kandidat i),
   // stärkste zuerst; begruende(a) hängt den Zug an, der sie am stärksten
   // ausgelöst hat.
-  function annahmenAus(spiel, sitz, w, kand, lw, lpListe, zuege) {
+  function annahmenAus(spiel, sitz, w, kand, lw, lpListe, zuege, temperatur) {
     const r = spiel.runde;
     const eff = effModus(r.code, r.stichNr);
     const meine = r.haende[sitz];
     const K = kand.length;
     if (!K) return [];
+    const t = temperatur != null ? temperatur : 1;
     const max = Math.max(...lw);
-    const gew = lw.map((x) => Math.exp(x - max));
+    const gew = lw.map((x) => Math.exp(t * (x - max)));
     const summe = gew.reduce((a, b) => a + b, 0);
     const kandidaten = [];
     for (let f = 0; f < 4; f++) {
@@ -698,40 +750,58 @@
     return kandidaten;
   }
 
-  // Der Zug, der eine Annahme am stärksten stützt: Er ist in den
-  // Verteilungen, in denen sie gilt, deutlich wahrscheinlicher.
+  // Wie ein Zug gespielt wurde: ausgespielt, in der Farbe gespielt,
+  // gestochen, weggeworfen – oder geschmiert (eine Zehn oder ein Ass auf den
+  // Stich des Partners ist kein Zeichen der Schwäche).
+  function wieGespielt(code, z) {
+    const effZ = effModus(code, z.lage.stichNr);
+    const st = z.lage.stich;
+    if (!st.length) return 'angespielt';
+    if (farbeVon(z.k) === farbeVon(st[0])) return 'zugegeben';
+    if (farbeVon(z.k) === trumpfVon(effZ)) return 'gestochen';
+    const vorne = z.lage.stichSitze[gewinnerIndex(st, effZ)];
+    return vorne === (z.p + 2) % 4 && PUNKTE[effZ][z.k] >= 10 ? 'geschmiert' : 'abgeworfen';
+  }
+
+  // Die Züge, die eine Annahme stützen – nur solche, die ein Mensch als
+  // Hinweis versteht: Wer eine Farbe tief ausspielt, ist dort stark; wer
+  // sie wegwirft, ist dort schwach. Also:
+  //   hat die höchste Karte:  sie/er hat die Farbe ausgespielt oder als
+  //                           Erstes eine andere Farbe weggeworfen, oder
+  //                           ein anderer hat sie weggeworfen
+  //   hat sie nicht:          sie/er hat die Farbe weggeworfen, oder ein
+  //                           anderer hat sie ausgespielt
+  //   hat keine mehr:         ihre/seine eigenen Züge in der Farbe
+  // Unter diesen die (höchstens zwei), die in den Verteilungen, in denen die
+  // Annahme gilt, deutlich wahrscheinlicher sind.
   function begruende(a, spiel, lpListe, zuege) {
-    if (a.zug !== undefined) return a;
+    if (a.gruende !== undefined) return a;
     const r = spiel.runde;
     const K = lpListe.length;
     const f = a.farbe != null ? a.farbe : farbeVon(a.karte);
-    let bestJ = -1, bestD = 0.3;
+    const passt = (z, wie) => {
+      const inF = farbeVon(z.k) === f;
+      if (a.art === 'leer') return z.p === a.s && (inF || (z.lage.stich.length && farbeVon(z.lage.stich[0]) === f && wie !== 'gestochen'));
+      if (a.art === 'hoch' && wie === 'zuerstWeg') return z.p === a.s && !inF;
+      if (!inF) return false;
+      if (a.art === 'hoch') return z.p === a.s ? wie === 'angespielt' : wie === 'abgeworfen';
+      return z.p === a.s ? wie === 'abgeworfen' : wie === 'angespielt';
+    };
+    const kandidaten = [];
     for (let j = 0; j < zuege.length; j++) {
-      // nur Züge, die mit der Farbe zu tun haben: in ihr gespielt oder auf
-      // einen Stich in ihr (stechen, abwerfen)
       const z = zuege[j];
-      if (farbeVon(z.k) !== f && !(z.lage.stich.length && farbeVon(z.lage.stich[0]) === f)) continue;
+      let wie = wieGespielt(r.code, z);
+      // das erste Wegwerfen: aus der schwächsten Farbe – also nicht aus f
+      if (wie === 'abgeworfen' && !(z.lage.abgeworfen > 0) && farbeVon(z.k) !== f && a.art === 'hoch' && z.p === a.s) wie = 'zuerstWeg';
+      if (!passt(z, wie)) continue;
       let s1 = 0, n1 = 0, s0 = 0, n0 = 0;
       for (let i = 0; i < K; i++) { if (a.ind[i]) { s1 += lpListe[i][j]; n1++; } else { s0 += lpListe[i][j]; n0++; } }
       if (!n1 || !n0) continue;
       const dd = s1 / n1 - s0 / n0;
-      if (dd > bestD) { bestD = dd; bestJ = j; }
+      if (dd >= 0.3) kandidaten.push({ dd, g: { s: z.p, k: z.k, n: z.lage.stichNr, wie } });
     }
-    if (bestJ < 0) { a.zug = null; return a; }
-    const z = zuege[bestJ];
-    const effZ = effModus(r.code, z.lage.stichNr);
-    const st = z.lage.stich;
-    let wie;
-    if (!st.length) wie = 'angespielt';
-    else if (farbeVon(z.k) === farbeVon(st[0])) wie = 'zugegeben';
-    else if (farbeVon(z.k) === trumpfVon(effZ)) wie = 'gestochen';
-    else {
-      // Wirft er eine Zehn oder ein Ass auf den Stich des Partners, ist das
-      // Schmieren, kein Zeichen der Schwäche.
-      const vorne = z.lage.stichSitze[gewinnerIndex(st, effZ)];
-      wie = vorne === (z.p + 2) % 4 && PUNKTE[effZ][z.k] >= 10 ? 'geschmiert' : 'abgeworfen';
-    }
-    a.zug = { s: z.p, k: z.k, n: z.lage.stichNr, wie };
+    kandidaten.sort((x, y) => y.dd - x.dd);
+    a.gruende = kandidaten.slice(0, 2).map((x) => x.g).sort((x, y) => x.n - y.n);
     return a;
   }
 
@@ -1415,19 +1485,11 @@
       if (zuege.length) {
         const K = Math.ceil(welten * (o.schaetzungFaktor || 4));
         const beta = o.schaetzungBeta != null ? o.schaetzungBeta : 1;
-        kand = []; lw = []; lpListe = [];
-        const puffer = new Float64Array(MERKMALE.length);
-        const menschen = o.menschen || [];
-        const gwM = menschen.length ? menschGewichte(gw) : gw;
-        const gwFuer = (p) => (menschen.includes(p) ? gwM : gw);
-        // höchstens etwa ein Drittel der Zeitgrenze für das Ziehen und Gewichten
-        for (let i = 0; i < K; i++) {
-          if (zeitMs && i >= Math.min(K, 2 * mindest) && Date.now() - start > zeitMs * 0.35) break;
-          const h = ziehe();
-          const lp = new Float64Array(zuege.length);
-          kand.push(h); lw.push(beta * weltLogL(zuege, h, spiel.regeln, gwFuer, puffer, lp)); lpListe.push(lp);
-        }
-        if (o.annahmen !== false) { annahmen = annahmenAus(spiel, sitz, w, kand, lw, lpListe, zuege); zuegeV = zuege; }
+        // höchstens etwa ein Drittel der Notbremse für das Ziehen und Gewichten
+        const abbruch = (i) => zeitMs && i >= Math.min(K, 2 * mindest) && Date.now() - start > zeitMs * 0.35;
+        ({ kand, lw, lpListe } = kandidatenZiehen(spiel, zuege, ziehe, K, gw, o, abbruch));
+        for (let i = 0; i < lw.length; i++) lw[i] *= beta;
+        if (o.annahmen !== false) { annahmen = annahmenAus(spiel, sitz, w, kand, lw, lpListe, zuege, o.annahmenTemperatur != null ? o.annahmenTemperatur : ANNAHMEN_TEMPERATUR); zuegeV = zuege; }
         const max = Math.max(...lw);
         const gew = lw.map((x) => Math.exp(x - max));
         const summe = gew.reduce((a, b) => a + b, 0);
@@ -1650,7 +1712,7 @@
   const GRUND_SECHSEN_NACH_SCHIEBEN = 'Dein Partner hat nach deinem Schieben Undenufe angesagt – spiel zuerst alle deine Sechsen. So weiss er genau, welche du hast: Kommt keine Sechs, hast du keine.';
   const GRUND_UEBERNEHMEN = 'Du musst deinen Partner übernehmen und machst den Stich selbst – nimm die tiefste Karte, die reicht, und behalte die hohen für später.';
   const GRUND_UEBERNEHMEN_GLEICH = 'Du musst deinen Partner übernehmen und machst den Stich selbst. Deine Karten sind gleichwertig – spiel die höchste zuerst.';
-  const GRUND_VERWERFEN_SCHWACH = 'Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
+  const GRUND_VERWERFEN_SCHWACH = 'Wegwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.';
 
   // Verwerfen heisst: Die ausgespielte Farbe fehlt, ein Gegner liegt vorne,
   // und man gibt eine Karte einer anderen Farbe (keinen Trumpf). Dann die
@@ -2044,7 +2106,7 @@
     'Du hast nur noch Trümpfe – spiel den kleinsten.',
     'Bock spielen: Diese Karte ist die höchste ihrer Farbe, die noch im Spiel ist – der Stich gehört euch.',
     'Dein Partner hat diese Farbe nicht mehr und kann stechen – spiel sie ihm zu.',
-    'Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe an und schone deine hohen Karten.',
+    'Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe aus und schone deine hohen Karten.',
     'Schmieren: Dein Partner macht diesen Stich sicher – gib ihm Punkte mit.',
     'Dein Partner macht den Stich – du hast keine Punkte zum Schmieren, also gibst du eine tiefe Karte.',
     'Dein Partner liegt vorne, aber nicht sicher – mit deinem Bock sicherst du den Stich ab.',
@@ -2073,7 +2135,7 @@
     GRUND_ASSE_NACH_SCHIEBEN,
     GRUND_SECHSEN_NACH_SCHIEBEN,
     GRUND_VERWERFEN_SCHWACH,
-    'Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.',
+    'Misère: Spiel eine tiefe Karte aus, die bestimmt jemand anderes überstechen muss.',
     'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',
     'Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.',
     'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.',
@@ -2157,7 +2219,7 @@
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
-    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, ZUG_GEWICHTE, menschGewichte, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
+    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, schaetzungsWelten, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, ZUG_GEWICHTE, menschGewichte, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
     ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
