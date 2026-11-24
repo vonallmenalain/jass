@@ -472,7 +472,8 @@ test('Annahmen: was der Computer aus den Zügen der anderen abliest', () => {
           assert.ok(['hoch', 'nichtHoch', 'leer'].includes(a.art));
           assert.ok(a.p >= 0 && a.p <= 100 && a.v >= 0 && a.v <= 100);
           if (a.art === 'leer') assert.ok(a.farbe >= 0 && a.farbe < 4); else assert.ok(a.karte >= 0 && a.karte < 36);
-          if (a.zug) assert.ok(['angespielt', 'zugegeben', 'gestochen', 'abgeworfen', 'geschmiert'].includes(a.zug.wie));
+          assert.ok(Array.isArray(a.gruende) && a.gruende.length <= 2);
+          for (const g of a.gruende) assert.ok(['angespielt', 'zugegeben', 'gestochen', 'abgeworfen', 'geschmiert'].includes(g.wie));
         }
         if (z.ohne != null) assert.notEqual(z.ohne, z.karte);
       }
