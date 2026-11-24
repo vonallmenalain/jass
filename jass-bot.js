@@ -340,7 +340,7 @@
     const partnerVorne = team(v.stichSitze[gi]) === team(v.sitz);
     const verlierer = legal.filter((k) => !schlaegt(k, vorneKarte, eff));
     if (verlierer.length) {
-      if (partnerVorne) return { karte: maxNach(verlierer, (k) => STAERKE[eff][k] - PUNKTE[eff][k] * 2), grund: 'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.' };
+      if (partnerVorne) return { karte: maxNach(verlierer, (k) => STAERKE[eff][k] - PUNKTE[eff][k] * 2), grund: 'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte weg.' };
       return { karte: maxNach(verlierer, (k) => PUNKTE[eff][k] * 2 + STAERKE[eff][k]), grund: 'Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.' };
     }
     if (v.stich.length === 3) return { karte: maxNach(legal, (k) => STAERKE[eff][k]), grund: 'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.' };
@@ -2181,7 +2181,7 @@
     GRUND_SECHSEN_NACH_SCHIEBEN,
     GRUND_VERWERFEN_SCHWACH,
     'Misère: Spiel eine tiefe Karte aus, die bestimmt jemand anderes überstechen muss.',
-    'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.',
+    'Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte weg.',
     'Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.',
     'Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.',
     'Misère: Du musst überstechen – mit der kleinstmöglichen Karte.',
@@ -2263,7 +2263,7 @@
   const api = {
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
-    sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
+    sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform, GRUENDE,
     simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, schaetzungsWelten, gegnerFarben, MERKMALE, zugMerkmale, zugLogWahrscheinlichkeit, ZUG_GEWICHTE, menschGewichte, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
     ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };

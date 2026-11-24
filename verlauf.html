@@ -130,7 +130,7 @@
       return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
     const mini = (k, code) => `<span class="mini">${K.svg(k, { code, trumpf: code && J.MODI[code] && J.MODI[code].trumpf === J.farbeVon(k) })}</span>`;
-    const teamName = (p, t) => p.spieler[t].name + ' & ' + p.spieler[t + 2].name;
+    const teamName = (p, t) => V.anzeigeName(p.spieler[t].name) + ' & ' + V.anzeigeName(p.spieler[t + 2].name);
     const datum = (ms) => new Date(ms).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const modusName = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c] ? J.MODI[c].lang : c);
 
@@ -286,10 +286,10 @@
 
     function rundeHtml(p, r) {
       const code = r.code || (r.ansagen.find((a) => a.wahl !== 'SCHIEBEN') || {}).wahl || null;
-      const name = (s) => esc(p.spieler[s].name);
+      const name = (s) => esc(V.anzeigeName(p.spieler[s].name));
       const ansagen = r.ansagen.map((a) => {
         const werte = a.werte ? `<div class="werte">Durchgerechnet: ${a.werte.map((w) => esc(modusName(w.c)) + ' ' + w.p).join(' · ')}</div>` : '';
-        return `<div class="grund"><b>${name(a.s)}</b> ${STUFE[a.stufe] || ''}: ${esc(modusName(a.wahl))}${a.grund && a.stufe !== 'mensch' ? ' – ' + esc(a.grund) : ''}${werte}</div>`;
+        return `<div class="grund"><b>${name(a.s)}</b> ${STUFE[a.stufe] || ''}: ${esc(modusName(a.wahl))}${a.grund && a.stufe !== 'mensch' ? ' – ' + esc(V.ichForm(a.grund)) : ''}${werte}</div>`;
       }).join('');
       const haende = [0, 2, 1, 3].map((s) => `<div class="hand-zeile"><div class="wer">${name(s)}<small>${s % 2 === 0 ? 'Team A' : 'Team B'}${s === r.ansager ? ' · Vorhand' : ''}</small></div>
         <div class="hand-karten">${J.sortiereHand(r.haende[s], code).map((k) => mini(k, code)).join('')}</div></div>`).join('');
@@ -314,7 +314,7 @@
           if (z.werte && z.werte.length > 1) werte = `<div class="werte">Durchgerechnet (Ø Punkte Vorsprung): ${z.werte.map((w) => esc(J.kurzName(w.k)) + ' ' + w.w).join(' · ')}</div>`;
           const tipp = z.tipp != null ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : '';
           const annahmen = V.annahmenText(z, (s) => p.spieler[s].name, code).map((t) => `<div class="annahme">${esc(t)}</div>`).join('');
-          return `<div class="grund"><b>${name(z.s)}</b> ${STUFE[z.stufe] || ''} spielt ${esc(J.kartenName(z.k, code))}${tipp}${z.grund ? '<br>' + esc(z.grund) : ''}${annahmen}${werte}</div>`;
+          return `<div class="grund"><b>${name(z.s)}</b> ${STUFE[z.stufe] || ''} spielt ${esc(J.kartenName(z.k, code))}${tipp}${z.grund && z.stufe !== 'mensch' ? '<br>' + esc(V.ichForm(z.grund)) : ''}${annahmen}${werte}</div>`;
         }).join('');
         return `<div class="stich-zeile ${markiert.length ? 'markiert offen' : ''}" data-stich="${i}">
           <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${fertig ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : 'nicht fertig'}</span></div>

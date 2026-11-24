@@ -68,6 +68,10 @@
     </div>
 
     <div class="panel stack">
+      <h2>Dein Name</h2>
+      <input class="text-feld" id="spielerName" maxlength="16" placeholder="Spieler" autocomplete="nickname" aria-label="Dein Name">
+    </div>
+    <div class="panel stack">
       <h2>Startseite</h2>
       <label class="schalter"><span class="text"><span>Quick Trumpf</span><small>Neun Karten: Was trumpfst du?</small></span><input type="checkbox" id="quickTrumpf"></label>
     </div>
@@ -126,6 +130,17 @@
       anzeigeBox = neu;
       E.anzeigeFormular(neu, anzeige, (a) => E.speichereAnzeige(a));
     }
+    // Der eigene Name (gegen den Computer und in den Gedanken) – derselbe
+    // Speicher wie beim Einrichten eines Spiels; leer heisst «Spieler».
+    const KEY_SPIELER = 'jass-lernen-spieler-v1';
+    const spielerListe = () => { const l = E.lese(KEY_SPIELER); return Array.isArray(l) ? l : []; };
+    const jetzt = (spielerListe()[0] || {}).name;
+    $('spielerName').value = jetzt && !/^(du|spieler)$/i.test(jetzt.trim()) ? jetzt : '';
+    $('spielerName').addEventListener('input', (e) => {
+      const l = spielerListe();
+      l[0] = Object.assign({}, l[0] || {}, { name: e.target.value.trim().slice(0, 16) || 'Spieler', typ: 'mensch' });
+      E.schreibe(KEY_SPIELER, l);
+    });
     $('quickTrumpf').checked = anzeige.quickTrumpf !== false;
     $('quickTrumpf').addEventListener('change', (e) => { anzeige.quickTrumpf = e.target.checked; E.speichereAnzeige(anzeige); });
     zeichneDesigns();
