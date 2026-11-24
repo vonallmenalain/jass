@@ -416,6 +416,8 @@
     };
   }
 
+  function restIn(s) { return s.haende[0].length + s.haende[1].length + s.haende[2].length + s.haende[3].length; }
+
   function simZuEnde(s) {
     while (s.stichNr < 9) simSpiele(s, mittelZug(simAnsicht(s)).karte);
   }
@@ -449,6 +451,206 @@
       if (alpha >= beta) break;
     }
     return best;
+  }
+
+  // --------------------------------------------------- Schneller Löser
+  // Dasselbe wie exakt() – alle Karten offen, beste Züge für beide Teams –,
+  // aber schnell genug, um schon ab dem ersten Stich exakt zu rechnen:
+  //   – Hände als Bitmasken je Farbe,
+  //   – Zwischenspeicher (tt) für Stellungen zu Beginn eines Stichs,
+  //   – Zugreihenfolge: bester Zug aus dem Speicher zuerst, dann hohe
+  //     Karten beim Anspielen, billig stechen oder Punkte schmieren,
+  //   – gleichwertige Karten (in der Stärke benachbart, gleich viele Punkte,
+  //     in derselben Hand) werden nur einmal probiert.
+  // Rückgabe wie exakt(): Wert (eigene − fremde Punkte, ± Match) für meinTeam.
+
+  const ZOB = (() => {
+    const r = J.zufall(0x51a7e);
+    const z = new Int32Array(36 * 4 * 2);
+    for (let i = 0; i < z.length; i++) z[i] = Math.floor(r() * 0x7fffffff);
+    return z;
+  })();
+  // Werte (0–8) einer Farbe, von der stärksten zur schwächsten, je eff.
+  const ORDNUNG = STAERKE.map((st) => [0, 1, 2, 3].map((f) => [0, 1, 2, 3, 4, 5, 6, 7, 8].sort((a, b) => st[f * 9 + b] - st[f * 9 + a])));
+
+  let loeserKnoten = 0;
+
+  function loese(s, meinTeam, tt) {
+    const R = s.regeln;
+    const code = s.code;
+    const vz = code === 'MIS' ? -1 : 1;
+    const matchAn = code !== 'MIS' && !!R.matchBonus;
+    const mp = R.matchPunkte || 0;
+    const puurFrei = R.puurFrei !== false;
+    const unterVerboten = R.untertrumpfen !== true;
+    const letzter = R.letzterStich || 0;
+    const speicher = tt || new Map();
+
+    const H = new Int32Array(16);
+    let h1 = 0, h2 = 0;
+    for (let p = 0; p < 4; p++) {
+      for (const k of s.haende[p]) {
+        H[p * 4 + ((k / 9) | 0)] |= 1 << (k % 9);
+        h1 ^= ZOB[(k * 4 + p) * 2]; h2 ^= ZOB[(k * 4 + p) * 2 + 1];
+      }
+    }
+    const tk = [0, 0, 0, 0], ts = [0, 0, 0, 0];
+    let n = s.stich.length;
+    for (let i = 0; i < n; i++) { tk[i] = s.stich[i]; ts[i] = s.stichSitze[i]; }
+    let stichNr = s.stichNr, amZug = s.amZug;
+    let z0 = s.stichZahl[0], z1 = s.stichZahl[1];
+    // Welche eff kommen noch vor (Slalom wechselt) – für «gleich viele Punkte».
+    const effs = [];
+    for (let i = stichNr; i < 9; i++) { const e = effModus(code, i); if (!effs.includes(e)) effs.push(e); }
+    const gleichePunkte = (k1, k2) => effs.every((e) => PUNKTE[e][k1] === PUNKTE[e][k2]);
+
+    // erlaubte Karten als Masken je Farbe (wie J.erlaubteKarten)
+    function erlaubt(p, eff, out) {
+      const b = p * 4;
+      if (n === 0) { out[0] = H[b]; out[1] = H[b + 1]; out[2] = H[b + 2]; out[3] = H[b + 3]; return; }
+      const led = (tk[0] / 9) | 0;
+      const T = eff < 4 ? eff : -1;
+      const vonLed = H[b + led];
+      out[0] = 0; out[1] = 0; out[2] = 0; out[3] = 0;
+      if (T < 0) {
+        if (vonLed) out[led] = vonLed; else { out[0] = H[b]; out[1] = H[b + 1]; out[2] = H[b + 2]; out[3] = H[b + 3]; }
+        return;
+      }
+      if (led === T) {
+        if (!vonLed || (puurFrei && vonLed === (1 << WB))) { out[0] = H[b]; out[1] = H[b + 1]; out[2] = H[b + 2]; out[3] = H[b + 3]; }
+        else out[T] = vonLed;
+        return;
+      }
+      out[led] = vonLed;
+      let tr = H[b + T];
+      if (tr && unterVerboten) {
+        let hoch = -1;
+        for (let i = 0; i < n; i++) if (((tk[i] / 9) | 0) === T && STAERKE[eff][tk[i]] > hoch) hoch = STAERKE[eff][tk[i]];
+        const nurTr = !H[b] + !H[b + 1] + !H[b + 2] + !H[b + 3] === 3 && !!tr;
+        if (hoch >= 0 && !nurTr) {
+          let m = 0;
+          for (let w = 0; w < 9; w++) if ((tr >> w) & 1 && STAERKE[eff][T * 9 + w] > hoch) m |= 1 << w;
+          tr = m;
+        }
+      }
+      out[T] = tr;
+      if (!vonLed) for (let f = 0; f < 4; f++) if (f !== T && f !== led) out[f] = H[b + f];
+    }
+
+    const erlaubtPuffer = [];
+    for (let i = 0; i < 40; i++) erlaubtPuffer.push([0, 0, 0, 0]);
+
+    function suche(alpha, beta, tiefe) {
+      loeserKnoten++;
+      if (stichNr === 9) return matchAn ? (z1 === 0 ? mp : z0 === 0 ? -mp : 0) : 0;
+      const eff = effModus(code, stichNr);
+      const p = amZug;
+      const max = (p & 1) === 0;
+      // Zwischenspeicher zu Beginn eines Stichs
+      let key = -1, eintrag = null;
+      if (n === 0) {
+        key = (h1 >>> 0) * 2097152 + (((h2 & 0x7fff) << 6) | (p << 2) | (matchAn ? (z1 === 0 ? 1 : 0) | (z0 === 0 ? 2 : 0) : 0));
+        eintrag = speicher.get(key);
+        if (eintrag) {
+          if (eintrag[0] >= beta) return eintrag[0];
+          if (eintrag[1] <= alpha) return eintrag[1];
+          if (eintrag[0] > alpha) alpha = eintrag[0];
+          if (eintrag[1] < beta) beta = eintrag[1];
+          if (alpha >= beta) return eintrag[0];
+        }
+      }
+      const a0 = alpha, b0 = beta;
+      // Züge erzeugen (gleichwertige nur einmal) und ordnen
+      const leg = erlaubtPuffer[tiefe];
+      erlaubt(p, eff, leg);
+      const zuege = [];
+      const noten = [];
+      const T = eff < 4 ? eff : -1;
+      let gewinner = -1, bestK = -1;
+      if (n > 0) { gewinner = 0; bestK = tk[0]; for (let i = 1; i < n; i++) if (schlaegt(tk[i], bestK, eff)) { bestK = tk[i]; gewinner = i; } }
+      const meinTeamVorne = n > 0 && (ts[gewinner] & 1) === (p & 1);
+      for (let f = 0; f < 4; f++) {
+        const m = leg[f];
+        if (!m) continue;
+        const ord = ORDNUNG[eff][f];
+        let letzte = -1, luecke = true;
+        for (let j = 0; j < 9; j++) {
+          const w = ord[j];
+          const k = f * 9 + w;
+          const bit1 = 1 << w;
+          let fremd = false;
+          for (let q = 0; q < 4; q++) if (q !== p && (H[q * 4 + f] & bit1)) { fremd = true; break; }
+          if (!fremd) for (let i = 0; i < n; i++) if (tk[i] === k) { fremd = true; break; }
+          if (fremd) { luecke = true; continue; }
+          if (!(m & bit1)) continue;
+          if (letzte >= 0 && !luecke && gleichePunkte(letzte, k)) continue;
+          letzte = k; luecke = false;
+          // Note für die Reihenfolge
+          let note;
+          if (n === 0) note = STAERKE[eff][k] + (f === T ? 30 : 0);
+          else if (schlaegt(k, bestK, eff)) note = meinTeamVorne ? PUNKTE[eff][k] : 200 - STAERKE[eff][k] + PUNKTE[eff][k];
+          else note = meinTeamVorne ? 100 + PUNKTE[eff][k] : -PUNKTE[eff][k] - STAERKE[eff][k] * 0.01;
+          if (eintrag && eintrag[2] === k) note = 1e6;
+          zuege.push(k); noten.push(note);
+        }
+      }
+      // sortieren (Einfügen, wenige Züge)
+      for (let i = 1; i < zuege.length; i++) {
+        const k = zuege[i], v = noten[i];
+        let j = i - 1;
+        while (j >= 0 && noten[j] < v) { zuege[j + 1] = zuege[j]; noten[j + 1] = noten[j]; j--; }
+        zuege[j + 1] = k; noten[j + 1] = v;
+      }
+      let best = max ? -Infinity : Infinity, bestZug = -1;
+      for (let zi = 0; zi < zuege.length; zi++) {
+        const k = zuege[zi];
+        const f = (k / 9) | 0, w = k % 9;
+        // spielen
+        H[p * 4 + f] &= ~(1 << w);
+        h1 ^= ZOB[(k * 4 + p) * 2]; h2 ^= ZOB[(k * 4 + p) * 2 + 1];
+        tk[n] = k; ts[n] = p; n++;
+        let wert;
+        if (n < 4) {
+          amZug = (p + 1) & 3;
+          wert = suche(alpha, beta, tiefe + 1);
+          amZug = p;
+        } else {
+          let g = 0;
+          for (let i = 1; i < 4; i++) if (schlaegt(tk[i], tk[g], eff)) g = i;
+          const sieger = ts[g];
+          let pk = PUNKTE[eff][tk[0]] + PUNKTE[eff][tk[1]] + PUNKTE[eff][tk[2]] + PUNKTE[eff][tk[3]];
+          if (stichNr === 8) pk += letzter;
+          const c = vz * ((sieger & 1) === 0 ? pk : -pk);
+          const merk0 = tk[0], merk1 = tk[1], merk2 = tk[2], s0 = ts[0], s1 = ts[1], s2 = ts[2];
+          if ((sieger & 1) === 0) z0++; else z1++;
+          n = 0; stichNr++; amZug = sieger;
+          wert = c + suche(alpha - c, beta - c, tiefe + 1);
+          stichNr--; amZug = p; n = 4;
+          if ((sieger & 1) === 0) z0--; else z1--;
+          tk[0] = merk0; tk[1] = merk1; tk[2] = merk2; ts[0] = s0; ts[1] = s1; ts[2] = s2;
+        }
+        // zurück
+        n--;
+        H[p * 4 + f] |= 1 << w;
+        h1 ^= ZOB[(k * 4 + p) * 2]; h2 ^= ZOB[(k * 4 + p) * 2 + 1];
+        if (max) { if (wert > best) { best = wert; bestZug = k; } if (best > alpha) alpha = best; }
+        else { if (wert < best) { best = wert; bestZug = k; } if (best < beta) beta = best; }
+        if (alpha >= beta) break;
+      }
+      if (key >= 0) {
+        const alt = eintrag || [-Infinity, Infinity, -1];
+        let lo = alt[0], hi = alt[1];
+        if (best <= a0) hi = Math.min(hi, best);
+        else if (best >= b0) lo = Math.max(lo, best);
+        else { lo = best; hi = best; }
+        speicher.set(key, [lo, hi, bestZug]);
+      }
+      return best;
+    }
+
+    const vorher = vz * (s.punkte[0] - s.punkte[1]);
+    const wert0 = vorher + suche(-Infinity, Infinity, 0);
+    return meinTeam === 0 ? wert0 : -wert0;
   }
 
   function sichern(s) {
@@ -807,13 +1009,22 @@
     const summe = new Map(legal.map((k) => [k, 0]));
     const meinTeam = team(sitz);
     const info = o.ansageBeachten === false ? null : ansageWissen(spiel, sitz, o.anzeigenBeachten === false ? null : w);
+    // Mit dem schnellen Löser: die Faustregeln spielen nur bis `loesenAb`
+    // Karten übrig sind, den Rest rechnet loese() exakt. Ohne (loeser:
+    // false) wie früher: Faustregeln bis zum Schluss, exakt erst ab exaktAb.
+    const mitLoeser = o.loeser !== false;
+    const loesenAb = o.loesenAb != null ? o.loesenAb : exaktAb;
     for (let i = 0; i < welten; i++) {
       const haende = info ? weltPassend(spiel, sitz, w, rng, info) : welt(spiel, sitz, w, rng);
+      const tt = mitLoeser ? new Map() : null;
       for (const k of legal) {
         const s = simAusSpiel(spiel, haende.map((h) => h.slice()), w);
         simSpiele(s, k);
         let wert;
-        if (restKarten - 1 <= exaktAb) wert = exakt(s, meinTeam, -Infinity, Infinity);
+        if (mitLoeser) {
+          while (s.stichNr < 9 && restIn(s) > loesenAb) simSpiele(s, mittelZug(simAnsicht(s)).karte);
+          wert = loese(s, meinTeam, tt);
+        } else if (restKarten - 1 <= exaktAb) wert = exakt(s, meinTeam, -Infinity, Infinity);
         else { simZuEnde(s); wert = simWert(s, meinTeam); }
         summe.set(k, summe.get(k) + wert);
       }
@@ -1107,13 +1318,28 @@
     // sonst war der Partner (Sitz 2) Vorhand.
     const vorhand = o.geschoben ? 2 : 0;
 
+    // Mit dem Löser (o.loeser): Faustregeln bis o.loesenAb Karten übrig
+    // sind, den Rest exakt – sonst Faustregeln bis zum Schluss.
+    const mitLoeser = !!o.loeser;
+    const loesenAb = o.loesenAb != null ? o.loesenAb : 12;
+    const gesamt = 152 + (r.letzterStich || 0);
     function spieleDurch(code, haende, ansager) {
       const ausspieler = r.ausspiel === 'ansager' ? ansager : vorhand;
       const s = simNeu(code, r, haende.map((h) => h.slice()), ausspieler, ansager);
-      simZuEnde(s);
-      let diff = simWert(s, 0);
-      let eigene = code === 'MIS' ? s.punkte[1] : s.punkte[0];
-      if (r.matchBonus && code !== 'MIS' && s.stichZahl[0] === 9) eigene += r.matchPunkte;
+      let diff, eigene;
+      if (mitLoeser) {
+        while (s.stichNr < 9 && restIn(s) > loesenAb) simSpiele(s, mittelZug(simAnsicht(s)).karte);
+        diff = loese(s, 0);
+        const match = r.matchBonus && code !== 'MIS' ? r.matchPunkte : 0;
+        if (match && diff >= gesamt + match) eigene = gesamt + match;
+        else if (match && diff <= -(gesamt + match)) eigene = 0;
+        else eigene = (gesamt + diff) / 2;   // bei Misère: die Punkte der Gegner
+      } else {
+        simZuEnde(s);
+        diff = simWert(s, 0);
+        eigene = code === 'MIS' ? s.punkte[1] : s.punkte[0];
+        if (r.matchBonus && code !== 'MIS' && s.stichZahl[0] === 9) eigene += r.matchPunkte;
+      }
       // Weisen und Stöck gehören zur Ansage dazu.
       if (code !== 'MIS' && (r.weisen || r.stoeck)) {
         const extra = zusatzPunkte(code, haende, r, ausspieler);
@@ -1393,7 +1619,7 @@
     const hand = runde.haende[sitz];
     const darf = J.darfSchieben(runde, spiel.regeln) && sitz === runde.ansager;
     if (stufe !== 'mittel') {
-      const b = bewertung(hand, spiel.regeln, { geschoben: !darf, rng: (optionen && optionen.rng) || J.zufall(J.neuerSeed()) });
+      const b = bewertung(hand, spiel.regeln, { geschoben: !darf, rng: (optionen && optionen.rng) || J.zufall(J.neuerSeed()), loeser: optionen && optionen.ansageLoeser, loesenAb: optionen && optionen.ansageLoesenAb });
       b.schritt((optionen && (optionen.ansage || optionen.welten)) || 80);
       const liste = b.ergebnis();
       return { code: liste[0].code, grund: 'Durchgerechnet.', liste };
@@ -1406,7 +1632,7 @@
     waehleKarte, waehleAnsage, mittelZug, schwerZug, offenBewerten, RECHENTIEFE, rechentiefe, ansichtAus, wissen, welt,
     bewertung, heuristikAnsage, schaetze, faustregel, faustregelTeile, merkmaleTrumpf, merkmaleObe,
     sprechKarte, sprechGrund, sprechSchnitt, sprechAnsage, alleSprechTeile, sprechform,
-    simNeu, simZuEnde, simWert, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
+    simNeu, simZuEnde, simWert, simAusSpiel, simSpiele, exakt, loese, loeserKnotenZaehler: () => loeserKnoten, GEWICHT, SCHIEBEN_SCHWELLE, verwerfKarte, VERWERF_SCHWELLE,
     ansageWissen, passtZurAnsage, passtZumSchieben, passtZumWissen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
