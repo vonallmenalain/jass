@@ -64,6 +64,7 @@
     .stich-zeile.offen .gruende { display: flex; }
     .grund { background: rgba(0,0,0,.2); border-radius: 10px; padding: 6px 8px; }
     .grund .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .grund .annahme { margin-top: 4px; }
     .notiz { background: rgba(254, 121, 113, .1); border: 1px solid rgba(254, 121, 113, .35); border-radius: 10px; padding: 6px 8px; font-size: 13px; }
     .ansage-liste { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
     .marke { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(250, 204, 21, .16); color: #ff9d96; margin-right: 4px; }
@@ -311,7 +312,8 @@
           let werte = '';
           if (z.werte && z.werte.length > 1) werte = `<div class="werte">Durchgerechnet (Ø Punkte Vorsprung): ${z.werte.map((w) => esc(J.kurzName(w.k)) + ' ' + w.w).join(' · ')}</div>`;
           const tipp = z.tipp != null ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : '';
-          return `<div class="grund"><b>${name(z.s)}</b> ${STUFE[z.stufe] || ''} spielt ${esc(J.kartenName(z.k, code))}${tipp}${z.grund ? '<br>' + esc(z.grund) : ''}${werte}</div>`;
+          const annahmen = V.annahmenText(z, (s) => p.spieler[s].name, code).map((t) => `<div class="annahme">${esc(t)}</div>`).join('');
+          return `<div class="grund"><b>${name(z.s)}</b> ${STUFE[z.stufe] || ''} spielt ${esc(J.kartenName(z.k, code))}${tipp}${z.grund ? '<br>' + esc(z.grund) : ''}${annahmen}${werte}</div>`;
         }).join('');
         return `<div class="stich-zeile ${markiert.length ? 'markiert offen' : ''}" data-stich="${i}">
           <div class="stich-kopf"><b>Stich ${i + 1}</b><span>${fertig ? name(zuege[gi].s) + ' · ' + punkte + ' Punkte' : 'nicht fertig'}</span></div>

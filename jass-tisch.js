@@ -399,15 +399,16 @@
     el('tipp').addEventListener('click', async () => {
       if (z.eingabe === 'ansage') { tippAnsage(); return; }
       if (!meinKartenZug() || tippLaeuft) return;
-      // Der Tipp rechnet wie ein Computer-Zug (bis 2 s) – im Hintergrund.
+      // Der Tipp rechnet wie ein Computer-Zug (etwa 2 s) – im Hintergrund.
       tippLaeuft = true;
       kommentar('💡 …');
       let t = null;
       const stich = z.spiel.runde.stichNr * 4 + z.spiel.runde.stich.length;
+      const opt = Object.assign({ menschen: [0, 1, 2, 3].filter((s) => z.spieler[s] && z.spieler[s].typ === 'mensch') }, B.rechentiefe(anzeige().rechnen));
       try {
         t = o.tippKarte ? await o.tippKarte()
-          : root.JassRechner ? await root.JassRechner.tipp(z.spiel, z.ansichtSitz, B.rechentiefe(anzeige().rechnen))
-            : B.schwerZug(z.spiel, z.ansichtSitz, B.rechentiefe(anzeige().rechnen));
+          : root.JassRechner ? await root.JassRechner.tipp(z.spiel, z.ansichtSitz, opt)
+            : B.schwerZug(z.spiel, z.ansichtSitz, opt);
       } finally { tippLaeuft = false; }
       // inzwischen weitergespielt? Dann gilt der Tipp nicht mehr.
       if (!t || !meinKartenZug() || z.spiel.runde.stichNr * 4 + z.spiel.runde.stich.length !== stich) { kommentar(''); return; }

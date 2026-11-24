@@ -540,6 +540,7 @@ details.abschnitt .inhalt { padding-bottom: 12px; display: flex; flex-direction:
 .hist-karten figure.sieger figcaption { color: #ff9d96; font-weight: 800; }
 .gedanke { background: rgba(0,0,0,.2); border-radius: 10px; padding: 6px 9px; font-size: 13.5px; line-height: 1.4; }
 .gedanke .werte { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.gedanke .annahme { margin-top: 4px; }
 [data-jetzt] { scroll-margin: 12px; }
 
 

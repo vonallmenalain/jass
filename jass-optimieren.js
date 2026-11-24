@@ -49,6 +49,8 @@
       const e = { s, k, stich: spiel.runde.stichNr, stufe: 'schwer' };
       if (z.grund) e.grund = z.grund;
       if (z.werte && z.werte.length > 1) e.werte = z.werte.slice(0, 9).map((w) => ({ k: w.karte, w: Math.round(w.wert * 10) / 10 }));
+      if (z.annahmen && z.annahmen.length) e.annahmen = z.annahmen;
+      if (z.ohne != null) e.ohne = z.ohne;
       zuege.push(e);
       J.spiele(spiel, s, k);
       if (beiZug) beiZug(zuege.length);

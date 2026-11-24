@@ -452,3 +452,58 @@ test('Ausspiel des Schiebers bei Obenabe: zuerst alle Asse – kommt keins, hat 
   const w = B.wissen(sp3, 2);
   assert.deepEqual([8, 17, 26, 35].map((k) => w.nicht[0][k]), [1, 1, 1, 1]);
 });
+
+test('Annahmen: was der Computer aus den Zügen der anderen abliest', () => {
+  const regeln = J.regelnMitStandard();
+  let gefunden = 0;
+  for (let i = 0; i < 3 && gefunden < 3; i++) {
+    const spiel = J.neuesSpiel(regeln, { seed: 777000 + i, ersterAnsager: 0 });
+    J.ansagen(spiel, J.MODUS_REIHENFOLGE[0]);
+    const r = spiel.runde;
+    const rng = J.zufall(i + 1);
+    while (r.phase === 'spiel') {
+      const s = r.amZug;
+      const z = B.schwerZug(spiel, s, { rng, welten: 40, loesenAb: 12, schaetzung: true, menschen: [0], gegenprobeWelten: 20 });
+      if (z.annahmen) {
+        gefunden++;
+        assert.ok(z.annahmen.length >= 1 && z.annahmen.length <= 2);
+        for (const a of z.annahmen) {
+          assert.notEqual(a.s, s, 'nur über andere');
+          assert.ok(['hoch', 'nichtHoch', 'leer'].includes(a.art));
+          assert.ok(a.p >= 0 && a.p <= 100 && a.v >= 0 && a.v <= 100);
+          if (a.art === 'leer') assert.ok(a.farbe >= 0 && a.farbe < 4); else assert.ok(a.karte >= 0 && a.karte < 36);
+          if (a.zug) assert.ok(['angespielt', 'zugegeben', 'gestochen', 'abgeworfen', 'geschmiert'].includes(a.zug.wie));
+        }
+        if (z.ohne != null) assert.notEqual(z.ohne, z.karte);
+      }
+      J.spiele(spiel, s, z.karte);
+    }
+  }
+  assert.ok(gefunden >= 1, 'mindestens eine Annahme in drei Runden');
+});
+
+test('Annahmen lassen sich abschalten', () => {
+  const spiel = J.neuesSpiel(J.regelnMitStandard(), { seed: 777000, ersterAnsager: 0 });
+  J.ansagen(spiel, J.MODUS_REIHENFOLGE[0]);
+  const r = spiel.runde;
+  const rng = J.zufall(5);
+  while (r.phase === 'spiel') {
+    const s = r.amZug;
+    const z = B.schwerZug(spiel, s, { rng, welten: 20, loesenAb: 12, schaetzung: true, annahmen: false });
+    assert.equal(z.annahmen, undefined);
+    J.spiele(spiel, s, z.karte);
+  }
+});
+
+test('Kartenschätzung: Menschen lesen sich stärker nach den Konventionen', () => {
+  const regeln = J.regelnMitStandard();
+  const gespielt = new Uint8Array(36);
+  // Schaufel ist Trumpf und schon gezogen; jetzt spielt jemand Herz an.
+  for (const k of [karte(S, WB), karte(S, W9), karte(S, WA), karte(S, W6), karte(S, W7), karte(S, W8), karte(S, W10), karte(S, WD)]) gespielt[k] = 1;
+  const lage = { code: 'T0', stichNr: 2, stich: [], stichSitze: [], sitz: 1, gespielt, abgeworfen: 0 };
+  const stark = [karte(H, W6), karte(H, WK), karte(H, WA), karte(K, W7), karte(E, W8), karte(E, W9), karte(K, W8)];
+  const lp = (gw) => B.zugLogWahrscheinlichkeit(karte(H, W6), stark, lage, regeln, gw, new Float64Array(B.MERKMALE.length));
+  const computer = lp(B.ZUG_GEWICHTE), mensch = lp(B.menschGewichte(B.ZUG_GEWICHTE));
+  // tief anziehen aus der starken Farbe: beim Menschen wahrscheinlicher
+  assert.ok(mensch > computer, `Mensch ${mensch.toFixed(2)} > Computer ${computer.toFixed(2)}`);
+});
