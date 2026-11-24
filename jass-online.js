@@ -894,15 +894,20 @@ function planeHost() {
   hostTimer = setTimeout(() => computerZug(n, 'schwer', stand), warte);
 }
 
-function computerZug(n, stufe, stand) {
+async function computerZug(n, stufe, stand) {
   if (!istHost || log.length !== stand || !spiel) return;
   const jetzt = P.naechster(spiel);
   if (jetzt.art !== n.art || jetzt.sitz !== n.sitz) return;
+  // im Hintergrund rechnen (jass-rechner.js); danach prüfen, ob die Lage noch gilt
+  const R = window.JassRechner;
+  const nochGleich = () => istHost && log.length === stand && spiel && P.naechster(spiel).art === n.art && P.naechster(spiel).sitz === n.sitz;
   if (n.art === 'ansage') {
-    const w = B.waehleAnsage(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
+    const w = R ? await R.ansage(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen)) : B.waehleAnsage(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
+    if (!nochGleich()) return;
     schreibe(w.code === 'SCHIEBEN' ? { t: 'p', s: n.sitz } : { t: 'a', s: n.sitz, c: w.code });
   } else {
-    const z = B.waehleKarte(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
+    const z = R ? await R.zug(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen)) : B.waehleKarte(spiel, n.sitz, stufe, B.rechentiefe(anzeige.rechnen));
+    if (!nochGleich()) return;
     schreibe(P.kartenEreignis(spiel, n.sitz, z.karte));
   }
 }

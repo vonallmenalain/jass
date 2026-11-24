@@ -259,7 +259,9 @@ test('Gleichwertige Karten, aber der König ist noch draussen: kein «Stich sich
     const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 0 });
     J.ansagen(spiel, 'T3');
     for (const [s, k] of zuege) J.spiele(spiel, s, k);
-    const z = B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120 });
+    // Der Text: mit dem bisherigen Rechenweg (ohne Löser), der hier Bauer
+    // oder Dame wählt – mit dem Löser kommt das Ass (Test unten).
+    const z = B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120, loeser: false });
     if (z.karte === karte(S, WB) || z.karte === karte(S, WD)) {
       gesehen++;
       assert.equal(z.karte, karte(S, WD), 'die höhere der beiden');
@@ -268,6 +270,50 @@ test('Gleichwertige Karten, aber der König ist noch draussen: kein «Stich sich
     }
   }
   assert.ok(gesehen > 0, 'Bauer oder Dame mindestens einmal gewählt');
+});
+
+test('Mit dem Löser: Ass vor Dame, wenn der König noch draussen ist (Partie mit Notiz)', () => {
+  // Zu Ende gespielt bringt das Ass zuerst +5,7 ± 0,7 Punkte gegenüber der
+  // Dame (werkzeuge/stelle-nachrechnen.js); die alte Rechnung sah die Dame vorn.
+  const regeln = J.regelnMitStandard();
+  const haende = [[0, 2, 27, 31, 29, 14, 11, 32, 13], [3, 12, 35, 23, 10, 34, 19, 1, 25], [8, 17, 15, 26, 5, 9, 24, 30, 6], [33, 16, 18, 7, 4, 21, 22, 28, 20]];
+  const zuege = [[0, 32], [1, 34], [2, 30], [3, 28], [0, 27], [1, 35], [2, 9], [3, 33], [1, 10], [2, 15], [3, 16], [0, 11], [3, 22], [0, 31], [1, 19], [2, 24], [0, 14], [1, 12], [2, 17], [3, 18]];
+  let ass = 0;
+  for (let i = 0; i < 4; i++) {
+    const spiel = J.neuesSpiel(regeln, { haende: haende.map((h) => h.slice()), ersterAnsager: 0 });
+    J.ansagen(spiel, 'T3');
+    for (const [s, k] of zuege) J.spiele(spiel, s, k);
+    if (B.schwerZug(spiel, 2, { rng: J.zufall(700 + i), welten: 120 }).karte === karte(S, WA)) ass++;
+  }
+  assert.ok(ass >= 3, 'Schaufel Ass in ' + ass + ' von 4');
+});
+
+test('König verlangen (Obenabe): Ass, wo der König fehlt – Partner gibt ihn – sonst hat er ihn nicht', () => {
+  const regeln = J.regelnMitStandard();
+  const k = karte;
+  // Du: Herz Ass und Dame ohne König; Ben (2): Herz König
+  const h0 = [k(H, WA), k(H, WD), k(H, W7), k(S, WA), k(S, WK), k(K, WA), k(K, W9), k(E, WA), k(E, W8)];
+  const h2 = [k(H, WK), k(H, W6), k(S, W6), k(S, W7), k(K, W6), k(K, W7), k(E, W6), k(E, W7), k(E, W9)];
+  const rest = [];
+  for (let x = 0; x < 36; x++) if (!h0.includes(x) && !h2.includes(x)) rest.push(x);
+  const opt = (i) => ({ rng: J.zufall(i), welten: 40, loesenAb: 12, koenigVerlangen: true, verlangenSchwelle: 1000 });
+  const spiel = J.neuesSpiel(regeln, { haende: [h0, rest.slice(0, 9), h2, rest.slice(9, 18)], ersterAnsager: 0 });
+  J.ansagen(spiel, 'OBE');
+  const a = B.schwerZug(spiel, 0, opt(1));
+  assert.equal(a.karte, k(H, WA), 'das Herz-Ass, wo der König fehlt');
+  assert.match(a.grund, /König fehlt/);
+  J.spiele(spiel, 0, a.karte);
+  J.spiele(spiel, 1, J.erlaubteFuer(spiel, 1)[0]);
+  const b = B.schwerZug(spiel, 2, opt(2));
+  assert.equal(b.karte, k(H, WK), 'Ben gibt den König');
+  // Lesen: Gibt der Partner eine andere Herz, hat er den König nicht.
+  const spiel2 = J.neuesSpiel(regeln, { haende: [h0.slice(), rest.slice(0, 9), [k(H, W8)].concat(h2.slice(1)), rest.slice(9, 17).concat(k(H, WK))], ersterAnsager: 0 });
+  J.ansagen(spiel2, 'OBE');
+  J.spiele(spiel2, 0, k(H, WA));
+  J.spiele(spiel2, 1, J.erlaubteFuer(spiel2, 1)[0]);
+  J.spiele(spiel2, 2, k(H, W8));
+  const w = B.wissen(spiel2, 0, { verlangen: true });
+  assert.equal(w.nicht[2][k(H, WK)], 1, 'Ben hat den Herz-König nicht');
 });
 
 test('Den letzten Trumpf holen: nur wenn genau ein Trumpf draussen ist', () => {
