@@ -55,7 +55,7 @@
 <body>
   <div class="app" style="--max: 820px">
     <div class="topbar">
-      <a class="icon-btn" href="training.html" aria-label="Zurück">←</a>
+      <a class="icon-btn" href="index.html" aria-label="Zurück">←</a>
       <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Stiche zählen</h1></div>
       <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
     </div>
@@ -218,7 +218,7 @@
       $('dialogInhalt').innerHTML = `<div class="ergebnis-titel" data-vorlesen>${serie.richtig === serie.laenge ? '🏆' : '⭐'} ${serie.richtig} von ${serie.laenge} richtig</div>
         ${neu ? '<p style="text-align:center;color:#ff9d96;font-weight:800">Neuer Rekord!</p>' : ''}
         <button class="btn btn-voll" type="button" id="nochmal">Nochmals</button>
-        <a class="btn-ghost btn-voll" href="training.html">Andere Übung</a>`;
+        <a class="btn-ghost btn-voll" href="index.html">Andere Übung</a>`;
       $('dialogInhalt').querySelector('.ergebnis-titel').dataset.sprechen = JSON.stringify(S.zaehlenErgebnis(serie.richtig, serie.laenge, neu));
       $('dialog').classList.add('offen');
       $('nochmal').addEventListener('click', () => { $('dialog').classList.remove('offen'); neueSerie(); });
