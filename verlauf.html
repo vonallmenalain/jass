@@ -122,6 +122,7 @@
     const PARAMS = new URLSearchParams(location.search);
     const ZURUECK = { spiel: 'jass-spiel.html', trainer: 'trumpf-trainer.html?zurueck=1', trainerstart: 'trumpf-trainer.html', helfer: 'trumpf-helfer.html', training: 'training.html' };
     const vomHelfer = (p) => !!(p && p.trainer && p.trainer.art === 'helfer');
+    const vonQuick = (p) => !!(p && p.trainer && p.trainer.art === 'quick');
     if (ZURUECK[PARAMS.get('von')]) $('zurueckLink').href = ZURUECK[PARAMS.get('von')];
     let filter = ['spiel', 'trainer'].includes(PARAMS.get('quelle')) ? PARAMS.get('quelle') : 'alle';
 
@@ -162,7 +163,7 @@
           const trainer = V.quelleVon(p) === 'trainer';
           const r0 = p.runden[0];
           const was = trainer
-            ? `<span class="marke">${vomHelfer(p) ? '🃏 Helfer' : '🎯 Trainer'}</span>` + (r0 && r0.code && J.MODI[r0.code] ? esc(J.MODI[r0.code].lang) + ' · ' : '') + (p.trainer && p.trainer.wahl ? 'deine Wahl ' + esc(modusName(p.trainer.wahl)) : 'eine Runde')
+            ? `<span class="marke">${vomHelfer(p) ? '🃏 Helfer' : vonQuick(p) ? '⚡ Quick Trumpf' : '🎯 Trainer'}</span>` + (r0 && r0.code && J.MODI[r0.code] ? esc(J.MODI[r0.code].lang) + ' · ' : '') + (p.trainer && p.trainer.wahl ? 'deine Wahl ' + esc(modusName(p.trainer.wahl)) : 'eine Runde')
             : `${esc(teamName(p, 0))} gegen ${esc(teamName(p, 1))} · ${p.runden.length} ${p.runden.length === 1 ? 'Runde' : 'Runden'}`;
           return `<button class="btn-ghost partie-zeile" type="button" data-id="${esc(p.id)}">
             <span class="oben"><span>${esc(datum(p.start))}</span><span>${esc(stand)}</span></span>
@@ -228,7 +229,7 @@
       $('ansicht').hidden = false;
       zeigeAuswahl();
       $('titel').textContent = datum(p.start);
-      $('eyebrow').textContent = p.optimiertVon ? 'Optimiert' : V.quelleVon(p) === 'trainer' ? (vomHelfer(p) ? 'Trumpf-Helfer' : 'Trumpf-Trainer') : 'Gegen Computer';
+      $('eyebrow').textContent = p.optimiertVon ? 'Optimiert' : V.quelleVon(p) === 'trainer' ? (vomHelfer(p) ? 'Trumpf-Helfer' : vonQuick(p) ? 'Quick Trumpf' : 'Trumpf-Trainer') : 'Gegen Computer';
       zeichneAnsicht();
       window.scrollTo(0, 0);
     }
@@ -276,7 +277,7 @@
           <p class="muted">${wie}.</p>`;
       } else if (!p.ende) ergebnis = '<p class="muted">Die Hand wurde nicht fertig gespielt.</p>';
       return `<div class="panel stack">
-        <h2>${vomHelfer(p) ? '🃏 Trumpf-Helfer' : '🎯 Trumpf-Trainer'}</h2>
+        <h2>${vomHelfer(p) ? '🃏 Trumpf-Helfer' : vonQuick(p) ? '⚡ Quick Trumpf' : '🎯 Trumpf-Trainer'}</h2>
         <p class="muted klein">${t.nr ? 'Hand ' + t.nr + (t.laenge ? ' von ' + t.laenge : '') + ' · ' : ''}${lage}${t.wahl ? ' · deine Wahl im Trainer: <b>' + esc(modusName(t.wahl)) + '</b>' : ''}</p>
         ${werte.length ? `<p class="muted klein">Ø Punkte je Ansage</p><div class="trainer-werte">${werte.map(zeile).join('')}</div>` : ''}
         ${ergebnis}

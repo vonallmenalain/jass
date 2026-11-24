@@ -141,10 +141,15 @@
     const trainerModus = new URLSearchParams(location.search).get('trainer') === '1';
     if (trainerModus) anzeige.gedanken = true;
     // Woher die Hand kam: Trumpf-Trainer (Standard) oder Trumpf-Helfer.
-    const vomHelfer = trainerModus && new URLSearchParams(location.search).get('zurueck') === 'helfer';
+    // Oder aus dem Quick Trumpf der Startseite (zurueck=start).
+    const zurueckNach = trainerModus ? new URLSearchParams(location.search).get('zurueck') : null;
+    const vomHelfer = zurueckNach === 'helfer';
+    const vomStart = zurueckNach === 'start';
     const ZIEL = vomHelfer
       ? { text: 'Zurück zum Trumpf-Helfer', ergebnis: 'jass-helfer-ergebnis', fertig: 'trumpf-helfer.html?ausgespielt=1', abbruch: 'trumpf-helfer.html' }
-      : { text: 'Zurück zum Trainer', ergebnis: 'jass-trainer-ergebnis', fertig: 'trumpf-trainer.html?ausgespielt=1', abbruch: 'trumpf-trainer.html?zurueck=1' };
+      : vomStart
+        ? { text: 'Zur Startseite', ergebnis: null, fertig: 'index.html', abbruch: 'index.html' }
+        : { text: 'Zurück zum Trainer', ergebnis: 'jass-trainer-ergebnis', fertig: 'trumpf-trainer.html?ausgespielt=1', abbruch: 'trumpf-trainer.html?zurueck=1' };
     let spiel = null;
     let partie = null;        // die Aufzeichnung (jass-verlauf.js)
     let letzterTipp = null;   // welche Karte der Tipp zuletzt vorschlug
@@ -436,7 +441,7 @@
         hand: r.startHaende[0].slice(), code: ab.code, geschoben: ab.geschoben, vorhand: ab.ansager,
         angesagtVon: ab.angesagtVon, punkte: spiel.summe[0], gegner: spiel.summe[1], partieId: partie && partie.id,
       };
-      E.schreibe(ZIEL.ergebnis, ergebnis);
+      if (ZIEL.ergebnis) E.schreibe(ZIEL.ergebnis, ergebnis);
       location.href = ZIEL.fertig;
     }
 
@@ -504,6 +509,12 @@
     // Verlauf neben dem Spiel sieht.
     function trainerInfo(hand, geschoben) {
       const gleicheHand = (x) => Array.isArray(x) && x.length === 9 && x.slice().sort().join() === hand.slice().sort().join();
+      if (vomStart) {
+        const q = E.lese('jass-quick-v1');
+        const info = { art: 'quick', geschoben: !!geschoben };
+        if (q && gleicheHand(q.hand) && Array.isArray(q.werte)) { info.werte = q.werte; info.n = q.n; info.wahl = q.wahl; }
+        return info;
+      }
       if (vomHelfer) {
         const h = E.lese('jass-lernen-helfer-v1');
         const info = { art: 'helfer', geschoben: !!geschoben };
@@ -541,7 +552,18 @@
           V.ansage(partie, spiel.runde, 2, 'SCHIEBEN', { stufe: spieler[2].typ, grund: 'Aus dem Trumpf-Trainer: geschoben' });
           J.schieben(spiel);
         }
-        history.replaceState(null, '', location.pathname + (trainerModus ? '?trainer=1' + (vomHelfer ? '&zurueck=helfer' : '') : ''));
+        // Quick Trumpf: die gewählte Ansage (oder Schieben) ist schon gemacht.
+        const ansage = params.get('ansage');
+        if (ansage && spiel.runde.phase === 'ansage' && J.ansageAmZug(spiel.runde) === 0) {
+          if (ansage === 'SCHIEBEN' && J.darfSchieben(spiel.runde, spiel.regeln)) {
+            V.ansage(partie, spiel.runde, 0, 'SCHIEBEN', { stufe: 'mensch' });
+            J.schieben(spiel);
+          } else if (J.erlaubteModi(spiel.regeln).includes(ansage)) {
+            V.ansage(partie, spiel.runde, 0, ansage, { stufe: 'mensch' });
+            J.ansagen(spiel, ansage);
+          }
+        }
+        history.replaceState(null, '', location.pathname + (trainerModus ? '?trainer=1' + (zurueckNach ? '&zurueck=' + zurueckNach : '') : ''));
         speichere();
         starteTisch();
       }
