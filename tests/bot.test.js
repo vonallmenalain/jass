@@ -72,6 +72,7 @@ test('Bewertung kennt Schieben nur, wenn erlaubt', () => {
   assert.ok(B.bewertung(hand, {}, {}).optionen.includes('SCHIEBEN'));
   assert.ok(!B.bewertung(hand, {}, { geschoben: true }).optionen.includes('SCHIEBEN'));
   assert.ok(!B.bewertung(hand, { schieben: false }, {}).optionen.includes('SCHIEBEN'));
+  assert.ok(!B.bewertung(hand, {}, { ohneSchieben: true }).optionen.includes('SCHIEBEN'));
 });
 
 test('Schmieren: Partner sticht sicher, also Punkte zugeben', () => {

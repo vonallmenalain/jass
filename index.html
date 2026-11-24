@@ -118,7 +118,6 @@
       font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px;
     }
     .quick-wahl button .farbzeichen { width: 22px; height: 22px; }
-    .quick-wahl button.schieben { background: var(--flaeche-2); color: var(--text); border-color: var(--linie); }
     .quick-wahl button:disabled { cursor: default; opacity: .45; }
     .quick-wahl button.meine { opacity: 1; border-color: #facc15; }
     .quick-wahl button.beste { opacity: 1; border-color: #4ade80; }
@@ -270,10 +269,11 @@
   <script src="jass-karten.js"></script>
   <script src="jass-einstellungen.js"></script>
   <script>
-    // Quick Trumpf: neun zufällige Karten – was trumpfst du? Der Computer
-    // rechnet schon, während man überlegt (gleich wie «Trumpf wählen»), und
-    // zeigt nach der Antwort seine Wahl mit einem kurzen Grund. Abschalten
-    // unter ⚙ (anzeige.quickTrumpf); «Ausblenden» gilt nur bis zum nächsten Besuch.
+    // Quick Trumpf: neun zufällige Karten – was trumpfst du? Ohne Schieben:
+    // Man muss ansagen und spielt als Erster aus (wie mit «Ausspielen»). Der
+    // Computer rechnet schon, während man überlegt (gleich wie «Trumpf
+    // wählen»), und zeigt nach der Antwort seine Wahl mit einem kurzen Grund.
+    // Abschalten unter ⚙ (anzeige.quickTrumpf); ✕ gilt nur bis zum nächsten Besuch.
     (function () {
       const J = window.JassEngine, B = window.JassBot, K = window.JassKarten, E = window.JassEinstellungen;
       if (!J || !B || !K || !E) return;
@@ -284,18 +284,15 @@
       if (K.setzeBild) K.setzeBild(anzeige.kartenbild);
       if (K.setzeFarben) K.setzeFarben(anzeige.farben);
       const box = $('quick');
-      const darfSchieben = !!regeln.schieben;
-      const name = (c) => (c === 'SCHIEBEN' ? 'Schieben' : J.MODI[c].lang);
+      const name = (c) => J.MODI[c].lang;
       const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       let hand = [], liste = null, wahl = null, rechnung = 0;
 
       function zeichneKarten(code) {
-        const T = code && code !== 'SCHIEBEN' ? J.MODI[code].trumpf : -1;
-        const c = code && code !== 'SCHIEBEN' ? code : null;
-        $('quickKarten').innerHTML = J.sortiereHand(hand).map((k) => `<div class="karte">${K.svg(k, { trumpf: J.farbeVon(k) === T, code: c })}</div>`).join('');
+        const T = code ? J.MODI[code].trumpf : -1;
+        $('quickKarten').innerHTML = J.sortiereHand(hand).map((k) => `<div class="karte">${K.svg(k, { trumpf: J.farbeVon(k) === T, code })}</div>`).join('');
       }
       function knopf(c) {
-        if (c === 'SCHIEBEN') return `<button type="button" class="schieben" data-wahl="SCHIEBEN">↔ Schieben</button>`;
         const m = J.MODI[c];
         return m.trumpf >= 0
           ? `<button type="button" data-wahl="${c}" aria-label="${m.lang}">${K.zeichen(m.trumpf)}</button>`
@@ -304,7 +301,7 @@
       function zeichneWahl() {
         const modi = J.erlaubteModi(regeln);
         const farben = modi.filter((c) => J.MODI[c].trumpf >= 0);
-        const andere = modi.filter((c) => J.MODI[c].trumpf < 0).concat(darfSchieben ? ['SCHIEBEN'] : []);
+        const andere = modi.filter((c) => J.MODI[c].trumpf < 0);
         $('quickWahl').innerHTML = [farben, andere].filter((z) => z.length).map((z) => `<div class="zeile">${z.map(knopf).join('')}</div>`).join('');
       }
       function neu() {
@@ -319,7 +316,7 @@
       // gleich wie «Trumpf wählen»: Rechentiefe aus den Einstellungen
       function rechne() {
         const id = ++rechnung;
-        const b = B.bewertung(hand, regeln, { geschoben: !darfSchieben });
+        const b = B.bewertung(hand, regeln, { ohneSchieben: true });
         const ziel = Math.max(200, B.rechentiefe(anzeige.rechnen).ansage * 4);
         const schritt = () => {
           if (id !== rechnung) return;
@@ -347,8 +344,7 @@
         });
         const grund = esc(B.faustregel(hand, beste.code));
         const diff = beste.punkte - meine.punkte;
-        // erwartete Punkte nur bei einer Ansage, nicht beim Schieben
-        const punkte = (x) => (x.code === 'SCHIEBEN' ? '' : ` (Ø ${Math.round(x.punkte)} Punkte)`);
+        const punkte = (x) => ` (Ø ${Math.round(x.punkte)} Punkte)`;
         $('quickErgebnis').innerHTML = meine === beste
           ? `<p><b>✓ Wie der Computer: ${esc(name(beste.code))}${punkte(beste)}.</b> ${grund}</p>`
           : `<p>Der Computer: <b>${esc(name(beste.code))}</b>${punkte(beste)}. ${grund}</p>

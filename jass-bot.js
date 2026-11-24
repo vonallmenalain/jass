@@ -1934,12 +1934,13 @@
   // Oberfläche zwischendurch zeichnen kann.
   //   hand        die 9 Karten des Ansagers (Sitz 0)
   //   geschoben   true: der Partner hat geschoben, Schieben geht nicht mehr
+  //   ohneSchieben  true: ich muss ansagen und bleibe Vorhand (Quick Trumpf)
   function bewertung(hand, regeln, optionen) {
     const o = optionen || {};
     const r = J.regelnMitStandard(regeln);
     const rng = o.rng || J.zufall(o.seed != null ? o.seed : J.neuerSeed());
     const modi = J.erlaubteModi(r);
-    const darfSchieben = !o.geschoben && r.schieben !== false;
+    const darfSchieben = !o.geschoben && !o.ohneSchieben && r.schieben !== false;
     const optionenListe = darfSchieben ? modi.concat('SCHIEBEN') : modi.slice();
     const summen = new Map(optionenListe.map((c) => [c, { diff: 0, eigene: 0, n: 0 }]));
     const rest = [];
