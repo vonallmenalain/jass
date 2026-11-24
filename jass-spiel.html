@@ -104,7 +104,7 @@
     const KEY_SPIELER = 'jass-lernen-spieler-v1';
     const LAGE = ['Unten', 'Rechts', 'Gegenüber', 'Links'];
     const STANDARD_SPIELER = [
-      { name: 'Du', typ: 'mensch' },
+      { name: 'Spieler', typ: 'mensch' },
       { name: 'Anna', typ: 'schwer' },
       { name: 'Ben', typ: 'schwer' },
       { name: 'Clara', typ: 'schwer' },
@@ -124,6 +124,8 @@
         const x = Object.assign({}, STANDARD_SPIELER[s], (liste || [])[s] || {});
         x.typ = s === 0 ? 'mensch' : 'schwer';
         x.name = String(x.name || STANDARD_SPIELER[s].name).slice(0, 16);
+        // früher hiess man hier «Du» – das verwirrte in den Gedanken
+        if (/^du$/i.test(x.name.trim())) x.name = STANDARD_SPIELER[s].name;
         return x;
       });
     }
@@ -180,10 +182,10 @@
     function gedankeHtml(z, code) {
       const name = esc(spieler[z.s].name);
       const karte = esc(J.kartenName(z.k, code));
-      if (z.stufe === 'mensch') return `<div class="gedanke"><b>${name}</b> ${z.s === 0 ? 'spielst' : 'spielt'} ${karte}${z.tipp != null && z.tipp !== z.k ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : ''}</div>`;
+      if (z.stufe === 'mensch') return `<div class="gedanke"><b>${name}</b> spielt ${karte}${z.tipp != null && z.tipp !== z.k ? ` <span class="muted">(Tipp war ${esc(J.kurzName(z.tipp))})</span>` : ''}</div>`;
       const werte = z.werte && z.werte.length > 1 ? `<div class="werte">Rechnung (Ø Vorsprung): ${z.werte.map((w) => esc(J.kurzName(w.k)) + ' ' + w.w).join(' · ')}</div>` : '';
       const annahmen = V.annahmenText(z, (s) => spieler[s].name, code).map((t) => `<div class="annahme">${esc(t)}</div>`).join('');
-      return `<div class="gedanke"><b>${name}</b> spielt ${karte}${z.grund ? '<br>' + esc(z.grund) : ''}${annahmen}${werte}</div>`;
+      return `<div class="gedanke"><b>${name}</b> spielt ${karte}${z.grund ? '<br>' + esc(V.ichForm(z.grund)) : ''}${annahmen}${werte}</div>`;
     }
     function historieHtml() {
       if (!partie || !spiel || !partie.runden.length) return '<p class="muted">Noch nichts gespielt.</p>';
@@ -195,8 +197,8 @@
         const code = x.code || (aktuell && jetzt.code) || ((x.ansagen.filter((a) => a.wahl !== 'SCHIEBEN').pop() || {}).wahl) || null;
         const ansagen = x.ansagen.map((a) => {
           const mensch = a.stufe === 'mensch';
-          const was = a.wahl === 'SCHIEBEN' ? (a.s === 0 ? 'schiebst' : 'schiebt') : (a.s === 0 ? 'sagst ' : 'sagt ') + esc(J.MODI[a.wahl].lang) + ' an';
-          const gedanke = mensch ? '' : a.wahl === 'SCHIEBEN' ? (a.grund || '') : B.faustregel(x.haende[a.s], a.wahl);
+          const was = a.wahl === 'SCHIEBEN' ? 'schiebt' : 'sagt ' + esc(J.MODI[a.wahl].lang) + ' an';
+          const gedanke = mensch ? '' : a.wahl === 'SCHIEBEN' ? V.ichForm(a.grund || '') : B.faustregel(x.haende[a.s], a.wahl);
           const werte = !mensch && a.werte ? `<div class="werte">Rechnung (Ø Punkte): ${a.werte.map((w) => esc(modusName(w.c)) + ' ' + w.p).join(' · ')}</div>` : '';
           return `<div class="gedanke"><b>${name(a.s)}</b> ${was}${gedanke ? '<br>' + esc(gedanke) : ''}${werte}</div>`;
         }).join('');

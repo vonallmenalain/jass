@@ -193,6 +193,74 @@
     return `jass-markierungen-${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}-${zwei(d.getHours())}${zwei(d.getMinutes())}.json`;
   }
 
+  // ------------------------------------------- Gedanken in der Ich-Form
+
+  // Die Begründungen der Computer sind als Tipp an den Menschen formuliert
+  // («Du hast die Farbe nicht …»). In den Gedanken eines Computers spricht
+  // er von sich: «Ich habe die Farbe nicht …». Unbekanntes bleibt, wie es ist.
+  const ICH_FORM = new Map([
+    ["Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.", "Trumpf ziehen: Ich habe den höchsten Trumpf, der noch im Spiel ist. So hole ich den Gegnern die Trümpfe heraus."],
+    ["Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.", "Trumpf ziehen: Wir haben angesagt und ich habe viele Trümpfe – ich spiele einen kleinen, damit die hohen herauskommen."],
+    ["Du hast nur noch Trümpfe – der höchste macht den Stich sicher.", "Ich habe nur noch Trümpfe – der höchste macht den Stich sicher."],
+    ["Du hast nur noch Trümpfe – spiel den kleinsten.", "Ich habe nur noch Trümpfe – ich spiele den kleinsten."],
+    ["Bock spielen: Diese Karte ist die höchste ihrer Farbe, die noch im Spiel ist – der Stich gehört euch.", "Bock spielen: Diese Karte ist die höchste ihrer Farbe, die noch im Spiel ist – der Stich gehört uns."],
+    ["Dein Partner hat diese Farbe nicht mehr und kann stechen – spiel sie ihm zu.", "Mein Partner hat diese Farbe nicht mehr und kann stechen – ich spiele sie ihm zu."],
+    ["Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe aus und schone deine hohen Karten.", "Kein sicherer Stich: Ich spiele eine tiefe Karte aus meiner längsten Farbe aus und schone meine hohen Karten."],
+    ["Schmieren: Dein Partner macht diesen Stich sicher – gib ihm Punkte mit.", "Schmieren: Mein Partner macht diesen Stich sicher – ich gebe ihm Punkte mit."],
+    ["Dein Partner macht den Stich – du hast keine Punkte zum Schmieren, also gibst du eine tiefe Karte.", "Mein Partner macht den Stich – ich habe keine Punkte zum Schmieren, also gebe ich eine tiefe Karte."],
+    ["Dein Partner liegt vorne, aber nicht sicher – mit deinem Bock sicherst du den Stich ab.", "Mein Partner liegt vorne, aber nicht sicher – mit meinem Bock sichere ich den Stich ab."],
+    ["Dein Partner liegt vorne – gib eine tiefe Karte und hoffe, dass der Stich hält.", "Mein Partner liegt vorne – ich gebe eine tiefe Karte und hoffe, dass der Stich hält."],
+    ["Du bist der Letzte und kannst den Stich machen – nimm ihn.", "Ich spiele zuletzt und kann den Stich machen – ich nehme ihn."],
+    ["Du bist der Letzte: Mit einem Trumpf holst du dir die Punkte im Stich.", "Ich spiele zuletzt: Mit einem Trumpf hole ich mir die Punkte im Stich."],
+    ["Mit deinem Bock übernimmst du den Stich – höher geht es in dieser Farbe nicht mehr.", "Mit meinem Bock übernehme ich den Stich – höher geht es in dieser Farbe nicht mehr."],
+    ["Im Stich liegen viele Punkte – versuch ihn zu übernehmen.", "Im Stich liegen viele Punkte – ich versuche ihn zu übernehmen."],
+    ["Du kannst den Stich nicht billig machen – gib die Karte, die am wenigsten wert ist.", "Ich kann den Stich nicht billig machen – ich gebe die Karte, die am wenigsten wert ist."],
+    ["Du hast die Farbe nicht und kannst den Stich nicht billig machen – wirf eine Karte weg, die wenig wert ist.", "Ich habe die Farbe nicht und kann den Stich nicht billig machen – ich werfe eine Karte weg, die wenig wert ist."],
+    ["Dein Partner hat diese Farbe angezeigt: Er ist dort stark. Spiel sie ihm zurück.", "Mein Partner hat diese Farbe angezeigt: Er ist dort stark. Ich spiele sie ihm zurück."],
+    ["Anzeigen: Spiel eine tiefe Karte der Farbe, in der du stark bist – so weiss dein Partner, was er dir zurückspielen soll.", "Anzeigen: Ich spiele eine tiefe Karte der Farbe, in der ich stark bin – so weiss mein Partner, was er mir zurückspielen soll."],
+    ["Schmieren mit Zeichen: Gib die höchste Karte dieser Farbe – so weiss dein Partner, dass du dort sehr stark bist, und spielt sie dir später zurück.", "Schmieren mit Zeichen: Ich gebe die höchste Karte dieser Farbe – so weiss mein Partner, dass ich dort sehr stark bin, und spielt sie mir später zurück."],
+    ["Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.", "Gleichwertige Karten: Ich spiele die höchste zuerst – so weiss mein Partner, dass der Stich sicher ist."],
+    ["Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.", "Gleichwertige Karten: Ich mache den Stich – ich spiele die höchste, für die Punkte ist es gleich. So weiss mein Partner, dass der Stich sicher ist."],
+    ["Gleichwertige Karten: Für die Punkte ist es gleich – spiel die höhere. Sicher ist der Stich damit aber noch nicht.", "Gleichwertige Karten: Für die Punkte ist es gleich – ich spiele die höhere. Sicher ist der Stich damit aber noch nicht."],
+    ["Den letzten Trumpf holen: Ihr habt angesagt, nur noch ein Trumpf ist draussen, und du hast den höchsten – zieh ihn heraus.", "Den letzten Trumpf holen: Wir haben angesagt, nur noch ein Trumpf ist draussen, und ich habe den höchsten – ich ziehe ihn heraus."],
+    ["Gegnerfarbe meiden: Ein Gegner hat eine Farbe ausgespielt und sucht dort – spiel sie ihm nicht zurück.", "Gegnerfarbe meiden: Ein Gegner hat eine Farbe ausgespielt und sucht dort – ich spiele sie ihm nicht zurück."],
+    ["Obenabe, erster Stich: Spiel das Ass, wo dir der König fehlt – hat ihn dein Partner, gibt er ihn dir darauf.", "Obenabe, erster Stich: Ich spiele das Ass, wo mir der König fehlt – hat ihn mein Partner, gibt er ihn mir darauf."],
+    ["Undenufe, erster Stich: Spiel die Sechs, wo dir die Sieben fehlt – hat sie dein Partner, gibt er sie dir darauf.", "Undenufe, erster Stich: Ich spiele die Sechs, wo mir die Sieben fehlt – hat sie mein Partner, gibt er sie mir darauf."],
+    ["Dein Partner verlangt mit dem Ass den König – gib ihn ihm, dann weiss er, dass die Farbe läuft.", "Mein Partner verlangt mit dem Ass den König – ich gebe ihn ihm, dann weiss er, dass die Farbe läuft."],
+    ["Dein Partner verlangt mit der Sechs die Sieben – gib sie ihm, dann weiss er, dass die Farbe läuft.", "Mein Partner verlangt mit der Sechs die Sieben – ich gebe sie ihm, dann weiss er, dass die Farbe läuft."],
+    ["Du musst deinen Partner übernehmen und machst den Stich selbst – nimm die tiefste Karte, die reicht, und behalte die hohen für später.", "Ich muss meinen Partner übernehmen und mache den Stich selbst – ich nehme die tiefste Karte, die reicht, und behalte die hohen für später."],
+    ["Du musst deinen Partner übernehmen und machst den Stich selbst. Deine Karten sind gleichwertig – spiel die höchste zuerst.", "Ich muss meinen Partner übernehmen und mache den Stich selbst. Meine Karten sind gleichwertig – ich spiele die höchste zuerst."],
+    ["Trumpf ziehen: Dein Partner hat nach deinem Schieben angesagt – spiel im ersten Stich deinen höchsten Trumpf. So weiss er, wie stark du im Trumpf bist: Kommt die Sechs, hast du keinen anderen.", "Trumpf ziehen: Mein Partner hat nach meinem Schieben angesagt – ich spiele im ersten Stich meinen höchsten Trumpf. So weiss er, wie stark ich im Trumpf bin: Kommt die Sechs, habe ich keinen anderen."],
+    ["Dein Partner hat nach deinem Schieben Obenabe angesagt – spiel zuerst alle deine Asse. So weiss er genau, welche du hast: Kommt kein Ass, hast du keines.", "Mein Partner hat nach meinem Schieben Obenabe angesagt – ich spiele zuerst alle meine Asse. So weiss er genau, welche ich habe: Kommt kein Ass, habe ich keines."],
+    ["Dein Partner hat nach deinem Schieben Undenufe angesagt – spiel zuerst alle deine Sechsen. So weiss er genau, welche du hast: Kommt keine Sechs, hast du keine.", "Mein Partner hat nach meinem Schieben Undenufe angesagt – ich spiele zuerst alle meine Sechsen. So weiss er genau, welche ich habe: Kommt keine Sechs, habe ich keine."],
+    ["Wegwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.", "Wegwerfen: Ich habe die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus meiner schwächsten Farbe. So weiss mein Partner, wo ich nichts habe."],
+    ["Misère: Spiel eine tiefe Karte aus, die bestimmt jemand anderes überstechen muss.", "Misère: Ich spiele eine tiefe Karte aus, die bestimmt jemand anderes überstechen muss."],
+    ["Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte weg.", "Misère: Mein Partner hat den Stich – ich werfe eine hohe Karte ohne Punkte weg."],
+    ["Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.", "Misère: Mein Partner hat den Stich – ich werfe eine hohe Karte ohne Punkte weg."],
+    ["Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.", "Misère: Der Gegner bekommt den Stich – ich lade ihm Punkte und hohe Karten auf."],
+    ["Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.", "Misère: Den Stich muss ich nehmen – dann werde ich wenigstens die gefährlichste Karte los."],
+    ["Misère: Du musst überstechen – mit der kleinstmöglichen Karte.", "Misère: Ich muss überstechen – mit der kleinstmöglichen Karte."],
+    ["Du hast die Farbe nicht und kannst den Stich nicht billig machen – verwirf eine Karte, die wenig wert ist.", "Ich habe die Farbe nicht und kann den Stich nicht billig machen – ich werfe eine Karte weg, die wenig wert ist."],
+    ["Verwerfen: Du hast die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus deiner schwächsten Farbe. So weiss dein Partner, wo du nichts hast.", "Wegwerfen: Ich habe die Farbe nicht, und die Rechnung sieht kaum einen Unterschied – also eine tiefe Karte aus meiner schwächsten Farbe. So weiss mein Partner, wo ich nichts habe."],
+    ["Kein sicherer Stich: Spiel eine tiefe Karte aus deiner längsten Farbe an und schone deine hohen Karten.", "Kein sicherer Stich: Ich spiele eine tiefe Karte aus meiner längsten Farbe aus und schone meine hohen Karten."],
+    ["Misère: Spiel eine tiefe Karte an, die bestimmt jemand anderes überstechen muss.", "Misère: Ich spiele eine tiefe Karte aus, die bestimmt jemand anderes überstechen muss."]
+  ]);
+  const ICH_MUSTER = [
+    [/^Du bist der Letzte: Mit einem Trumpf holst du dir (\d+) Punkte\.$/, 'Ich spiele zuletzt: Mit einem Trumpf hole ich mir $1 Punkte.'],
+    [/^(Ich habe (?:\d+|viele) (?:mögliche )?Kartenverteilungen durchgespielt(?:, die zur Ansage passen)?): Mit dieser Karte macht ihr im Schnitt am meisten Punkte\.$/, '$1: Mit dieser Karte machen wir im Schnitt am meisten Punkte.'],
+  ];
+  function ichForm(grund) {
+    if (!grund) return grund;
+    if (ICH_FORM.has(grund)) return ICH_FORM.get(grund);
+    for (const [muster, ersatz] of ICH_MUSTER) if (muster.test(grund)) return grund.replace(muster, ersatz);
+    return grund;
+  }
+
+  // Wer früher «Du» hiess, heisst in der Anzeige «Spieler».
+  function anzeigeName(n) {
+    return /^du$/i.test(String(n || '').trim()) ? 'Spieler' : String(n || '');
+  }
+
   // ------------------------------------------------- Annahmen als Sätze
 
   // Was ein Computer über die anderen annahm (schwerZug: annahmen, ohne) –
@@ -215,10 +283,8 @@
     const J = engine();
     const saetze = [];
     if (!z || !z.annahmen || !z.annahmen.length) return saetze;
-    // Wer in der App «Du» heisst, wird mit du angesprochen.
-    const du = (s) => /^du$/i.test(String(name(s)).trim());
-    const wer = (s) => (du(s) ? 'du' : name(s));
-    const hat = (s) => (du(s) ? 'hast' : 'hat');
+    const wer = (s) => anzeigeName(name(s));
+    const hat = () => 'hat';
     const WIE = { angespielt: 'ausgespielt', zugegeben: 'gespielt', gestochen: 'gestochen', abgeworfen: 'weggeworfen', geschmiert: 'geschmiert', zuerstWeg: 'weggeworfen' };
     const prozent = (p, v) => `(${p}\u00a0% statt ${v}\u00a0%)`;
     // «weil Ben im 6. Stich das Herz-Ass weggeworfen hat» – bei zwei Zügen
@@ -243,7 +309,7 @@
           : `, weil ${teil(gruende[0])} ${wort(gruende[0])} und ${zweiter} ${wort(gruende[1])} ${hat(gruende[0].s)}`;
       }
       if (gruende.length === 2 && wort(gruende[0]) === wort(gruende[1])) {
-        const plural = gruende.some((g) => du(g.s)) ? 'habt' : 'haben';
+        const plural = 'haben';
         return `, weil ${teil(gruende[0])} und ${teil(gruende[1])} ${wort(gruende[0])} ${plural}`;
       }
       return ', weil ' + gruende.map((g) => `${teil(g)} ${wort(g)} ${hat(g.s)}`).join(' und ');
@@ -272,7 +338,7 @@
 
   const api = {
     neu, runde, ansage, karte, rundeFertig, spielFertig, notiz, alle, speichere, lade, loesche, dateiname, istPartie, quelleVon, KEY,
-    annahmenText,
+    annahmenText, ichForm, anzeigeName,
     markierungenOffen, markierungsDatei, markiereHeruntergeladen, markierungsDateiname,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -1286,7 +1286,7 @@ window.JassStimmeDateien = {
   "Mein Tipp: Slalom, undenufe beginnt.": "stimme/ec2c53642620.mp3",
   "Mein Tipp: Undenufe.": "stimme/99844df7c47f.mp3",
   "Misère ist die beste Wahl.": "stimme/036c43cf3796.mp3",
-  "Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte ab.": "stimme/b2f39ca877d7.mp3",
+  "Misère: Dein Partner hat den Stich – wirf eine hohe Karte ohne Punkte weg.": "stimme/0212aef7e38a.mp3",
   "Misère: Den Stich musst du nehmen – dann wenigstens die gefährlichste Karte los werden.": "stimme/4e511d102c68.mp3",
   "Misère: Der Gegner bekommt den Stich – lade ihm Punkte und hohe Karten auf.": "stimme/bdfa8840c3da.mp3",
   "Misère: Du musst überstechen – mit der kleinstmöglichen Karte.": "stimme/0b2ddbbd7067.mp3",

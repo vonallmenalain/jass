@@ -138,6 +138,13 @@ function fehler(html, zurueck) {
   if (b) b.addEventListener('click', () => { verlasseTisch(); zeigeStart(); });
 }
 
+// Der Name aus den Einstellungen (⚙) als Vorschlag, wenn online noch keiner gesetzt ist.
+function eigenerName() {
+  const l = E.lese('jass-lernen-spieler-v1');
+  const n = Array.isArray(l) && l[0] && typeof l[0].name === 'string' ? l[0].name.trim() : '';
+  return /^(du|spieler)?$/i.test(n) ? '' : n.slice(0, 20);
+}
+
 function meinName() {
   return ($('meinName').value || E.lese(KEY_NAME) || '').trim().slice(0, 20);
 }
@@ -172,7 +179,7 @@ signInAnonymously(auth).catch((e) => {
 // -------------------------------------------------------------------- Start
 
 function zeigeStart() {
-  $('meinName').value = E.lese(KEY_NAME) || '';
+  $('meinName').value = E.lese(KEY_NAME) || eigenerName();
   zeichneZuletzt();
   history.replaceState(null, '', location.pathname + (EMULATOR ? '?emulator=1' : ''));
   zeige('start');

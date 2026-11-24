@@ -503,12 +503,18 @@
 
     // Zeigt einen fertigen Stich, lässt ihn liegen und räumt ihn zum
     // Gewinner weg – nach ms, oder mit aufKlick erst, wenn man tippt.
+    // Ein Tipp gilt sofort, abgeräumt wird aber erst, wenn die letzte Karte
+    // hereingeflogen ist (0,28 s) und eine halbe Sekunde lag.
+    const STICH_MINDESTENS = 800;
     async function stichZeigen(eintrag, ms, aufKlick) {
       anzeigeStich = eintrag;
       wartetAufKlick = !!aufKlick;
       zeichne();
-      if (aufKlick) await new Promise((weiter) => { ueberspringen = () => { ueberspringen = null; weiter(); }; });
+      const seit = Date.now();
+      const liegenLassen = () => new Promise((r) => setTimeout(r, Math.max(0, STICH_MINDESTENS - (Date.now() - seit))));
+      if (aufKlick) await new Promise((weiter) => { ueberspringen = () => { ueberspringen = null; liegenLassen().then(weiter); }; });
       else await warte(ms, true);
+      await liegenLassen();
       wartetAufKlick = false;
       const info = el('stichInfo');
       info.classList.remove('weiter');
