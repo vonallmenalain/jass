@@ -1304,10 +1304,6 @@
     const s = new Set(GRUENDE.map(sprechform));
     const add = s.add.bind(s);
     s.add = (x) => add(sprechform(x));
-    for (let k = 0; k < 36; k++) {
-      s.add(sprechKarte(k, null));
-      s.add(sprechKarte(k, 'T' + farbeVon(k)));
-    }
     Object.values(MODUS_TIPP).forEach((x) => s.add(x));
     for (let n = 0; n <= SCHNITT_MAX; n++) s.add(sprechSchnitt(n, false));
     s.add(sprechSchnitt(0, true));

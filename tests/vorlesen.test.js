@@ -28,10 +28,10 @@ test('Text aus HTML: Zeilen, Sätze, keine Knöpfe und keine Bildzeichen', () =>
 });
 
 test('Feste Texte der Seiten werden gefunden', () => {
-  const s = V.statischeSaetze(fs.readFileSync(path.join(WURZEL, 'trumpf-trainer.html'), 'utf8'));
-  assert.ok(s.includes('Trumpf: Puur und drei Trümpfe.'), s.join(' | '));
-  assert.ok(s.includes('Faustregeln'));
-  assert.ok(!s.some((x) => x.includes('${')), 'keine Vorlagen aus <script>');
+  const s = V.statischeSaetze(fs.readFileSync(path.join(WURZEL, 'training.html'), 'utf8'));
+  assert.deepEqual(s, ['Stiche zählen', 'Trumpf wählen', 'Trumpf-Helfer']);
+  const t = V.statischeSaetze(fs.readFileSync(path.join(WURZEL, 'trumpf-trainer.html'), 'utf8'));
+  assert.ok(!t.some((x) => x.includes('${')), 'keine Vorlagen aus <script>');
 });
 
 test('Die Bausteine erzeugen nur Sätze, die alle() kennt', () => {

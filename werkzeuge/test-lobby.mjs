@@ -68,6 +68,8 @@ await papa.seite.click('#eroeffnenBtn');
 await papa.seite.waitForSelector('.code-gross');
 const code = (await papa.seite.textContent('.code-gross')).trim();
 console.log('Tisch', code);
+const aktiv = async (g) => g.seite.evaluate(() => JSON.parse(localStorage.getItem('jass-online-aktiv-v1') || 'null'));
+pruefe(await warteBis(async () => ((await aktiv(papa)) || {}).code === code), 'Startseite kennt Papas laufenden Tisch');
 
 // Mia sieht ihn in der Liste und setzt sich.
 await mia.seite.goto(BASIS + '?emulator=1');
@@ -130,6 +132,7 @@ await papa.seite.click('#schliessenBtn');
 await papa.seite.click('#schliessenJa');
 await papa.seite.waitForSelector('#start:not([hidden])');
 pruefe((await lies(`jass/${code}`)) === null && (await lies(`offen/${code}`)) === null, 'Geschlossen: Tisch und Eintrag gelöscht');
+pruefe((await aktiv(papa)) === null, 'Geschlossen: nicht mehr auf Papas Startseite');
 pruefe((await papa.seite.locator(`#meineTische [data-code="${code}"]`).count()) === 0, 'Papas «Zuletzt» kennt ihn nicht mehr');
 pruefe(await warteBis(async () => /gibt es nicht/.test(await mia.seite.textContent('#fehler'))), 'Mia erfährt, dass es den Tisch nicht mehr gibt');
 pruefe(await warteBis(async () => (await tim.seite.locator(`#offeneTische [data-code="${code}"]`).count()) === 0), 'Tims Liste ist leer');

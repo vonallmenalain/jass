@@ -50,7 +50,7 @@
 <body>
   <div class="app" style="--max: 760px">
     <div class="topbar">
-      <a class="icon-btn" href="jass-spiel.html" aria-label="Zurück" id="zurueckLink">←</a>
+      <a class="icon-btn" href="index.html" aria-label="Zurück" id="zurueckLink">←</a>
       <div class="topbar-titel"><span class="eyebrow" id="eyebrow">Gegen Computer &amp; Trumpf-Trainer</span><h1 id="titel">Gespielte Partien</h1></div>
     </div>
     <section class="stack" id="liste"></section>
@@ -81,7 +81,7 @@
     // Woher man kam: der Pfeil oben führt dorthin zurück. Vom Trumpf-Trainer
     // aus geht es zur Hand, die gerade ausgespielt wurde.
     const PARAMS = new URLSearchParams(location.search);
-    const ZURUECK = { trainer: 'trumpf-trainer.html?zurueck=1', trainerstart: 'trumpf-trainer.html', helfer: 'trumpf-helfer.html', training: 'training.html' };
+    const ZURUECK = { spiel: 'jass-spiel.html', trainer: 'trumpf-trainer.html?zurueck=1', trainerstart: 'trumpf-trainer.html', helfer: 'trumpf-helfer.html', training: 'training.html' };
     const vomHelfer = (p) => !!(p && p.trainer && p.trainer.art === 'helfer');
     if (ZURUECK[PARAMS.get('von')]) $('zurueckLink').href = ZURUECK[PARAMS.get('von')];
     let filter = ['spiel', 'trainer'].includes(PARAMS.get('quelle')) ? PARAMS.get('quelle') : 'alle';

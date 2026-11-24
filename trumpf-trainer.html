@@ -100,15 +100,6 @@
 
     <!-- Start -->
     <section class="panel stack" id="start">
-      <div class="regel-box" data-vorlesen>
-        <h3>Faustregeln</h3>
-        <ul>
-          <li><b>Trumpf:</b> Buur und drei Trümpfe.</li>
-          <li><b>Obenabe:</b> drei Asse.</li>
-          <li><b>Undenufe:</b> viele Sechser und Siebner.</li>
-          <li><b>Schieben:</b> wenn nichts passt.</li>
-        </ul>
-      </div>
       <p class="muted klein" id="startRegeln" hidden></p>
       <div class="reihe">
         <span>Serie:</span>
@@ -323,7 +314,7 @@
         <h3>Ausgespielt</h3>
         <div class="gross">Ihr habt <b>${e.punkte}</b> Punkte gemacht.</div>
         <p class="muted">${wie}${anders}. Im Schnitt wären es ${erwartet == null ? '–' : Math.round(erwartet)} gewesen. ${satz}</p>
-        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=trainer" style="align-self:flex-start" data-verlauf>📜 Gespielte Runde ansehen – Zug für Zug</a>` : ''}
+        ${e.partieId ? `<a class="btn-ghost btn-klein" href="verlauf.html?p=${encodeURIComponent(e.partieId)}&amp;von=trainer" style="align-self:flex-start" data-verlauf>📜 Gespielte Runde</a>` : ''}
       </div>`;
     }
 
