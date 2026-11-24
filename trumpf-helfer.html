@@ -290,7 +290,7 @@
       E.schreibe(KEY, { hand, lage, werte: liste.map((x) => ({ c: x.code, p: Math.round(x.punkte * 10) / 10 })), n: liste[0].n });
       if (verdeckt) {
         $('ergebnis').hidden = false;
-        $('ergebnis').innerHTML = `<p class="muted" style="text-align:center">Was würdest du ansagen? Überleg zuerst – dann aufdecken.</p>
+        $('ergebnis').innerHTML = `<p class="muted" style="text-align:center">Was würdest du ansagen?</p>
           <button class="btn btn-voll" type="button" id="aufdecken">Vorschlag zeigen</button>`;
         $('aufdecken').addEventListener('click', () => { verdeckt = false; zeigeErgebnis(liste); });
         return;
