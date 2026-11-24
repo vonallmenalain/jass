@@ -463,7 +463,8 @@
   // zählt mehr – wer tief Herz anspielt, hat eher den Herz-Bock.
 
   // Gewichte aus werkzeuge/zug-modell.js (in MERKMALE-Reihenfolge).
-  let ZUG_GEWICHTE = null;
+  // (48 Werte, 82 213 Züge aus 3000 Computer-Partien, Treffer 58 % gegen Raten)
+  const ZUG_GEWICHTE = [0, 0, -1.836, -0.19, -1.184, -0.367, 1.076, -0.332, -0.054, 0.946, 0.247, -0.682, 1.314, 1.274, 1.596, 0.489, -0.323, 0.233, 0.344, -0.742, 0.278, 0, 0, 1.651, -0.659, -1.389, 1.435, 1.27, -1.094, 1.089, 0.581, 0.179, 0.203, 2.576, 0.836, -0.376, 0, 0, 1.429, 0.112, 0.091, 0.498, -0.257, 0.26, -0.998, 0.811, 0.008, 2.616];
 
   const MERKMALE = [
     'konstante', 'anspielen', 'trumpf', 'punkte', 'bock', 'einHoeherer', 'hoehereAnteil',
