@@ -31,9 +31,9 @@ test('vorbereiten: RGBA → normierte Kanäle (wie beim Training)', () => {
   assert.ok(Math.abs(t[3] - (1 - 0.456) / 0.224) < 1e-6);   // G von Pixel 2
 });
 
-test('netzGroesse: kurze Seite 320, Vielfache von 32', () => {
-  assert.deepEqual(R.netzGroesse(3072, 4096), { w: 320, h: 416 });
-  assert.deepEqual(R.netzGroesse(4000, 3000), { w: 416, h: 320 });
+test('netzGroesse: kurze Seite 416, Vielfache von 32', () => {
+  assert.deepEqual(R.netzGroesse(3072, 4096), { w: 416, h: 544 });
+  assert.deepEqual(R.netzGroesse(4000, 3000), { w: 544, h: 416 });
   const g = R.netzGroesse(1080, 2400);
   assert.equal(g.w % 32, 0); assert.equal(g.h % 32, 0);
 });

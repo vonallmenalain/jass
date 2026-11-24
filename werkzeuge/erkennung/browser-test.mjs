@@ -6,9 +6,11 @@
 // künstlicher Fächer aus unseren Kartenbildern, die Karten stehen in
 // test-faecher.json). Mit Angabe: eigene Fotos, z. B.
 //   node werkzeuge/erkennung/browser-test.mjs hand.jpg=E10,KB,E6,SB,EB,S8,K6,H9,H6
+// Wo auf dem Foto nicht sicher zu sehen ist, welche Karte es ist, stehen
+// beide zur Wahl: EB|ED.
 // Lädt das Foto im Trumpf-Helfer über «📷 Foto», wartet auf die Erkennung und
 // vergleicht die vorgewählte Hand. Bestanden: insgesamt mindestens 75 % und je
-// Foto höchstens 3 Fehler (an den 12 Handfotos: 88 %). Bildschirmfoto:
+// Foto höchstens 3 Fehler (an den 12 Handfotos: 96 %). Bildschirmfoto:
 // werkzeuge/erkennung/browser-test.png
 import http from 'node:http';
 import fs from 'node:fs';
@@ -24,10 +26,10 @@ const TYPEN = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const F = { S: 0, H: 1, K: 2, E: 3 }, W = { 6: 0, 7: 1, 8: 2, 9: 3, 10: 4, B: 5, D: 6, K: 7, A: 8 };
 const code = (s) => F[s[0]] * 9 + W[s.slice(1)];
 
-let faelle = process.argv.slice(2).map((a) => { const [d, k] = a.split('='); return { datei: d, karten: k.split(',').map(code) }; });
+let faelle = process.argv.slice(2).map((a) => { const [d, k] = a.split('='); return { datei: d, karten: k.split(',').map((x) => x.split('|').map(code)) }; });
 if (!faelle.length) {
   const soll = JSON.parse(fs.readFileSync(path.join(HIER, 'test-faecher.json'), 'utf8'));
-  faelle = [{ datei: path.join(HIER, 'test-faecher.jpg'), karten: soll.karten }];
+  faelle = [{ datei: path.join(HIER, 'test-faecher.jpg'), karten: soll.karten.map((k) => [k]) }];
 }
 
 const server = http.createServer((req, res) => {
@@ -53,7 +55,12 @@ for (const f of faelle) {
   const text = await seite.textContent('#fotoText');
   const hand = await seite.$$eval('#hand [data-weg]', (b) => b.map((x) => Number(x.dataset.weg)));
   const unsicher = await seite.$$eval('#hand .unsicher', (b) => b.map((x) => Number(x.dataset.weg)));
-  const treffer = hand.filter((k) => f.karten.includes(k)).length;
+  const offen = f.karten.map((x) => x.slice());
+  let treffer = 0;
+  for (const k of hand) {
+    const j = offen.findIndex((x) => x.includes(k));
+    if (j >= 0) { offen.splice(j, 1); treffer++; }
+  }
   console.log(`${path.basename(f.datei)}: ${treffer}/${f.karten.length} richtig, ${unsicher.length} unsicher, ${((Date.now() - t0) / 1000).toFixed(1)} s – ${text.trim().slice(0, 60)}`);
   gesamt += treffer; moeglich += f.karten.length;
   if (treffer < f.karten.length - 3) alleOk = false;

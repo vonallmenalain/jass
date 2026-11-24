@@ -65,7 +65,7 @@ def wertung(pred, soll):
             if k in s: richtig += 1; offen.pop(j); break
     return richtig
 @torch.no_grad()
-def echt(netz, groessen=(320, 384)):
+def echt(netz, groessen=tuple(int(x) for x in os.environ.get('PRUEF_GROESSEN', '320,384').split(','))):
     netz.eval(); erg = {}
     for kurz in groessen:
         r = []
@@ -85,12 +85,14 @@ if __name__ == '__main__':
     if len(sys.argv) > 4: netz.load_state_dict(torch.load(sys.argv[4]))
     rück = [p for n, p in netz.named_parameters() if n.startswith('s')]
     rest = [p for n, p in netz.named_parameters() if not n.startswith('s')]
-    opt = torch.optim.AdamW([{'params': rück, 'lr': 6e-4}, {'params': rest, 'lr': 2e-3}], weight_decay=1e-4)
+    # Nachtrainieren (4. Argument = Start-Netz): LR_FAKTOR=0.5 AUFWAERMEN=100
+    lrf = float(os.environ.get('LR_FAKTOR', '1'))
+    opt = torch.optim.AdamW([{'params': rück, 'lr': 6e-4 * lrf}, {'params': rest, 'lr': 2e-3 * lrf}], weight_decay=1e-4)
     basis = [g['lr'] for g in opt.param_groups]
     schritt, t0, verlauf = 0, time.time(), []
     while schritt < schritte:
         for x, ziel, gew in dl:
-            f = min(1, (schritt + 1) / 300) * 0.5 * (1 + math.cos(math.pi * schritt / schritte))
+            f = min(1, (schritt + 1) / int(os.environ.get('AUFWAERMEN', '300'))) * 0.5 * (1 + math.cos(math.pi * schritt / schritte))
             for g, b in zip(opt.param_groups, basis): g['lr'] = b * f
             loss = fokal(netz(x), ziel, gew)
             opt.zero_grad(); loss.backward(); opt.step()
