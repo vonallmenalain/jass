@@ -565,6 +565,31 @@
     return { karte: k, grund: r.code === 'UNE' ? GRUND_SECHSEN_NACH_SCHIEBEN : GRUND_ASSE_NACH_SCHIEBEN };
   }
 
+  // Trumpf weiter ziehen: Das ansagende Team ist am Ausspiel, hält den
+  // höchsten Trumpf, der noch im Spiel ist, und die Gegner können noch
+  // Trumpf haben – dann diesen Trumpf spielen. Die Rechnung (Durchspielen
+  // mit Faustregeln) unterschätzt das Ziehen; gemessen in
+  // werkzeuge/trumpf-weiter.js.
+  function trumpfWeiter(spiel, sitz, legal, w) {
+    const r = spiel.runde;
+    if (r.stich.length || r.stichNr === 0) return null;
+    if (r.angesagtVon !== sitz && r.angesagtVon !== partner(sitz)) return null;
+    const T = MODI[r.code].trumpf;
+    if (T < 0) return null;
+    const eff = effModus(r.code, r.stichNr);
+    const meine = legal.filter((k) => farbeVon(k) === T);
+    if (!meine.length) return null;
+    const hoch = maxNach(meine, (k) => STAERKE[eff][k]);
+    const hand = r.haende[sitz];
+    if (hoehereDraussen(hoch, eff, w.gespielt, hand) > 0) return null;
+    let draussen = 0;
+    for (let k = T * 9; k < T * 9 + 9; k++) if (!w.gespielt[k] && !hand.includes(k)) draussen++;
+    if (!draussen) return null;
+    const leer = (s) => !!(w.leer[s] & bit(T));
+    if (leer((sitz + 1) % 4) && leer((sitz + 3) % 4)) return null;
+    return hoch;
+  }
+
   function wissen(spiel, sitz, optionen) {
     const runde = spiel.runde;
     const gespielt = new Uint8Array(36);
@@ -811,6 +836,12 @@
         return { karte: k, grund: GRUND_TRUMPF_NACH_SCHIEBEN, werte };
       }
     }
+    if (o.trumpfWeiter !== false) {
+      const k = trumpfWeiter(spiel, sitz, legal, w);
+      const x = k != null ? werte.find((y) => y.karte === k) : null;
+      const schwelleT = o.trumpfWeiterSchwelle != null ? o.trumpfWeiterSchwelle : TRUMPF_WEITER_SCHWELLE;
+      if (x && werte[0].wert - x.wert <= schwelleT) return { karte: k, grund: GRUND_TRUMPF_WEITER, werte };
+    }
     // Bei (fast) gleichem Wert die Wahl der Faustregel nehmen.
     let wahl = werte[0];
     const m = werte.find((x) => x.karte === mittel.karte);
@@ -885,6 +916,8 @@
   const VERWERF_SCHWELLE = 2;
   const ZURUECK_SCHWELLE = 2;
   const GLEICH_SCHWELLE = 4;
+  const TRUMPF_WEITER_SCHWELLE = 16;
+  const GRUND_TRUMPF_WEITER = 'Trumpf ziehen: Ihr habt angesagt, du hast den höchsten Trumpf, und die Gegner können noch Trumpf haben – hol ihn heraus.';
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
   const GRUND_GLEICHWERTIG_STICH = 'Gleichwertige Karten: Du machst den Stich – spiel die höchste, für die Punkte ist es gleich. So weiss dein Partner, dass der Stich sicher ist.';
@@ -1291,6 +1324,7 @@
     GRUND_GLEICHWERTIG,
     GRUND_GLEICHWERTIG_STICH,
     GRUND_GLEICHWERTIG_OFFEN,
+    GRUND_TRUMPF_WEITER,
     GRUND_UEBERNEHMEN,
     GRUND_UEBERNEHMEN_GLEICH,
     GRUND_TRUMPF_NACH_SCHIEBEN,
