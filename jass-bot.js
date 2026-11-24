@@ -1210,9 +1210,11 @@
   // meisten); den letzten holen bringt etwas.
   // ohneBock (zum Messen): auch ziehen, wenn man den höchsten Trumpf nicht
   // hat – dann mit dem tiefsten (der Partner hat vielleicht den höchsten).
-  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen, ohneBock) {
+  // nurGeschoben: mehr als einen Trumpf draussen nur nach dem Schieben.
+  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen, ohneBock, nurGeschoben) {
     const r = spiel.runde;
     if (r.stich.length || r.stichNr === 0) return null;
+    if (nurGeschoben && !r.geschoben) maxDraussen = 1;
     if (r.angesagtVon !== sitz && r.angesagtVon !== partner(sitz)) return null;
     const T = MODI[r.code].trumpf;
     if (T < 0) return null;
@@ -1641,7 +1643,7 @@
       }
     }
     if (o.trumpfWeiter !== false) {
-      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1, !!o.trumpfWeiterOhneBock);
+      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1, !!o.trumpfWeiterOhneBock, !!o.trumpfWeiterNurGeschoben);
       const x = k != null ? werte.find((y) => y.karte === k) : null;
       const schwelleT = o.trumpfWeiterSchwelle != null ? o.trumpfWeiterSchwelle : TRUMPF_WEITER_SCHWELLE;
       if (x && werte[0].wert - x.wert <= schwelleT) return fertig({ karte: k, grund: GRUND_TRUMPF_WEITER, werte });

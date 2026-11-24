@@ -15,21 +15,37 @@
 //   immer!     wie immer, aber auch wenn die Rechnung es klar schlechter sieht
 // Ausgabe: Unterschied zu «heute» für das ansagende Team, über alle und über
 // die Spiele, in denen sich etwas geändert hat; dazu nach Schieben getrennt.
+//
+// Ergebnis (24.11.2026, 400 Trumpf-Spiele, Tiefe schnell), geänderte Spiele:
+//   bis2       +1,9 ± 2,5 (39)  · nach Schieben +7,3 ± 3,2 · selbst −3,3 ± 3,4
+//   immerBock  +0,8 ± 2,3 (58)  · nach Schieben +7,3 ± 2,5 · selbst −5,0 ± 3,3
+//   immer      +0,6 ± 1,4 (149) · nach Schieben +4,1 ± 1,9 · selbst −2,1 ± 1,8
+//   immer!     −2,3 ± 1,2 (269) – über alle −1,5 ± 0,8 Punkte pro Spiel
+// Gegenprobe nur nach dem Schieben: --geschoben --varianten bis2S,immerBockS
 const J = require('../jass-engine.js');
 const B = require('../jass-bot.js');
 
-const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const args = process.argv.slice(2).filter((a, i, l) => !a.startsWith('--') && !(i > 0 && l[i - 1] === '--varianten'));
 const [nStr = '50', startStr = '0', tiefe = 'schnell'] = args;
 const N = Number(nStr), START = Number(startStr);
 const T_CODES = ['T0', 'T1', 'T2', 'T3'];
 const regeln = J.regelnMitStandard({ weisen: false, stoeck: false, matchBonus: false, multiplikatoren: false });
-const VARIANTEN = {
+const ALLE_VARIANTEN = {
   heute: {},
   bis2: { trumpfWeiterDraussen: 2 },
   immerBock: { trumpfWeiterDraussen: 9 },
   immer: { trumpfWeiterDraussen: 9, trumpfWeiterOhneBock: true },
   'immer!': { trumpfWeiterDraussen: 9, trumpfWeiterOhneBock: true, trumpfWeiterSchwelle: 1000 },
+  // Gegenprobe: nur nach dem Schieben weiter ziehen
+  bis2S: { trumpfWeiterDraussen: 2, trumpfWeiterNurGeschoben: true },
+  immerBockS: { trumpfWeiterDraussen: 9, trumpfWeiterNurGeschoben: true },
 };
+// --varianten a,b,… wählt aus (Standard: die ersten fünf); --geschoben nimmt
+// nur Verteilungen, in denen nach dem Schieben angesagt wurde.
+const opt = (name) => { const i = process.argv.indexOf('--' + name); return i >= 0 ? process.argv[i + 1] : null; };
+const NUR_GESCHOBEN = process.argv.includes('--geschoben');
+const VARIANTEN = { heute: {} };
+for (const n of (opt('varianten') || 'bis2,immerBock,immer,immer!').split(',')) VARIANTEN[n] = ALLE_VARIANTEN[n];
 
 function spiele(seed, ansage, extra) {
   const spiel = J.neuesSpiel(regeln, { seed: 710000 + seed, ersterAnsager: 0 });
@@ -49,6 +65,7 @@ for (let i = START, gefunden = 0; gefunden < N && i < START + N * 10; i++) {
   const a0 = B.waehleAnsage(spiel, 0, 'schwer', Object.assign({ rng: rngA }, B.rechentiefe('schnell')));
   if (a0.code === 'SCHIEBEN') { ansage.push('SCHIEBEN'); J.schieben(spiel); ansage.push(B.waehleAnsage(spiel, 2, 'schwer', Object.assign({ rng: rngA }, B.rechentiefe('schnell'))).code); } else ansage.push(a0.code);
   if (!T_CODES.includes(ansage[ansage.length - 1])) continue;
+  if (NUR_GESCHOBEN && ansage[0] !== 'SCHIEBEN') continue;
   gefunden++;
   const heute = spiele(i, ansage, VARIANTEN.heute);
   const z = { i, geschoben: ansage[0] === 'SCHIEBEN', heute: heute.punkte, v: {} };
