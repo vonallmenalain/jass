@@ -69,7 +69,7 @@
   <div class="app" style="--max: 720px">
     <div class="topbar">
       <a class="icon-btn" href="index.html" aria-label="Zurück">←</a>
-      <div class="topbar-titel"><span class="eyebrow">Jass lernen</span><h1>Trumpf-Helfer</h1></div>
+      <div class="topbar-titel"><span class="eyebrow">Jass Training</span><h1>Trumpf-Helfer</h1></div>
       <button class="icon-btn" type="button" id="einstellungenBtn" aria-label="Einstellungen">⚙</button>
     </div>
 
@@ -135,6 +135,7 @@
     let hand = Array.isArray(gemerkt.hand) ? gemerkt.hand.filter((k) => k >= 0 && k < 36).slice(0, 9) : [];
     let lage = gemerkt.lage === 'geschoben' ? 'geschoben' : 'vorhand';
     let rechnung = 0;
+    let verdeckt = false;   // nach «Zufall»: Vorschlag erst auf Knopfdruck
     const merke = () => E.schreibe(KEY, { hand, lage });
     // Die zuletzt errechnete Liste – beim Zurückkommen vom Ausspielen nicht
     // neu rechnen, damit der Vergleich zum selben Schnitt passt.
@@ -192,20 +193,24 @@
       if (!b || b.disabled) return;
       const k = Number(b.dataset.karte);
       hand = hand.includes(k) ? hand.filter((x) => x !== k) : hand.concat(k);
+      verdeckt = false;
       alles();
     });
     $('hand').addEventListener('click', (e) => {
       const b = e.target.closest('[data-weg]');
       if (!b) return;
       hand = hand.filter((x) => x !== Number(b.dataset.weg));
+      verdeckt = false;
       alles();
     });
-    $('leeren').addEventListener('click', () => { hand = []; alles(); });
-    // Neun zufällige Karten – und gleich ausrechnen, was man ansagen sollte.
+    $('leeren').addEventListener('click', () => { hand = []; verdeckt = false; alles(); });
+    // Neun zufällige Karten – der Computer rechnet gleich, sein Vorschlag
+    // bleibt aber verdeckt (verdeckt): zuerst selbst überlegen, dann aufdecken.
     $('zufall').addEventListener('click', () => {
       hand = J.mische(Array.from({ length: 36 }, (_, k) => k), Math.random).slice(0, 9);
+      verdeckt = true;
       alles();
-      $('ergebnis').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('hand').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     $('lage').addEventListener('click', (e) => {
       const b = e.target.closest('[data-lage]');
@@ -283,6 +288,13 @@
 
     function zeigeErgebnis(liste) {
       E.schreibe(KEY, { hand, lage, werte: liste.map((x) => ({ c: x.code, p: Math.round(x.punkte * 10) / 10 })), n: liste[0].n });
+      if (verdeckt) {
+        $('ergebnis').hidden = false;
+        $('ergebnis').innerHTML = `<p class="muted" style="text-align:center">Was würdest du ansagen? Überleg zuerst – dann aufdecken.</p>
+          <button class="btn btn-voll" type="button" id="aufdecken">Vorschlag zeigen</button>`;
+        $('aufdecken').addEventListener('click', () => { verdeckt = false; zeigeErgebnis(liste); });
+        return;
+      }
       const beste = liste[0];
       const max = Math.max(...liste.map((x) => x.punkte));
       const min = Math.min(0, ...liste.map((x) => x.punkte));
