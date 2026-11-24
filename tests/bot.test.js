@@ -316,7 +316,7 @@ test('König verlangen (Obenabe): Ass, wo der König fehlt – Partner gibt ihn 
   assert.equal(w.nicht[2][k(H, WK)], 1, 'Ben hat den Herz-König nicht');
 });
 
-test('Den letzten Trumpf holen: nur wenn genau ein Trumpf draussen ist', () => {
+test('Den letzten Trumpf holen; nach dem Schieben weiter Trumpf ziehen', () => {
   // Schaufel Trumpf, Du sagst an und hast Buur, Nell, Ass, König, Dame.
   // Nach dem ersten Stich (Buur, 6, 7, 8) ist nur noch die 10 draussen.
   const regeln = J.regelnMitStandard();
@@ -341,6 +341,21 @@ test('Den letzten Trumpf holen: nur wenn genau ein Trumpf draussen ist', () => {
   J.ansagen(spiel2, 'T0');
   J.spiele(spiel2, 0, 5); J.spiele(spiel2, 1, 0); J.spiele(spiel2, 2, spiel2.runde.haende[2][0]); J.spiele(spiel2, 3, 2);
   assert.doesNotMatch(B.schwerZug(spiel2, 0, opt(1)).grund, /letzten Trumpf/);
+  // Nach dem Schieben (Du schiebst, der Partner sagt an) weiter Trumpf
+  // ziehen, auch mit zwei Trümpfen draussen – hier sähe die Rechnung eine
+  // andere Karte knapp vorne.
+  const geschoben = [[5, 3, 8, 23, 35, 28, 26, 21, 25], [0, 1, 24, 32, 27, 16, 11, 29, 17], [6, 7, 33, 18, 31, 12, 22, 14, 34], [2, 4, 15, 19, 13, 20, 30, 9, 10]];
+  const spiel3 = J.neuesSpiel(regeln, { haende: geschoben, ersterAnsager: 0 });
+  J.schieben(spiel3);
+  J.ansagen(spiel3, 'T0');
+  for (const [s, k] of [[0, 5], [1, 0], [2, 6], [3, 2]]) J.spiele(spiel3, s, k);
+  assert.equal(spiel3.runde.amZug, 0);
+  const opt3 = (extra) => Object.assign({ rng: J.zufall(902), welten: 40 }, extra);
+  const z3 = B.schwerZug(spiel3, 0, opt3({}));
+  assert.equal(z3.karte, karte(S, W9), 'nach dem Schieben mit dem Nell weiter ziehen');
+  assert.match(z3.grund, /^Trumpf ziehen: Du hast den höchsten Trumpf/);
+  // Wie früher nur den letzten Trumpf: die Rechnung entscheidet
+  assert.notEqual(B.schwerZug(spiel3, 0, opt3({ trumpfWeiterDraussen: 1 })).karte, karte(S, W9));
 });
 
 test('Ass schmieren als Zeichen: mit Ass, König, Dame geschmiert – der Partner spielt die Farbe zurück', () => {

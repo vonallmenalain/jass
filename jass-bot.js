@@ -181,7 +181,7 @@
       const gegnerHabenNoch = draussen > 0 && [1, 3].some((i) => !(v.leer[(v.sitz + i) % 4] & bit(T)));
       if (truempfe.length && gegnerHabenNoch && v.angesagtVon >= 0 && team(v.angesagtVon) === meinTeam) {
         const boss = hoechste(truempfe.filter((k) => hoehereDraussen(k, eff, v.gespielt, v.hand) === 0), eff);
-        if (boss != null) return { karte: boss, grund: 'Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.' };
+        if (boss != null) return { karte: boss, grund: GRUND_TRUMPF_ZIEHEN };
         if (truempfe.length >= 3) {
           return { karte: minNach(truempfe, (k) => STAERKE[eff][k]), grund: 'Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.' };
         }
@@ -1202,17 +1202,18 @@
     return { karte: k, grund: r.code === 'UNE' ? GRUND_SECHSEN_NACH_SCHIEBEN : GRUND_ASSE_NACH_SCHIEBEN };
   }
 
-  // Den letzten Trumpf holen: Das ansagende Team ist am Ausspiel, hält den
-  // höchsten Trumpf, der noch im Spiel ist, und draussen ist nur noch ein
-  // Trumpf, den ein Gegner haben kann – dann diesen Trumpf spielen.
-  // Gemessen (werkzeuge/trumpf-weiter.js): Weiter ziehen, solange mehrere
-  // Trümpfe draussen sind, kostet im Schnitt Punkte (nach dem Schieben am
-  // meisten); den letzten holen bringt etwas.
+  // Trumpf ziehen: Das ansagende Team ist am Ausspiel, hält den höchsten
+  // Trumpf, der noch im Spiel ist, und ein Gegner kann noch Trumpf haben –
+  // dann diesen Trumpf spielen. Draussen dürfen höchstens maxDraussen Trümpfe
+  // sein (die beim Partner zählen mit); mit nurGeschoben gilt das nur nach
+  // dem Schieben, sonst nur für den letzten Trumpf.
   // ohneBock (zum Messen): auch ziehen, wenn man den höchsten Trumpf nicht
   // hat – dann mit dem tiefsten (der Partner hat vielleicht den höchsten).
-  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen, ohneBock) {
+  // Gibt { karte, letzter } zurück; letzter: nur noch ein Trumpf draussen.
+  function trumpfWeiter(spiel, sitz, legal, w, maxDraussen, ohneBock, nurGeschoben) {
     const r = spiel.runde;
     if (r.stich.length || r.stichNr === 0) return null;
+    if (nurGeschoben && !r.geschoben) maxDraussen = 1;
     if (r.angesagtVon !== sitz && r.angesagtVon !== partner(sitz)) return null;
     const T = MODI[r.code].trumpf;
     if (T < 0) return null;
@@ -1229,7 +1230,7 @@
     if (!draussen || draussen > maxDraussen) return null;
     const leer = (s) => !!(w.leer[s] & bit(T));
     if (leer((sitz + 1) % 4) && leer((sitz + 3) % 4)) return null;
-    return bock ? hoch : minNach(meine, (k) => STAERKE[eff][k]);
+    return { karte: bock ? hoch : minNach(meine, (k) => STAERKE[eff][k]), letzter: draussen === 1 };
   }
 
   function wissen(spiel, sitz, optionen) {
@@ -1641,10 +1642,13 @@
       }
     }
     if (o.trumpfWeiter !== false) {
-      const k = trumpfWeiter(spiel, sitz, legal, w, o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : 1, !!o.trumpfWeiterOhneBock);
-      const x = k != null ? werte.find((y) => y.karte === k) : null;
+      const tw = trumpfWeiter(spiel, sitz, legal, w,
+        o.trumpfWeiterDraussen != null ? o.trumpfWeiterDraussen : TRUMPF_WEITER_DRAUSSEN,
+        !!o.trumpfWeiterOhneBock,
+        o.trumpfWeiterNurGeschoben != null ? !!o.trumpfWeiterNurGeschoben : TRUMPF_WEITER_NUR_GESCHOBEN);
+      const x = tw ? werte.find((y) => y.karte === tw.karte) : null;
       const schwelleT = o.trumpfWeiterSchwelle != null ? o.trumpfWeiterSchwelle : TRUMPF_WEITER_SCHWELLE;
-      if (x && werte[0].wert - x.wert <= schwelleT) return fertig({ karte: k, grund: GRUND_TRUMPF_WEITER, werte });
+      if (x && werte[0].wert - x.wert <= schwelleT) return fertig({ karte: tw.karte, grund: tw.letzter ? GRUND_TRUMPF_WEITER : GRUND_TRUMPF_ZIEHEN, werte });
     }
     // Bei (fast) gleichem Wert die Wahl der Faustregel nehmen.
     let wahl = werte[0];
@@ -1735,6 +1739,15 @@
   const ZURUECK_SCHWELLE = 2;
   const GLEICH_SCHWELLE = 4;
   const TRUMPF_WEITER_SCHWELLE = 8;
+  // «Lieber einmal mehr Trumpf ziehen» (werkzeuge/trumpf-ziehen-mehr.js):
+  // Nach dem Schieben zieht das ansagende Team weiter Trumpf, solange es den
+  // höchsten hat, egal wie viele draussen sind; nach der eigenen Ansage nur
+  // den letzten. Gemessen an 600 neuen Spielen nach dem Schieben: +0,07 ±
+  // 0,27 Punkte pro Spiel – neutral, als Konvention übernommen. Nach der
+  // eigenen Ansage sah es eher schlechter aus (−5,0 ± 3,3 in den geänderten
+  // Spielen), ohne den höchsten Trumpf und ohne Schwelle klar schlechter.
+  const TRUMPF_WEITER_DRAUSSEN = 9;
+  const TRUMPF_WEITER_NUR_GESCHOBEN = true;
   // Gegnerfarbe meiden. Gemessen (werkzeuge/staerke-duell.js 600
   // "tiefe:schnell,gegnerFarbe:true" "tiefe:schnell,gegnerFarbe:false"):
   // +0,02 ± 0,14 Punkte pro Spiel – neutral, als Konvention übernommen.
@@ -1746,6 +1759,7 @@
   const GRUND_SIEBEN_VERLANGEN = 'Undenufe, erster Stich: Spiel die Sechs, wo dir die Sieben fehlt – hat sie dein Partner, gibt er sie dir darauf.';
   const GRUND_KOENIG_GEBEN = 'Dein Partner verlangt mit dem Ass den König – gib ihn ihm, dann weiss er, dass die Farbe läuft.';
   const GRUND_SIEBEN_GEBEN = 'Dein Partner verlangt mit der Sechs die Sieben – gib sie ihm, dann weiss er, dass die Farbe läuft.';
+  const GRUND_TRUMPF_ZIEHEN = 'Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.';
   const GRUND_TRUMPF_WEITER = 'Den letzten Trumpf holen: Ihr habt angesagt, nur noch ein Trumpf ist draussen, und du hast den höchsten – zieh ihn heraus.';
   const SCHMIER_SCHWELLE = 2;
   const GRUND_GLEICHWERTIG = 'Gleichwertige Karten: Spiel die höchste zuerst – so weiss dein Partner, dass der Stich sicher ist.';
@@ -2144,7 +2158,7 @@
   // (werkzeuge/stimme-google.mjs). Ein Test prüft, dass nichts fehlt.
   const GRUENDE = [
     'Nur diese Karte ist erlaubt.',
-    'Trumpf ziehen: Du hast den höchsten Trumpf, der noch im Spiel ist. So holst du den Gegnern die Trümpfe heraus.',
+    GRUND_TRUMPF_ZIEHEN,
     'Trumpf ziehen: Ihr habt angesagt und du hast viele Trümpfe – spiel einen kleinen, damit die hohen herauskommen.',
     'Du hast nur noch Trümpfe – der höchste macht den Stich sicher.',
     'Du hast nur noch Trümpfe – spiel den kleinsten.',
